@@ -41,11 +41,12 @@ test('payroll uses explicit rate, regular time and immutable revisions',async()=
  assert.equal((await get('manager')).status,403);
  assert.equal((await post({action:'close',expected_revision:0,reviewed:true,reason:'Đối soát tháng'})).status,409);
  for(const user_id of [f.ids.staff,f.ids.other,f.ids.manager])assert.equal((await post({action:'save-input',user_id,hourly_rate:30000,additions:0,deductions:0,note:''})).status,200);
- const d=(await (await get()).json()).data.rows.find(r=>r.id===f.ids.staff);
+ const live=(await (await get()).json()).data,d=live.rows.find(r=>r.id===f.ids.staff);
+ assert.equal(live.attendance_detail.version,1);const detail=live.attendance_detail.records.find(a=>a[0]===f.ids.staff);assert.equal(detail[14],600);assert.equal(detail[15],480);assert.equal(detail[17],60);
  assert.equal(d.regular_minutes,480);assert.equal(d.worked_minutes,600);assert.equal(d.extra_minutes,120);assert.equal(d.estimated_total,240000);
  assert.equal((await post({action:'close',expected_revision:0,reviewed:true,reason:'Đối soát tháng'})).status,201);
  assert.equal((await post({action:'save-input',user_id:f.ids.staff,hourly_rate:40000,additions:0,deductions:0,note:''})).status,200);
- const frozen=(await (await get('admin','&revision=1')).json()).data.rows.find(r=>r.id===f.ids.staff);assert.equal(frozen.estimated_total,240000);
+ const closed=(await (await get('admin','&revision=1')).json()).data,frozen=closed.rows.find(r=>r.id===f.ids.staff);assert.equal(frozen.estimated_total,240000);assert.deepEqual(closed.attendance_detail,live.attendance_detail);
  assert.equal((await post({action:'close',expected_revision:0,reviewed:true,reason:'Đối soát lại'})).status,409);
  assert.equal((await post({action:'close',expected_revision:1,reviewed:true,reason:'Đối soát lại'})).status,201);
  await assert.rejects(f.db.prepare("UPDATE payroll_closings SET reason='Changed' WHERE month=?").bind(month).run(),/PAYROLL_SNAPSHOT_IMMUTABLE/);

@@ -1,6 +1,7 @@
 import {ApiError,dayVN,validDay} from './access.mjs';
 import {readAssignments,summarizeAssignment} from './reports.mjs';
 import {componentsReady,calculatePay} from './payroll-components.mjs';
+import {payrollAttendance} from './payroll-attendance.mjs';
 export function monthBounds(month){
  if(typeof month!=='string'||!/^\d{4}-\d{2}$/.test(month)||!validDay(month+'-01'))throw new ApiError(400,'Chọn tháng hợp lệ');
  const d=new Date(month+'-01T00:00:00Z');d.setUTCMonth(d.getUTCMonth()+1);d.setUTCDate(0);
@@ -18,7 +19,7 @@ export async function payrollDraft(db,actor,month){
   let p=by.get(a.user_id);if(!p){p={id:a.user_id,employee_code:a.employee_code,full_name:a.full_name,department:a.department,active:0,planned_minutes:0,worked_minutes:0,regular_minutes:0,extra_minutes:0,leave_shifts:0,absence_shifts:0,issues:0,pending:0,days:0,shifts:0,work_units:0,overtime_minutes:0,_days:new Set()};by.set(a.user_id,p);}
   if(a.extra_state==='REJECTED')continue;
   if(a.extra_state==='PENDING'||a.request_state==='PENDING'){p.pending++;continue;}
-  const s=summarizeAssignment(a);
+  const s=summarizeAssignment(a,now);
   p.planned_minutes+=Math.floor((a.ends_at-a.starts_at)/60000);
   if(s.leave){p.leave_shifts++;continue;}
   if(!s.days){if(now>a.ends_at){if(!a.in_id&&!a.out_id&&!s.adjusted)p.absence_shifts++;else p.issues++;}continue;}
@@ -30,5 +31,5 @@ export async function payrollDraft(db,actor,month){
   const i=rates.get(p.id),pay=calculatePay(p,i,components.get(p.id));
   const result={...p,days:p._days.size,hourly_rate:i?.hourly_rate??null,note:i?.note??'',...pay};delete result._days;return result;
  });
- return {month,from,to,rows,components_ready,overtime_review_count:rows.filter(r=>r.overtime_review_required).length,work_units:rows.reduce((n,r)=>n+r.work_units,0),overtime_minutes:rows.reduce((n,r)=>n+r.overtime_minutes,0),missing_rates:rows.filter(r=>r.hourly_rate===null).length,pending:rows.reduce((n,r)=>n+r.pending,0),issues:rows.reduce((n,r)=>n+r.issues,0),absences:rows.reduce((n,r)=>n+r.absence_shifts,0),extra_minutes:rows.reduce((n,r)=>n+r.extra_minutes,0),leave_shifts:rows.reduce((n,r)=>n+r.leave_shifts,0),total:rows.reduce((n,r)=>n+(r.estimated_total??0),0),month_ended:to<dayVN(now)&&assignments.every(a=>a.ends_at+43200000<now),computed_at:now};
+ return {month,from,to,rows,attendance_detail:payrollAttendance(assignments,now),components_ready,overtime_review_count:rows.filter(r=>r.overtime_review_required).length,work_units:rows.reduce((n,r)=>n+r.work_units,0),overtime_minutes:rows.reduce((n,r)=>n+r.overtime_minutes,0),missing_rates:rows.filter(r=>r.hourly_rate===null).length,pending:rows.reduce((n,r)=>n+r.pending,0),issues:rows.reduce((n,r)=>n+r.issues,0),absences:rows.reduce((n,r)=>n+r.absence_shifts,0),extra_minutes:rows.reduce((n,r)=>n+r.extra_minutes,0),leave_shifts:rows.reduce((n,r)=>n+r.leave_shifts,0),total:rows.reduce((n,r)=>n+(r.estimated_total??0),0),month_ended:to<dayVN(now)&&assignments.every(a=>a.ends_at+43200000<now),computed_at:now};
 }

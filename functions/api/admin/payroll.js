@@ -48,8 +48,10 @@ export async function onRequestPost({request,env}){
   if(draft.rows.some(r=>r.estimated_total<0))throw new ApiError(409,'Có tổng âm, kiểm tra khoản điều chỉnh');
   const latest=(await snapshots(db,month)).results[0]?.revision??0;
   if(b.expected_revision!==latest)throw new ApiError(409,'Đã có bản chốt khác; tải lại');
-  const revision=latest+1;
-  await db.batch([db.prepare('INSERT INTO payroll_closings(month,revision,snapshot_json,created_by,created_at,reason) VALUES(?,?,?,?,?,?)').bind(month,revision,JSON.stringify(draft),actor.id,Date.now(),reason),managementAudit(db,actor,'payroll',month,'CLOSE',{revision})]);
+  const revision=latest+1,snapshot=JSON.stringify(draft);
+  // Stay below D1's single-value limit; never truncate a closing silently.
+  if(new TextEncoder().encode(snapshot).length>1800000)throw new ApiError(413,'Bản chốt vượt dung lượng lưu an toàn. Cần kiểm tra số ca và cấu hình trước khi chốt.');
+  await db.batch([db.prepare('INSERT INTO payroll_closings(month,revision,snapshot_json,created_by,created_at,reason) VALUES(?,?,?,?,?,?)').bind(month,revision,snapshot,actor.id,Date.now(),reason),managementAudit(db,actor,'payroll',month,'CLOSE',{revision})]);
   return reply({ok:true,revision},201);
  }
  invalid('Thao tác không hợp lệ');

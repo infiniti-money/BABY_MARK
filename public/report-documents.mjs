@@ -1,5 +1,6 @@
 import {createXlsx} from './xlsx.mjs';
 import {componentFields,salaryModes} from './payroll-components.mjs';
+import {payrollSheets} from './payroll-workbook.mjs';
 const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const n=v=>Number.isFinite(v)?v:0,hr=v=>Math.round(n(v)/60*100)/100;
 const stamp=v=>v==null?'':new Date(v+7*3600000).toISOString().slice(0,19).replace('T',' '),day=v=>String(v||'').split('-').reverse().join('/'),money=v=>v==null?'Chưa đặt':v.toLocaleString('vi-VN')+' đ';
@@ -14,7 +15,7 @@ function sum(rows){const days=new Set(),leaves=new Set();let shifts=0,minutes=0,
 function select(kind,data,id){const all=kind==='report'?data.rows:data.data.rows,rows=id?all.filter(r=>(kind==='report'?r.user_id:r.id)===id):all;if(!rows.length)throw Error('Không có dữ liệu để xuất hoặc in.');return rows;}
 export function people(kind,data){return (kind==='report'?group(data.rows).map(g=>g[0]):data.data.rows).map(r=>({id:kind==='report'?r.user_id:r.id,name:r.full_name,code:r.employee_code}));}
 export function workbook(kind,data,id=''){const rows=select(kind,data,id),title=kind==='report'?'BẢNG CÔNG BABY MARK':'BẢNG LƯƠNG BABY MARK',subtitle=kind==='report'?day(data.from)+' – '+day(data.to):data.data.month+' · '+ver(data)+' · '+warning;
- if(kind==='payroll')return createXlsx([{name:'Bảng lương',title,subtitle,headers:ph,rows:rows.map(pr)}]);
+ if(kind==='payroll')return createXlsx(payrollSheets(data,rows,title,subtitle,ph,pr));
  const sheets=[{name:'Tổng hợp nhân viên',title,subtitle,headers:['Mã NV','Họ tên','Ngày đủ công','Ca đủ công','Phút công','Giờ công','Muộn (phút)','Sớm (phút)','Ngày nghỉ duyệt','Công quy đổi','Làm thêm sau ca (phút)'],rows:group(rows).map(g=>[g[0].employee_code,g[0].full_name,...sum(g),g.reduce((v,r)=>v+(r.summary?.work_units??r.summary?.days??0),0),g.reduce((v,r)=>v+n(r.summary?.overtime_minutes),0)])},{name:'Chi tiết từng ca',title,subtitle,headers,rows:rows.map(detail)}];
  if(!id&&data.branches?.length)sheets.push({name:'Theo cửa hàng',title,subtitle,headers:['Mã cửa hàng','Cửa hàng','Ca lịch','Ca đủ','Công quy đổi','Làm thêm sau ca (phút)','Phút công','Muộn','Sớm','Ca nghỉ','Ca vắng','Thiếu ra','Ngoài vùng','Chờ duyệt'],rows:data.branches.map(b=>[b.branch_code,b.branch_name,b.scheduled,b.completed,b.work_units??0,b.overtime_minutes??0,b.minutes,b.late,b.early,b.leave,b.absent,b.missing_out,b.outside,b.pending])});return createXlsx(sheets);
 }
