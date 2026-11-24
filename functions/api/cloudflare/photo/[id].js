@@ -11,11 +11,12 @@ export async function onRequestGet({request,env,params}){
  const user=await auth.json();
  if(typeof user.id!=='string')return fail(401,'Unauthorized');
  const record=await env.DB.prepare(
- "SELECT t.photo_path FROM attendances t JOIN assignments a ON a.id=t.assignment_id JOIN profiles p ON p.id=? AND p.active=1 WHERE t.id=? AND (t.user_id=p.id OR p.role='admin' OR (p.role='manager' AND EXISTS(SELECT 1 FROM branch_managers bm WHERE bm.user_id=p.id AND bm.branch_id=a.branch_id)))"
+ "SELECT t.photo_path,t.server_timestamp FROM attendances t JOIN assignments a ON a.id=t.assignment_id JOIN profiles p ON p.id=? AND p.active=1 WHERE t.id=? AND (t.user_id=p.id OR p.role='admin' OR (p.role='manager' AND EXISTS(SELECT 1 FROM branch_managers bm WHERE bm.user_id=p.id AND bm.branch_id=a.branch_id)))"
  ).bind(user.id,String(params.id)).first();
  if(!record)return fail(404,'Not found');
- const object=await env.TIMEMARKS.get(record.photo_path);
- if(!object)return fail(404,'Not found');
- return new Response(object.body,{headers:{...headers,'Content-Type':'image/jpeg','Content-Security-Policy':"default-src 'none'; sandbox",'Content-Disposition':'inline'}});
+ if(Date.now()>=record.server_timestamp+60*86400000)return fail(410,'Ảnh đã hết hạn lưu trữ');
+ const object=await env.TIMEMARKS.get(record.photo_path,'arrayBuffer');
+ if(!object)return fail(404,'Not found or not yet available');
+ return new Response(object,{headers:{...headers,'Content-Type':'image/jpeg','Content-Security-Policy':"default-src 'none'; sandbox",'Content-Disposition':'inline'}});
  }catch{return fail(500,'Unable to read photo')}
 }
