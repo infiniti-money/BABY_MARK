@@ -1,0 +1,29 @@
+name: BABY MARK scheduled rosters
+on:
+  schedule:
+    - cron: '15 19 * * *'
+  workflow_dispatch:
+permissions: {}
+concurrency:
+  group: babymark-roster-automation
+  cancel-in-progress: false
+jobs:
+  roster:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      ROSTER_SECRET: ${{ secrets.BABYMARK_ROSTER_CRON_SECRET }}
+    steps:
+      - name: Generate opted-in future rosters
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ -z "${ROSTER_SECRET:-}" ]]; then
+            echo "Skipped: scheduler secret not configured."
+            exit 0
+          fi
+          response="$(mktemp)"
+          trap 'rm -f "$response"' EXIT
+          curl --fail --silent --show-error --max-time 90 --output "$response" --request POST --header "Authorization: Bearer $ROSTER_SECRET" 'https://babymark.pages.dev/api/maintenance/rosters'
+          jq '{configured,created,skipped,failed}' "$response"
+          jq -e '.failed == 0' "$response" >/dev/null

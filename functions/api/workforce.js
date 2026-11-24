@@ -1,5 +1,5 @@
 import {reply,bodyJSON,digest} from '../../cloudflare/lib/auth.mjs';
-import {actorFor,ApiError,apiFailure,assignmentScope,dateRange,identifier,textField,invalid,managementAudit} from '../../cloudflare/lib/access.mjs';
+import {actorFor,ApiError,apiFailure,assignmentScope,dateRange,identifier,textField,invalid,managementAudit,validDay,dayVN} from '../../cloudflare/lib/access.mjs';
 
 export async function onRequestGet({request,env}){
  try{
@@ -37,6 +37,15 @@ export async function onRequestPost({request,env}){
    ]);
    if(!result[0].results?.length)throw new ApiError(409,'Yêu cầu hoặc quyền duyệt đã thay đổi; tải lại dữ liệu');
    return reply({id,state});
+  }
+  if(b.action==='leave-range'){
+   const from=b.from,to=b.to,reason=textField(b.reason,1000);
+   if(!validDay(from)||!validDay(to)||from<dayVN(now)||to<from||Date.parse(to)-Date.parse(from)>30*86400000||reason.length<5)invalid('Chọn từ hôm nay, tối đa 31 ngày và lý do tối thiểu 5 ký tự');
+   const rows=(await db.prepare("SELECT a.id,a.work_date FROM assignments a WHERE a.user_id=? AND a.work_date BETWEEN ? AND ? AND a.starts_at>? AND NOT EXISTS(SELECT 1 FROM attendances t WHERE t.assignment_id=a.id) AND NOT EXISTS(SELECT 1 FROM workforce_requests w WHERE w.assignment_id=a.id AND w.state IN ('PENDING','APPROVED')) ORDER BY a.work_date,a.starts_at LIMIT 63").bind(actor.id,from,to,now).all()).results;
+   if(!rows.length||rows.length>62)invalid('Không có ca tương lai đủ điều kiện hoặc quá nhiều ca');
+   const payload=rows.map(a=>({id:crypto.randomUUID(),assignment_id:a.id}));
+   const result=await db.batch([db.prepare("INSERT INTO workforce_requests(id,assignment_id,user_id,kind,reason,state,created_at) SELECT json_extract(j.value,'$.id'),a.id,?,'LEAVE',?,'PENDING',? FROM json_each(?) j JOIN assignments a ON a.id=json_extract(j.value,'$.assignment_id') WHERE a.user_id=? AND a.starts_at>? AND NOT EXISTS(SELECT 1 FROM attendances t WHERE t.assignment_id=a.id) AND NOT EXISTS(SELECT 1 FROM workforce_requests w WHERE w.assignment_id=a.id AND w.state IN ('PENDING','APPROVED'))").bind(actor.id,reason,now,JSON.stringify(payload),actor.id,now),managementAudit(db,actor,'workforce',actor.id,'LEAVE_RANGE',{from,to,requested:rows.length})]);
+   return reply({created:result[0].meta.changes},201);
   }
   if(b.action!=null)invalid('Thao tác không hợp lệ');
   const assignment=identifier(b.assignment_id),kind=b.kind,reason=textField(b.reason,1000);
