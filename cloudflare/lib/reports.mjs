@@ -24,8 +24,8 @@ ${extra?' LEFT JOIN extra_attendance x ON x.assignment_id=a.id':''}
 
 export function summarizeAssignment(row,now=Date.now()){
  const outside=row.in_status==='OUTSIDE'||row.out_status==='OUTSIDE';
- if(row.extra_state&&row.extra_state!=='APPROVED')return {status:row.extra_state==='PENDING'?'Ca bổ sung chờ duyệt':'Ca bổ sung bị từ chối',minutes:0,late:0,early:0,days:0,leave:0,adjusted:false,outside};
- if(row.request_state==='APPROVED'&&row.request_kind==='LEAVE')return {status:'Nghỉ đã duyệt',minutes:0,late:0,early:0,days:0,leave:1,adjusted:false,outside};
+ if(row.extra_state&&row.extra_state!=='APPROVED')return {status:row.extra_state==='PENDING'?'Ca bổ sung chờ duyệt':'Ca bổ sung bị từ chối',minutes:0,late:0,early:0,days:0,work_units:0,overtime_minutes:0,leave:0,adjusted:false,outside};
+ if(row.request_state==='APPROVED'&&row.request_kind==='LEAVE')return {status:'Nghỉ đã duyệt',minutes:0,late:0,early:0,days:0,work_units:0,overtime_minutes:0,leave:1,adjusted:false,outside};
  const adjusted=row.request_state==='APPROVED'&&row.request_kind==='CORRECTION';
  const entry=adjusted?row.proposed_in:row.in_at,exit=adjusted?row.proposed_out:row.out_at;
  const late=entry!=null&&entry>row.starts_at+row.grace_minutes*60000?Math.ceil((entry-row.starts_at)/60000):0;
@@ -33,16 +33,16 @@ export function summarizeAssignment(row,now=Date.now()){
  const complete=entry!=null&&exit!=null&&exit>=entry;
  let status=outside?'Ngoài vùng':entry==null?(now>row.ends_at?'Vắng':now>row.starts_at+row.grace_minutes*60000?'Chưa vào / muộn':'Chưa vào ca'):exit==null?(now>row.ends_at?'Thiếu chấm ra':'Đang làm'):!complete?'Cần kiểm tra':late&&early?'Muộn / về sớm':late?'Đi muộn':early?'Về sớm':'Đủ công';
  if(adjusted)status='Điều chỉnh đã duyệt'+(outside?' / ngoài vùng':'');
- return {status,minutes:complete&&!outside?Math.floor((exit-entry)/60000):0,late,early,days:complete&&!outside?1:0,leave:0,adjusted,outside};
+ return {status,minutes:complete&&!outside?Math.floor((exit-entry)/60000):0,late,early,days:complete&&!outside?1:0,work_units:complete&&!outside&&exit>entry&&row.request_state!=='PENDING'?(row.shift_id==='BM-ALLDAY'?2:1):0,overtime_minutes:complete&&!outside&&row.request_state!=='PENDING'?Math.max(0,Math.floor((exit-Math.max(entry,row.ends_at))/60000)):0,leave:0,adjusted,outside};
 }
 
 export function summarizeReport(rows){
- const dates=new Set(),leaveDates=new Set(),employees=new Set();let minutes=0,late=0,early=0,shifts=0;
+ const dates=new Set(),leaveDates=new Set(),employees=new Set();let minutes=0,late=0,early=0,shifts=0,work_units=0,overtime_minutes=0;
  for(const row of rows){
   const s=row.summary,key=row.user_id+':'+row.work_date;employees.add(row.user_id);
   if(s.days){dates.add(key);shifts++;}
   if(s.leave)leaveDates.add(key);
-  minutes+=s.minutes;late+=s.late;early+=s.early;
+  minutes+=s.minutes;late+=s.late;early+=s.early;work_units+=s.work_units??s.days??0;overtime_minutes+=s.overtime_minutes??0;
  }
- return {days:dates.size,shifts,leaveDays:leaveDates.size,minutes,late,early,employees:employees.size,assignments:rows.length};
+ return {days:dates.size,shifts,work_units,overtime_minutes,leaveDays:leaveDates.size,minutes,late,early,employees:employees.size,assignments:rows.length};
 }

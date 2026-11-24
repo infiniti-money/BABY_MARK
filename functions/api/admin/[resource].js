@@ -82,6 +82,7 @@ export async function onRequestPost({request,env,params}){
    await db.batch(statements);return reply({id});
   }
   if(resource==='shifts'){
+   if(b.action==='all-day-preset'){const result=await db.batch([db.prepare("INSERT INTO shifts(id,name,start_time,end_time,grace_period) VALUES('BM-ALLDAY','Làm cả ngày (2 công)','07:00','21:30',5) ON CONFLICT(id) DO NOTHING"),managementAudit(db,actor,'shifts','BM-ALLDAY','ADD_ALL_DAY',{})]);return reply({id:'BM-ALLDAY',created:result[0].meta.changes});}
    if(b.action==='delete-unused'){
     if(!b.id)invalid('Cần mã mẫu ca');
     const guard='id=? AND NOT EXISTS(SELECT 1 FROM assignments WHERE shift_id=shifts.id)';
@@ -90,6 +91,7 @@ export async function onRequestPost({request,env,params}){
     return reply({id,deleted:true});
    }
    const name=textField(b.name,120),start=textField(b.start_time,5),end=textField(b.end_time,5),grace=b.grace_period;
+   if(id==='BM-ALLDAY'&&(start!=='07:00'||end!=='21:30'))invalid('Ca cả ngày có khung giờ chuẩn 07:00–21:30');
    shiftInterval('2026-01-01',start,end);
    if(!Number.isInteger(grace)||grace<0||grace>120)invalid('Thời gian cho phép đi muộn không hợp lệ');
    if(b.id&&!await db.prepare('SELECT id FROM shifts WHERE id=?').bind(id).first())throw new ApiError(404,'Không tìm thấy ca');
@@ -107,12 +109,13 @@ export async function onRequestPost({request,env,params}){
     if(result[1].meta?.changes!==1)throw new ApiError(409,'Chỉ hủy ca tương lai chưa có dữ liệu liên quan');
     return reply({id,cancelled:true});
    }
-   if(b.action==='bulk'){
+   if(b.action==='bulk'||b.action==='event'){
+    const event=b.action==='event',eventName=event?textField(b.event_name,120):'';
     if(!Array.isArray(b.user_ids)||!b.user_ids.length||b.user_ids.length>50||new Set(b.user_ids).size!==b.user_ids.length)invalid('Chọn nhân viên hợp lệ');
-    const users=b.user_ids.map(identifier),branch=identifier(b.branch_id),shiftId=identifier(b.shift_id);
+    const users=b.user_ids.map(identifier),branch=identifier(b.branch_id),shiftId=event?'BM-ALLDAY':identifier(b.shift_id);
     if(!validDay(b.from)||!validDay(b.to)||b.from<dayVN()||b.to<b.from||Date.parse(b.to)-Date.parse(b.from)>30*86400000)invalid('Chọn tối đa 31 ngày từ hôm nay');
     if(!Array.isArray(b.weekdays)||!b.weekdays.length||b.weekdays.some(v=>!Number.isInteger(v)||v<1||v>7))invalid('Chọn ngày trong tuần');
-    const shift=await db.prepare('SELECT * FROM shifts WHERE id=?').bind(shiftId).first(),br=await db.prepare('SELECT * FROM branches WHERE id=?').bind(branch).first();
+    const shift=event?{start_time:'07:00',end_time:'21:30',grace_period:5}:await db.prepare('SELECT * FROM shifts WHERE id=?').bind(shiftId).first(),br=await db.prepare('SELECT * FROM branches WHERE id=?').bind(branch).first();
     if(!shift||!br||br.active===0)invalid('Cửa hàng hoặc ca không hoạt động');
     const eligible=await all(db,"SELECT id FROM profiles WHERE active=1 AND role<>'admin' AND id IN ("+users.map(()=>'?').join(',')+")",...users);
     if(eligible.length!==users.length)invalid('Có tài khoản không hoạt động hoặc không hợp lệ');
@@ -120,12 +123,13 @@ export async function onRequestPost({request,env,params}){
     for(let t=Date.parse(b.from);t<=Date.parse(b.to);t+=86400000){
      const d=new Date(t);if(!b.weekdays.includes(d.getUTCDay()||7))continue;
      const work_date=d.toISOString().slice(0,10),interval=shiftInterval(work_date,shift.start_time,shift.end_time);
+     if(event&&interval.starts_at<=Date.now())invalid('Chỉ tạo chương trình chưa bắt đầu.');
      for(const user_id of users)rows.push({id:crypto.randomUUID(),user_id,work_date,...interval});
     }
     if(!rows.length||rows.length>100)invalid('Mỗi lần phân tối đa 100 ca; chia thành nhiều đợt');
     const payload=JSON.stringify(rows);
-    const result=await db.batch([db.prepare("INSERT INTO assignments(id,user_id,branch_id,shift_id,work_date,starts_at,ends_at,grace_minutes) SELECT json_extract(value,'$.id'),json_extract(value,'$.user_id'),?,?,json_extract(value,'$.work_date'),json_extract(value,'$.starts_at'),json_extract(value,'$.ends_at'),? FROM json_each(?)").bind(branch,shiftId,shift.grace_period,payload),managementAudit(db,actor,'assignments',crypto.randomUUID(),'BULK_CREATE',{branch_id:branch,shift_id:shiftId,user_ids:users,from:b.from,to:b.to,weekdays:b.weekdays,count:rows.length})]);
-    return reply({created:result[0].meta.changes},201);
+    const result=await db.batch([...(event?[db.prepare("INSERT INTO shifts(id,name,start_time,end_time,grace_period) VALUES('BM-ALLDAY','Làm cả ngày (2 công)','07:00','21:30',5) ON CONFLICT(id) DO NOTHING")]:[]),db.prepare("INSERT INTO assignments(id,user_id,branch_id,shift_id,work_date,starts_at,ends_at,grace_minutes) SELECT json_extract(value,'$.id'),json_extract(value,'$.user_id'),?,?,json_extract(value,'$.work_date'),json_extract(value,'$.starts_at'),json_extract(value,'$.ends_at'),? FROM json_each(?)").bind(branch,shiftId,shift.grace_period,payload),managementAudit(db,actor,'assignments',crypto.randomUUID(),event?'EVENT_CREATE':'BULK_CREATE',{branch_id:branch,shift_id:shiftId,user_ids:users,from:b.from,to:b.to,weekdays:b.weekdays,count:rows.length,...(event?{event_name:eventName}:{})})]);
+    return reply({created:result[event?1:0].meta.changes},201);
    }
    const user=identifier(b.user_id),branch=identifier(b.branch_id),shiftId=identifier(b.shift_id);
    const profile=await db.prepare('SELECT id FROM profiles WHERE id=? AND active=1').bind(user).first();

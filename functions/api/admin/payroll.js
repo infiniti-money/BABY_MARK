@@ -4,8 +4,8 @@ import {monthBounds,payrollDraft} from '../../../cloudflare/lib/payroll.mjs';
 const ready=async db=>!!await db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='payroll_closings'").first();
 const snapshots=(db,m)=>db.prepare('SELECT revision,created_at,reason FROM payroll_closings WHERE month=? ORDER BY revision DESC').bind(m).all();
 function csv(d){
- const columns=['Mã NV','Nhân viên','Bộ phận','Ngày công','Ca đủ công','Phút dự kiến','Phút thực tế','Phút trong ca','Phút ngoài ca','Ca nghỉ duyệt','Ca vắng','Ca cần kiểm tra','Đơn giá giờ VND','Tiền giờ trong ca','Khoản cộng','Khoản trừ','Tổng dự kiến','Ghi chú'];
- const rows=d.rows.map(r=>[r.employee_code,r.full_name,r.department,r.days,r.shifts,r.planned_minutes,r.worked_minutes,r.regular_minutes,r.extra_minutes,r.leave_shifts,r.absence_shifts,r.issues,r.hourly_rate,r.base,r.additions,r.deductions,r.estimated_total,r.note]);
+ const columns=['Mã NV','Nhân viên','Bộ phận','Ngày công','Ca đủ công','Công quy đổi','Làm thêm sau ca (phút)','Phút dự kiến','Phút thực tế','Phút trong ca','Phút ngoài ca','Ca nghỉ duyệt','Ca vắng','Ca cần kiểm tra','Đơn giá giờ VND','Tiền giờ trong ca','Khoản cộng','Khoản trừ','Tổng dự kiến','Ghi chú'];
+ const rows=d.rows.map(r=>[r.employee_code,r.full_name,r.department,r.days,r.shifts,r.work_units??null,r.overtime_minutes??null,r.planned_minutes,r.worked_minutes,r.regular_minutes,r.extra_minutes,r.leave_shifts,r.absence_shifts,r.issues,r.hourly_rate,r.base,r.additions,r.deductions,r.estimated_total,r.note]);
  return new Response('\uFEFF'+[columns,...rows].map(r=>r.map(csvCell).join(',')).join('\r\n'),{headers:{'Content-Type':'text/csv; charset=utf-8','Cache-Control':'private, no-store','Content-Disposition':'attachment; filename="BABY_MARK_PAYROLL_'+d.month+'.csv"'}});
 }
 export async function onRequestGet({request,env}){
