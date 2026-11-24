@@ -21,34 +21,49 @@ export function attendanceTiming({type,serverTimestamp,shiftStart,shiftEnd,grace
  const early=Math.max(0,Math.ceil((shiftEnd-serverTimestamp)/60000));return {status:early?'Về sớm':'Đủ giờ ra ca',minutes:early};
 }
 export function makeTimemark(meta,{preview=false}={}){
- const {serverTimestamp,shiftStart,shiftEnd,lat,lng,accuracy,distance,radius,type,branchName,employeeName,employeeCode,address='',graceMinutes=0}=meta;
+ const {serverTimestamp,shiftStart,shiftEnd,lat,lng,accuracy,distance,radius,type,branchName,employeeName,employeeCode,address='',graceMinutes=0,branchCode='',shiftName='',reference=''}=meta;
  if(![serverTimestamp,shiftStart,shiftEnd,lat,lng,accuracy,distance,radius,graceMinutes].every(Number.isFinite)||Math.abs(lat)>90||Math.abs(lng)>180||accuracy<0||accuracy>50||distance<0||radius<20||radius>1000||graceMinutes<0||graceMinutes>120||shiftEnd<=shiftStart||!['IN','OUT'].includes(type)||!clean(branchName)||!clean(employeeName)||!clean(employeeCode))throw Error('INVALID_TIMEMARK_METADATA');
  const timing=attendanceTiming(meta),outside=distance>radius,uncertain=!outside&&distance+accuracy>radius;
  const location=outside?'NGOÀI VÙNG':uncertain?'SÁT RANH GIỚI':'TRONG VÙNG';
  const status=timing.status+(timing.minutes?' · '+timing.minutes+' phút':'');
  const rows=[];
- // Only the small rounded cards have a background. All other pixels stay transparent.
- const panel=(x,y,w,h,opacity=PANEL_OPACITY,fill='#141017')=>rows.push('<rect x="'+x+'" y="'+y+'" width="'+w+'" height="'+h+'" rx="18" fill="'+fill+'" fill-opacity="'+opacity+'" stroke="#ffffff" stroke-opacity=".24" stroke-width="1"/>');
- const text=(x,y,s,size=22,fill='#fff',weight=500)=>rows.push('<text x="'+x+'" y="'+y+'" font-family="DejaVu Sans, Arial, sans-serif" font-size="'+size+'" font-weight="'+weight+'" fill="'+fill+'" stroke="#171019" stroke-opacity=".85" stroke-width="1.5" stroke-linejoin="round" paint-order="stroke fill">'+esc(s)+'</text>');
- const multiline=(label,value,y,lines=2,size=23)=>{text(36,y,label,16,'#ffd5e1',700);fitLines(value,30,lines).forEach((s,i)=>text(36,y+25+i*24,s,size,'#ffffff',650))};
- // Logo top left; clock top right. Leave central portrait region untouched.
+ const rose='#ffd5e1',white='#ffffff',muted='#f0e7eb',ok='#d1f7de',warn='#ffd28c',bad='#ffd0d0';
+ const panel=(x,y,w,h,opacity=PANEL_OPACITY,fill='#17121c')=>rows.push('<rect x="'+x+'" y="'+y+'" width="'+w+'" height="'+h+'" rx="18" fill="'+fill+'" fill-opacity="'+opacity+'" stroke="#ffffff" stroke-opacity=".24" stroke-width="1"/>');
+ const text=(x,y,s,size=22,fill=white,weight=500)=>rows.push('<text x="'+x+'" y="'+y+'" font-family="DejaVu Sans, Arial, sans-serif" font-size="'+size+'" font-weight="'+weight+'" fill="'+fill+'" stroke="#171019" stroke-opacity=".85" stroke-width="1.5" stroke-linejoin="round" paint-order="stroke fill">'+esc(s)+'</text>');
+ const rect=(x,y,w,h,fill,opacity=1)=>rows.push('<rect x="'+x+'" y="'+y+'" width="'+w+'" height="'+h+'" rx="3" fill="'+fill+'" fill-opacity="'+opacity+'"/>');
+ const single=(x,y,value,max,size,fill=white,weight=650)=>text(x,y,fitLines(value,max,1)[0]||'',size,fill,weight);
+ // Brand signature and timestamp remain in opposite corners; central portrait is clear.
  panel(18,18,116,116,LOGO_OPACITY,'#fff1f4');
  rows.push('<image x="23" y="23" width="106" height="106" xlink:href="'+logo+'"/>');
- panel(422,18,360,160);
- text(442,49,type==='IN'?'VÀO CA':'TAN CA',25,'#ffd5e1',700);
- text(442,97,time.format(serverTimestamp),43,'#fff',700);
- text(442,128,date.format(serverTimestamp)+' · ICT',23);
- text(442,157,status,20,timing.minutes?'#ffd28c':'#d1f7de',700);
- // Two floating bottom cards, not a full-width opaque panel.
+ panel(18,143,356,45);
+ text(32,172,'BABY MARK  /  TIMEMARK',20,white,750);
+ panel(398,18,384,190);
+ rect(414,35,5,35,'#f58ba9');
+ text(430,60,type==='IN'?'VÀO CA':'TAN CA',27,rose,750);
+ text(418,118,time.format(serverTimestamp),56,white,750);
+ text(420,149,date.format(serverTimestamp)+' · UTC+7',23,white,600);
+ single(420,178,status,27,21,timing.minutes?warn:ok,700);
+ text(420,196,'Giờ máy chủ cấp dấu',14,muted,500);
+ // Employee and workplace: large names, codes and planned shift.
  panel(18,824,764,190);
- multiline('CỬA HÀNG',branchName,847);
- multiline('NHÂN VIÊN',employeeName+' · '+employeeCode,923,2,22);
- text(36,1000,'CA LÀM: '+hm(shiftStart)+' – '+hm(shiftEnd)+(date.format(shiftStart)!==date.format(shiftEnd)?' (+1 ngày)':''),21);
+ rect(36,838,5,21,'#f58ba9');
+ single(51,852,'CỬA HÀNG'+(branchCode?' · '+branchCode:''),48,17,rose,750);
+ fitLines(branchName,39,2).forEach((v,k)=>text(36,879+k*25,v,24,white,700));
+ single(36,929,'NHÂN VIÊN · '+employeeCode,49,17,rose,750);
+ fitLines(employeeName,42,2).forEach((v,k)=>text(36,954+k*24,v,23,white,700));
+ const shift='CA LÀM: '+hm(shiftStart)+' – '+hm(shiftEnd)+(date.format(shiftStart)!==date.format(shiftEnd)?' (+1 ngày)':'');
+ text(36,1002,shift,21,white,650);
+ if(clean(shiftName)&&shift.length<32)single(420,1002,shiftName,25,17,muted,600);
+ // Location: independent GPS classification and reported accuracy.
  panel(18,1024,764,158);
- text(36,1053,'GPS: '+lat.toFixed(6)+', '+lng.toFixed(6)+' ± '+Math.round(accuracy)+' m',21);
- text(36,1083,location+' · '+Math.round(distance)+' / '+Math.round(radius)+' m',21,outside?'#ffd0d0':uncertain?'#ffd28c':'#d1f7de',700);
- text(36,1108,'ĐỊA CHỈ',16,'#ffd5e1',700);
- fitLines(address||'Chưa xác định địa chỉ',36,2).forEach((s,i)=>text(36,1134+i*25,s,20));
+ const tint=outside?bad:uncertain?warn:ok;
+ rect(36,1037,5,22,tint);
+ text(51,1055,location+' · '+Math.round(distance)+' / '+Math.round(radius)+' m',24,tint,750);
+ text(36,1083,'GPS '+lat.toFixed(6)+', '+lng.toFixed(6)+'  ·  Sai số ±'+Math.round(accuracy)+' m',20,white,600);
+ text(36,1107,'ĐỊA CHỈ CỬA HÀNG',15,rose,750);
+ fitLines(address||'Chưa xác định địa chỉ',51,2).forEach((v,k)=>text(36,1131+k*22,v,19,white,600));
+ if(clean(reference))single(36,1172,'Mã dấu: '+reference+' · Ảnh ghép trên thiết bị',59,14,muted,500);
+ else text(36,1172,'Ảnh ghép trên thiết bị',14,muted,500);
  if(preview){panel(150,192,500,44,.7,'#fff1f4');rows.push('<text x="400" y="220" text-anchor="middle" font-family="sans-serif" font-size="18" font-weight="bold" fill="#9c3449">MẪU XEM TRƯỚC · KHÔNG PHẢI BẰNG CHỨNG</text>')}
  return '<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="800" height="1200" viewBox="0 0 800 1200">'+rows.join('')+'</svg>';
 }

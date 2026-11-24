@@ -6,7 +6,7 @@ import {HttpError,readLimited,jsonLimited,idPattern,errorResponse} from '../../.
 import {policy} from '../../../cloudflare/lib/policy.mjs';
 const MAX_AGE=90000;
 const fail=(status,message,code)=>{throw new HttpError(status,message,code);};
-const assignmentSQL=`SELECT a.*,b.name AS branch_name,b.latitude,b.longitude,b.allowed_radius,b.address_text,
+const assignmentSQL=`SELECT a.*,b.name AS branch_name,b.code AS branch_code,b.latitude,b.longitude,b.allowed_radius,b.address_text,
  s.name AS shift_name FROM assignments a JOIN branches b ON b.id=a.branch_id JOIN shifts s ON s.id=a.shift_id WHERE a.id=? AND a.user_id=?`;
 const planHash=a=>digest(JSON.stringify([a.user_id,a.branch_id,a.branch_name,a.shift_id,a.work_date,a.starts_at,a.ends_at,a.grace_minutes,a.latitude,a.longitude,a.allowed_radius,a.address_text]));
 function openWindow(a,now){if(now<a.starts_at-4*3600000||now>a.ends_at+12*3600000)fail(409,'Ca ngoài thời gian cho phép chấm công','OUTSIDE_SHIFT_WINDOW');}
@@ -26,7 +26,7 @@ async function prepare(request,env,user){
  if(await env.DB.prepare("SELECT id FROM attendance_challenges WHERE assignment_id=? AND type=? AND state='PROCESSING'").bind(a.id,b.type).first())fail(409,'Yêu cầu trước đang xử lý; kiểm tra lịch sử','ATTENDANCE_PROCESSING');
  const distance=distanceMeters(lat,lng,a.latitude,a.longitude),id=crypto.randomUUID();
  const metadata={serverTimestamp:now,shiftStart:a.starts_at,shiftEnd:a.ends_at,lat,lng,accuracy,distance,radius:a.allowed_radius,type:b.type,
-  branchName:a.branch_name,employeeName:user.full_name,employeeCode:user.employee_code,address:a.address_text||'',graceMinutes:a.grace_minutes,
+  branchName:a.branch_name,branchCode:a.branch_code,shiftName:a.shift_name,reference:id.slice(0,8).toUpperCase(),employeeName:user.full_name,employeeCode:user.employee_code,address:a.address_text||'',graceMinutes:a.grace_minutes,
   timestampMeaning:'SERVER_CHALLENGE_ISSUED',photoSource:'CLIENT_RENDERED'};
  const inserted=await env.DB.prepare("INSERT INTO attendance_challenges(id,user_id,assignment_id,type,created_at,expires_at,metadata_json,plan_hash) SELECT ?,?,?,?,?,?,?,? WHERE (SELECT COUNT(*) FROM attendance_challenges WHERE user_id=? AND created_at>?)<10")
   .bind(id,user.id,a.id,b.type,now,now+MAX_AGE,JSON.stringify(metadata),await planHash(a),user.id,now-300000).run();

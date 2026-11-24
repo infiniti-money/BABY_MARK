@@ -8,3 +8,5 @@ test('invalid GPS and exact same point',()=>{assert.throws(()=>makeTimemark({...
 test('overnight shift',()=>assert.match(makeTimemark({...m,shiftStart:Date.parse('2026-11-24T15:00:00Z'),shiftEnd:Date.parse('2026-11-25T01:00:00Z')}),/\(\+1 ngày\)/));
 
 test('transparent overlay, full photo height and floating panels',()=>{const s=makeTimemark(m);assert.equal(PHOTO_HEIGHT,HEIGHT);assert.equal(PANEL_OPACITY,.4);assert.equal(LOGO_OPACITY,.7);assert.match(s,/fill-opacity="0.4"/);assert.match(s,/fill-opacity="0.7"/);assert.match(s,/stroke-width="1.5"/);assert.doesNotMatch(s,/<rect x="0" y="0" width="800" height="1200"/);assert.doesNotMatch(s,/KHÔNG PHẢI BẰNG CHỨNG/);assert.ok(s.includes('rx="18"'))});
+
+test('professional layout includes server-issued reference, branch code and shift name, escaped and bounded',()=>{const s=makeTimemark({...m,branchCode:'BM-014',shiftName:'Ca sáng',reference:'A1B2C3D4',radius:200});for(const x of ['BM-014','Ca sáng','A1B2C3D4','Giờ máy chủ cấp dấu','UTC+7','22 / 200 m','Sai số ±8 m','Ảnh ghép trên thiết bị'])assert.ok(s.includes(x),x);assert.doesNotMatch(makeTimemark({...m,reference:'<script>'}),/<script>/)});

@@ -10,3 +10,6 @@ Clock on the image is the server challenge issue time. D1 `stamp_issued_at` pres
 Browser acceptance tests exercise real workerd/D1/KV, camera/GPS fixtures, JPEG decode, protected retrieval, transparent center alpha, 40% card alpha, and high-entropy compression below the cap. Test camera media and coordinates are synthetic. Physical Android/iOS devices, actual store lighting, readable text at reduced resolution and deployed free-tier CPU still need acceptance.
 
 The legacy Node Sharp renderer is retained only as historical source and is not shipped. The preview API/demo is explicitly a preview and cannot record attendance. [Official runtime constraints and sources](cloudflare-runtime-audit.md).
+
+## Timemark Pro
+Mẫu mới giữ nguyên ảnh dọc 800 × 1200, vùng chân dung giữa trong suốt và nền 40%/logo 70%. Tăng cỡ đồng hồ, thêm mã cửa hàng, mã nhân viên tách riêng, tên ca khi đủ chỗ và mã dấu ngắn từ challenge phía máy chủ (không phải chữ ký xác thực). Tách trạng thái khoảng cách và trạng thái giờ, hiển thị UTC+7, sai số, tọa độ, địa chỉ cửa hàng và ghi rõ ảnh ghép trên thiết bị. Chuỗi dài có thể rút gọn bằng dấu …; dữ liệu đầy đủ lưu trong hệ thống. Ảnh cũ giữ nguyên, không cần migration.
