@@ -1,7 +1,7 @@
 // Trusted server-side pipeline helper. Do not expose as an anonymous upload API.
 export const RETENTION_SECONDS=60*86400;
 export const MAX_IMAGE_BYTES=200000;
-export const STORAGE_BUDGET_BYTES=800000000;
+export const STORAGE_BUDGET_BYTES=900000000;
 export function validatePhoto(key,bytes,capturedAt,now=Date.now()){
  if(typeof key!=='string'||!/^timemark\/[0-9a-f-]{36}\.jpg$/i.test(key))throw Error('INVALID_KEY');
  if(!(bytes instanceof ArrayBuffer)||bytes.byteLength<4||bytes.byteLength>MAX_IMAGE_BYTES)throw Error('INVALID_IMAGE_SIZE');
