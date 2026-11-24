@@ -57,7 +57,10 @@ test.describe.serial('Cloudflare local frontend and actual D1/KV endpoints',()=>
     await page.getByLabel('Mã nhân viên',{exact:true}).fill(newCode);
     await page.getByLabel('Họ và tên',{exact:true}).fill('Nhân viên kiểm thử mới');
     await page.getByLabel('Tên đăng nhập',{exact:true}).fill(newUsername);
-    await page.getByLabel('Bộ phận',{exact:true}).fill('Kiểm thử nội bộ');
+    await expect(page.locator('#employee-departments option[value="Kho"]')).toHaveCount(1);
+    await expect(page.locator('#employee-departments option[value="Lái xe"]')).toHaveCount(1);
+    await expect(page.locator('#employee-departments option[value="Kế toán"]')).toHaveCount(1);
+    await page.getByLabel('Bộ phận',{exact:true}).fill('Kho');
     await page.getByRole('button',{name:'Tạo và cấp mã truy cập',exact:true}).click();
     const issued=page.getByTestId('issued-secret');
     await expect(issued).toHaveText(/^[0-9a-f]{48}$/);
@@ -329,7 +332,7 @@ test('offline logout still clears local account data and camera access',async({p
 });
 
 test('administrator creates and resets a chosen password and staff logs in through the browser',async({page})=>{
-  const name='test-human-'+Date.now().toString(36).slice(-6),pwd='Local test passphrase 2026!',next='Second local test passphrase!';
+  const name='test-human-'+Date.now().toString(36).slice(-6),pwd='Test9!abc',next='Second local test passphrase!';
   await login(page);
   await page.getByRole('button',{name:'Quản trị',exact:true}).click();
   await page.getByRole('button',{name:'Cấp tài khoản',exact:true}).click();
