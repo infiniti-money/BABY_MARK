@@ -373,3 +373,37 @@ test('admin settings and branch lifecycle are available after migration 0009',as
  await page.getByRole('dialog').getByRole('button',{name:'Xác nhận',exact:true}).click();
  await expect(row.getByRole('button',{name:'Ngừng hoạt động',exact:true})).toBeVisible();
 });
+
+test('responsive admin navigation, readable records and forms at narrow, tablet and desktop widths',async({page})=>{
+ await page.setViewportSize({width:320,height:640});
+ await login(page);
+ const more=page.getByRole('button',{name:'Thêm',exact:true});
+ await expect(more).toBeVisible();
+ await expect(more).toHaveAttribute('aria-expanded','false');
+ await more.click();
+ await expect(more).toHaveAttribute('aria-expanded','true');
+ await page.getByRole('button',{name:'Quản trị',exact:true}).click();
+ await expect(page.getByRole('heading',{name:'Nhân viên',exact:true})).toBeVisible();
+ await expect(page.locator('.responsive-table td[data-label="Nhân viên"]').first()).toBeVisible();
+ await expect(more).toHaveAttribute('aria-expanded','false');
+ const fits=()=>page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth);
+ expect(await fits()).toBeTruthy();
+ await page.getByRole('button',{name:'Cấp tài khoản',exact:true}).click();
+ await expect(page.getByRole('dialog')).toBeVisible();
+ await expect(page.getByLabel('Mật khẩu nhân viên (không bắt buộc)',{exact:true})).toBeVisible();
+ expect(await page.getByRole('dialog').evaluate(el=>el.scrollWidth<=el.clientWidth+1)).toBeTruthy();
+ await page.getByRole('button',{name:'Hủy',exact:true}).click();
+ for(const size of [{width:390,height:844},{width:768,height:1024},{width:1024,height:768},{width:1440,height:900},{width:844,height:390}]){
+  await page.setViewportSize(size);expect(await fits()).toBeTruthy();
+ }
+ await more.click();await expect(page.getByRole('button',{name:'Push điện thoại',exact:true})).toBeVisible();
+ await page.keyboard.press('Escape');await expect(more).toHaveAttribute('aria-expanded','false');
+});
+test('mobile employee can reach own password settings without sideways scrolling',async({page})=>{
+ await page.setViewportSize({width:390,height:844});
+ await login(page,'staff');
+ await page.getByRole('button',{name:'Thêm',exact:true}).click();
+ await page.getByRole('button',{name:'Đổi mật khẩu',exact:true}).click();
+ await expect(page.getByRole('dialog',{name:'Đổi mật khẩu của bạn'})).toBeVisible();
+ expect(await page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth)).toBeTruthy();
+});

@@ -85,7 +85,7 @@ const navItems = () => [['today','camera','Chấm công'],['history','clock','L�
 const titles = {today:'Chấm công hôm nay',history:'Lịch sử chấm công',schedule:'Lịch làm việc',requests:'Yêu cầu công',admin:'Quản trị hệ thống',reports:'Báo cáo chấm công',alerts:'Thông báo đi muộn',push:'Push điện thoại'};
 function shell() {
   const name=state.user.full_name;
-  app.innerHTML=`<div class="shell"><aside class="sidebar"><div class="brand"><img src="/brand/logo.png" alt="BABY MARK"><div><strong>BABY MARK</strong><span>KHÔNG GIAN LÀM VIỆC</span></div></div><div class="nav-label">ĐỘI NGŨ BABY MARK</div><nav class="nav" aria-label="Điều hướng chính">${navItems().map(([id,ic,label])=>`<button data-view="${id}" class="${state.view===id?'active':''}" ${state.view===id?'aria-current="page"':''}>${icon(ic)}<span>${label}</span></button>`).join('')}</nav><div class="sidebar-bottom"><div class="privacy-note">${icon('shield')}<strong>Riêng tư theo phân quyền</strong>Ảnh chỉ dành cho bạn và người quản lý được cấp quyền.</div>${state.user.role!=='admin'?'<button class="logout" data-action="self-password">Đổi mật khẩu</button>':''}<button class="logout" data-action="logout">Đăng xuất tài khoản</button></div></aside><div class="workspace"><header class="topbar"><div class="topbar-path">Không gian làm việc / <span>${titles[state.view]}</span></div><div class="profile"><div class="avatar">${esc(name.split(/\s+/).map(s=>s[0]).slice(-2).join('').toUpperCase())}</div><div><strong>${esc(name)}</strong><small>${esc(state.user.employee_code)} · ${roles[state.user.role]}</small></div><button class="btn quiet small mobile-logout" data-action="logout" aria-label="Đăng xuất">${icon('logout')}</button></div></header><main id="main" class="main"><div class="page-head"><div><p class="eyebrow">${state.view==='today'?'MỘT NGÀY LÀM VIỆC TỐT LÀNH':'BABY MARK · ĐỘI NGŨ'}</p><h1>${titles[state.view]}</h1><p class="muted">${state.view==='today'?'Ghi nhận ca làm của bạn bằng ảnh trực tiếp và vị trí hiện tại.':'Dữ liệu được hiển thị theo phạm vi tài khoản của bạn.'}</p></div><div class="date-chip">${icon('calendar')} ${new Intl.DateTimeFormat('vi-VN',{timeZone:tz,weekday:'long',day:'2-digit',month:'2-digit',year:'numeric'}).format(Date.now())}</div></div><div id="content">${loading()}</div><p class="footer-note">BABY MARK · Múi giờ Việt Nam (UTC+7) · Ảnh tối đa 200 KB, lưu tối đa 60 ngày theo ngân sách ảnh 900 MB · Bảng công lưu 2 năm.</p></main></div></div>`;
+  app.innerHTML=`<div class="shell"><aside class="sidebar"><div class="brand"><img src="/brand/logo.png" alt="BABY MARK"><div><strong>BABY MARK</strong><span>KHÔNG GIAN LÀM VIỆC</span></div></div><div class="nav-label">ĐỘI NGŨ BABY MARK</div><nav id="main-nav" class="nav" aria-label="Điều hướng chính">${navItems().map(([id,ic,label])=>`<button data-view="${id}" class="${state.view===id?'active':''} ${['today','history','schedule'].includes(id)?'primary-nav':'extra-nav'}" ${state.view===id?'aria-current="page"':''}>${icon(ic)}<span>${label}</span></button>`).join('')}<button type="button" class="mobile-more ${['today','history','schedule'].includes(state.view)?'':'active'}" data-action="mobile-menu" aria-expanded="false" aria-controls="main-nav"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h16"/></svg><span>Thêm</span></button></nav><div class="sidebar-bottom"><div class="privacy-note">${icon('shield')}<strong>Riêng tư theo phân quyền</strong>Ảnh chỉ dành cho bạn và người quản lý được cấp quyền.</div>${state.user.role!=='admin'?'<button class="logout" data-action="self-password">Đổi mật khẩu</button>':''}<button class="logout" data-action="logout">Đăng xuất tài khoản</button></div></aside><div class="workspace"><header class="topbar"><div class="topbar-path">Không gian làm việc / <span>${titles[state.view]}</span></div><div class="profile"><div class="avatar">${esc(name.split(/\s+/).map(s=>s[0]).slice(-2).join('').toUpperCase())}</div><div><strong>${esc(name)}</strong><small>${esc(state.user.employee_code)} · ${roles[state.user.role]}</small></div><button class="btn quiet small mobile-logout" data-action="logout" aria-label="Đăng xuất">${icon('logout')}</button></div></header><main id="main" class="main"><div class="page-head"><div><p class="eyebrow">${state.view==='today'?'MỘT NGÀY LÀM VIỆC TỐT LÀNH':'BABY MARK · ĐỘI NGŨ'}</p><h1>${titles[state.view]}</h1><p class="muted">${state.view==='today'?'Ghi nhận ca làm của bạn bằng ảnh trực tiếp và vị trí hiện tại.':'Dữ liệu được hiển thị theo phạm vi tài khoản của bạn.'}</p></div><div class="date-chip">${icon('calendar')} ${new Intl.DateTimeFormat('vi-VN',{timeZone:tz,weekday:'long',day:'2-digit',month:'2-digit',year:'numeric'}).format(Date.now())}</div></div><div id="content">${loading()}</div><p class="footer-note">BABY MARK · Múi giờ Việt Nam (UTC+7) · Ảnh tối đa 200 KB, lưu tối đa 60 ngày theo ngân sách ảnh 900 MB · Bảng công lưu 2 năm.</p></main></div></div>`;
 }
 function stat(label,value,note,ic) { return `<article class="stat"><div class="label">${label}${icon(ic)}</div><strong>${esc(value)}</strong><small>${esc(note)}</small></article>`; }
 function filterBar({reports=false,action='filter'}={}) {
@@ -195,11 +195,30 @@ function requestForm() {
   if(!own.length)return notify('Bạn chưa có ca được phân công trong khoảng ngày đang xem.',true);
   showModal('Gửi yêu cầu công',`<form data-form="request-create" class="form-stack"><label>Ca làm<select name="assignment_id" required><option value="">Chọn ca của bạn</option>${own.map(a=>`<option value="${esc(a.id)}">${dateVN(a.work_date)} · ${esc(a.branch_name)} · ${hm(a.starts_at)}</option>`).join('')}</select></label><label>Loại yêu cầu<select name="kind" id="request-kind"><option value="LEAVE">Nghỉ phép</option><option value="CORRECTION">Điều chỉnh giờ công</option></select></label><div id="correction-times" class="form-grid" hidden>${field('Giờ vào đề xuất (Việt Nam)','proposed_in','',{type:'datetime-local',required:false})}${field('Giờ ra đề xuất (Việt Nam)','proposed_out','',{type:'datetime-local',required:false})}</div><label>Lý do<textarea name="reason" required minlength="5" maxlength="1000" placeholder="Mô tả lý do để quản lý có thể đối soát"></textarea></label><p class="hint">Yêu cầu chỉ có hiệu lực sau phê duyệt. Đơn điều chỉnh không thay đổi ảnh hoặc vị trí gốc.</p><p class="error-text" data-form-error hidden role="alert"></p><div class="modal-actions"><button class="btn secondary" type="button" data-action="close-modal">Hủy</button><button class="btn" type="submit">Gửi yêu cầu</button></div></form>`);
 }
+function mobileMenu(open){
+  const sidebar=$('.sidebar'),trigger=$('[data-action="mobile-menu"]');
+  if(!sidebar||!trigger)return;
+  sidebar.classList.toggle('menu-open',open);trigger.setAttribute('aria-expanded',String(open));
+}
+function prepareResponsiveTables(){
+ for(const wrap of document.querySelectorAll('#content .table-wrap')){
+  const table=wrap.querySelector('table');if(!table)continue;
+  const headers=[...table.querySelectorAll('thead th')].map(th=>th.textContent.trim());
+  table.classList.add('responsive-table');table.setAttribute('role','table');
+  for(const section of table.querySelectorAll('thead,tbody'))section.setAttribute('role','rowgroup');
+  for(const tr of table.rows){tr.setAttribute('role','row');for(const [index,cell] of [...tr.cells].entries()){
+   if(cell.tagName==='TH'){cell.scope='col';cell.setAttribute('role','columnheader');}
+   else{cell.setAttribute('role','cell');cell.dataset.label=headers[index]||'';}
+  }}
+ }
+}
 async function navigate(view=state.view) {
   if(!state.user)return;
-  stopCamera(); state.view=view; const id=++state.renderId; shell();
+  const changed=state.view!==view;stopCamera(); state.view=view; const id=++state.renderId; shell();
+  if(changed)window.scrollTo(0,0);
   try {
     await ({today:renderToday,history:renderHistory,schedule:renderSchedule,admin:renderAdmin,reports:renderReports,requests:renderRequests,alerts:renderAlerts,push:renderPush}[view])(id);
+    if(id===state.renderId)prepareResponsiveTables();
   } catch(e) { if(id===state.renderId&&$('#content'))$('#content').innerHTML=errorHTML(e.message); }
 }
 
@@ -270,6 +289,7 @@ document.addEventListener('click',async event=>{
   if(button.dataset.adminTab){state.adminTab=button.dataset.adminTab;return void navigate('admin');}
   const action=button.dataset.action;if(!action)return;
   try {
+    if(action==='mobile-menu'){mobileMenu(button.getAttribute('aria-expanded')!=='true');return;}
     if(action==='close-modal')return closeModal();
     if(action==='refresh')return void navigate();
     if(action==='push-enable'){
@@ -358,6 +378,12 @@ document.addEventListener('click',async event=>{
     }
   }catch(e){notify(e.message||'Không thể thực hiện. Vui lòng thử lại.',true);}
   finally{if(button.isConnected)button.disabled=false;}
+});
+document.addEventListener('keydown',event=>{
+ if(event.key==='Escape'&&!modal.open&&$('.sidebar.menu-open')){mobileMenu(false);$('[data-action="mobile-menu"]')?.focus();}
+});
+document.addEventListener('pointerdown',event=>{
+ if($('.sidebar.menu-open')&&!event.target.closest('.sidebar'))mobileMenu(false);
 });
 document.addEventListener('change',event=>{
   if(event.target.id==='request-kind') {
