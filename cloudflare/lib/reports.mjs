@@ -7,8 +7,7 @@ export async function readAssignments(db,actor,url){
   if(value){conditions.push(`${column}=?`);values.push(identifier(value));}
  }
  const extra=!!await db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='extra_attendance'").first();
- const face=!!await db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='face_exception_reviews'").first();
- const sql=`SELECT a.*,${face?"json_extract(i.metadata_json,'$.face_verification.mode') AS in_face,json_extract(o.metadata_json,'$.face_verification.mode') AS out_face,fi.state AS in_face_review,fo.state AS out_face_review,":''}${extra?'x.kind AS extra_kind,x.state AS extra_state,x.replaced_name,x.reason AS extra_reason,':''}p.employee_code,p.full_name,p.department,b.name AS branch_name,b.code AS branch_code,b.address_text,b.latitude,b.longitude,b.allowed_radius,s.name AS shift_name,
+ const sql=`SELECT a.*,${extra?'x.kind AS extra_kind,x.state AS extra_state,x.replaced_name,x.reason AS extra_reason,':''}p.employee_code,p.full_name,p.department,b.name AS branch_name,b.code AS branch_code,b.address_text,b.latitude,b.longitude,b.allowed_radius,s.name AS shift_name,
  i.id AS in_id,i.server_timestamp AS in_at,i.status AS in_status,i.late_minutes AS in_late,i.distance_m AS in_distance_m,i.photo_source AS in_photo_source,
  o.id AS out_id,o.server_timestamp AS out_at,o.status AS out_status,o.early_minutes AS out_early,o.distance_m AS out_distance_m,o.photo_source AS out_photo_source,
  r.id AS request_id,r.kind AS request_kind,r.state AS request_state,r.proposed_in,r.proposed_out,r.decided_by,r.decided_at
@@ -16,7 +15,6 @@ export async function readAssignments(db,actor,url){
 ${extra?' LEFT JOIN extra_attendance x ON x.assignment_id=a.id':''}
  LEFT JOIN attendances i ON i.assignment_id=a.id AND i.type='IN'
  LEFT JOIN attendances o ON o.assignment_id=a.id AND o.type='OUT'
-${face?' LEFT JOIN face_exception_reviews fi ON fi.attendance_id=i.id LEFT JOIN face_exception_reviews fo ON fo.attendance_id=o.id':''}
  LEFT JOIN workforce_requests r ON r.id=(SELECT wr.id FROM workforce_requests wr WHERE wr.assignment_id=a.id ORDER BY CASE wr.state WHEN 'APPROVED' THEN 0 WHEN 'PENDING' THEN 1 ELSE 2 END,wr.created_at DESC,wr.id DESC LIMIT 1)
  WHERE ${conditions.join(' AND ')} ORDER BY a.work_date,a.starts_at,p.employee_code,a.id LIMIT 5001`;
  const {results}=await db.prepare(sql).bind(...values).all();
@@ -28,7 +26,6 @@ export function summarizeAssignment(row,now=Date.now()){
  const outside=row.in_status==='OUTSIDE'||row.out_status==='OUTSIDE';
  if(row.extra_state&&row.extra_state!=='APPROVED')return {status:row.extra_state==='PENDING'?'Ca bổ sung chờ duyệt':'Ca bổ sung bị từ chối',minutes:0,late:0,early:0,days:0,leave:0,adjusted:false,outside};
  if(row.request_state==='APPROVED'&&row.request_kind==='LEAVE')return {status:'Nghỉ đã duyệt',minutes:0,late:0,early:0,days:0,leave:1,adjusted:false,outside};
- if((row.in_face==='EXCEPTION'&&row.in_face_review!=='APPROVED')||(row.out_face==='EXCEPTION'&&row.out_face_review!=='APPROVED'))return {status:row.in_face_review==='REJECTED'||row.out_face_review==='REJECTED'?'Ngoại lệ khuôn mặt bị từ chối':'Ngoại lệ khuôn mặt chờ duyệt',minutes:0,late:0,early:0,days:0,leave:0,adjusted:false,outside};
  const adjusted=row.request_state==='APPROVED'&&row.request_kind==='CORRECTION';
  const entry=adjusted?row.proposed_in:row.in_at,exit=adjusted?row.proposed_out:row.out_at;
  const late=entry!=null&&entry>row.starts_at+row.grace_minutes*60000?Math.ceil((entry-row.starts_at)/60000):0;

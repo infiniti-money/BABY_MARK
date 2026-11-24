@@ -4,7 +4,6 @@ import {storeStampedPhoto} from '../../../cloudflare/lib/timemark-kv.mjs';
 import {jpegDimensions} from '../../../cloudflare/lib/jpeg.mjs';
 import {HttpError,readLimited,jsonLimited,idPattern,errorResponse} from '../../../cloudflare/lib/http.mjs';
 import {policy} from '../../../cloudflare/lib/policy.mjs';
-import {faceRequired,faceEvidence} from '../../../cloudflare/lib/face-verification.mjs';
 const MAX_AGE=90000;
 const fail=(status,message,code)=>{throw new HttpError(status,message,code);};
 const assignmentSQL=`SELECT a.*,b.name AS branch_name,b.latitude,b.longitude,b.allowed_radius,b.address_text,
@@ -25,11 +24,10 @@ async function prepare(request,env,user){
  const count=await env.DB.prepare('SELECT COUNT(*) AS n FROM attendance_challenges WHERE user_id=? AND created_at>?').bind(user.id,now-300000).first();
  if(count.n>=10)fail(429,'Đã yêu cầu chụp quá nhiều lần; chờ vài phút','PREPARE_RATE_LIMIT');
  if(await env.DB.prepare("SELECT id FROM attendance_challenges WHERE assignment_id=? AND type=? AND state='PROCESSING'").bind(a.id,b.type).first())fail(409,'Yêu cầu trước đang xử lý; kiểm tra lịch sử','ATTENDANCE_PROCESSING');
- const face_verification=await faceEvidence(env,user,a,b,now);
  const distance=distanceMeters(lat,lng,a.latitude,a.longitude),id=crypto.randomUUID();
  const metadata={serverTimestamp:now,shiftStart:a.starts_at,shiftEnd:a.ends_at,lat,lng,accuracy,distance,radius:a.allowed_radius,type:b.type,
   branchName:a.branch_name,employeeName:user.full_name,employeeCode:user.employee_code,address:a.address_text||'',graceMinutes:a.grace_minutes,
-  timestampMeaning:'SERVER_CHALLENGE_ISSUED',photoSource:'CLIENT_RENDERED',face_verification};
+  timestampMeaning:'SERVER_CHALLENGE_ISSUED',photoSource:'CLIENT_RENDERED'};
  const inserted=await env.DB.prepare("INSERT INTO attendance_challenges(id,user_id,assignment_id,type,created_at,expires_at,metadata_json,plan_hash) SELECT ?,?,?,?,?,?,?,? WHERE (SELECT COUNT(*) FROM attendance_challenges WHERE user_id=? AND created_at>?)<10")
   .bind(id,user.id,a.id,b.type,now,now+MAX_AGE,JSON.stringify(metadata),await planHash(a),user.id,now-300000).run();
  if(inserted.meta.changes!==1)fail(429,'Đã yêu cầu chụp quá nhiều lần; chờ vài phút','PREPARE_RATE_LIMIT');
@@ -56,7 +54,6 @@ async function submit(request,env,user){
  }
  if(c.state!=='READY')fail(409,'Yêu cầu đã sử dụng hoặc đang xử lý; kiểm tra lịch sử','CHALLENGE_USED');
  if(receivedAt>=c.expires_at)fail(410,'Yêu cầu chụp đã hết hạn; chụp lại','CHALLENGE_EXPIRED');
- if(await faceRequired(env.DB,user.id)&&!['VERIFIED','EXCEPTION'].includes(JSON.parse(c.metadata_json).face_verification?.mode))fail(409,'Chính sách xác minh đã thay đổi; chụp lại','FACE_REQUIRED');
  const a=await env.DB.prepare(assignmentSQL).bind(c.assignment_id,user.id).first();
  if(!a||await planHash(a)!==c.plan_hash)fail(409,'Thông tin ca hoặc cửa hàng đã thay đổi; chụp lại','PLAN_CHANGED');
  openWindow(a,receivedAt);
