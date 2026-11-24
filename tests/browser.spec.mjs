@@ -173,6 +173,7 @@ test.describe.serial('Cloudflare local frontend and actual D1/KV endpoints',()=>
     expect(download.suggestedFilename()).toMatch(/BABY_MARK.*\.csv$/);
     const stream=await download.createReadStream();const chunks=[];for await(const chunk of stream)chunks.push(chunk);
     const csv=Buffer.concat(chunks).toString('utf8');expect(csv).toContain('Nhân viên');
+    const excelEvent=page.waitForEvent('download');await page.getByRole('button',{name:'Xuất Excel tổng chấm công',exact:true}).click();const excel=await excelEvent;expect(excel.suggestedFilename()).toMatch(/BABY_MARK_CHAM_CONG_TONG.*\.xlsx$/);const excelStream=await excel.createReadStream(),excelChunks=[];for await(const chunk of excelStream)excelChunks.push(chunk);const excelBytes=Buffer.concat(excelChunks);expect([...excelBytes.subarray(0,4)]).toEqual([80,75,3,4]);expect(excelBytes.toString('utf8')).toContain('Công từng ngày');
     const managerToken=await apiToken(request,'manager');
     const managerMe=await request.get('/api/auth/me',{headers:auth(managerToken)}),managerId=(await managerMe.json()).user.id;
     const scoped=await request.get(`/api/reports?from=${dayVN(Date.now()-86400000)}&to=${dayVN(Date.now())}`,{headers:auth(managerToken)});

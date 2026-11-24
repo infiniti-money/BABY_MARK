@@ -11,3 +11,12 @@ test('six-sheet total payroll includes frozen per-day work and excludes other st
  const one=new TextDecoder().decode(workbook('payroll',d,'a'));assert.ok(!one.includes('PRIVATE OTHER'));assert.ok(!one.includes('Store B'));assert.ok(one.includes('Store A'));
  const legacy=new TextDecoder().decode(workbook('payroll',payroll));assert.ok(legacy.includes('Bản chốt này chưa lưu chi tiết từng ca'));
 });
+
+test('attendance workbook exports six tabs, correct per-day units across months, and scoped stores',async()=>{
+ const {attendanceSheets,attendanceTotals}=await import('../public/attendance-workbook.mjs');
+ const a={user_id:'a',employee_code:'NV01',full_name:'One',department:'Sales',branch_id:'a-store',branch_code:'A',branch_name:'Store A',work_date:'2026-10-31',summary:{days:1,minutes:870,work_units:2,overtime_minutes:30},exception_flags:[]},b={...a,work_date:'2026-11-01',summary:{days:0,minutes:0,work_units:0},exception_flags:['MISSING_IN']},c={...a,work_date:'2026-11-02',extra_state:'REJECTED',summary:{days:0,work_units:0},exception_flags:[]},other={...a,user_id:'b',employee_code:'NV02',full_name:'PRIVATE OTHER',branch_id:'b-store',branch_code:'B',branch_name:'Private Store'};
+ const data={from:'2026-10-31',to:'2026-11-02',rows:[a,b,c,other],computed_at:1793500000000};
+ const sheets=attendanceSheets(data,[a,b,c],'Title','Period',['A','B'],r=>[r.employee_code,r.full_name]);
+ assert.equal(sheets.length,6);const daily=sheets.find(s=>s.name==='Công từng ngày');assert.deepEqual(daily.headers.slice(3,6),['31/10','01/11','02/11']);assert.deepEqual(daily.rows[0].slice(3),[2,0,null,2,30]);assert.equal(attendanceTotals([a,b,c]).missing_in,1);assert.equal(sheets.find(s=>s.name==='Cần đối soát').rows.length,2);
+ const txt=new TextDecoder().decode(workbook('report',data,'a'));assert.ok(!txt.includes('PRIVATE OTHER'));assert.ok(!txt.includes('Private Store'));for(const name of ['Tổng quan','Tổng hợp nhân viên','Theo cửa hàng','Công từng ngày','Chi tiết từng ca','Cần đối soát'])assert.ok(txt.includes(name));assert.ok(txt.includes('Store A'));assert.ok(txt.includes('Chưa vào ca'));assert.ok(!txt.includes('<f>'));
+});

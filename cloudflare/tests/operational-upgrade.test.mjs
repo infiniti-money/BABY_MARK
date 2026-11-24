@@ -26,6 +26,6 @@ test('reports and exceptions respect role/store scope',async()=>{const f=await a
  const query='?from='+f.workDate+'&to='+f.workDate;
  const res=await f.call(alerts,'manager',{method:'GET',query});assert.equal(res.status,200);const ar=await res.json();assert.equal(ar.alerts.length,1);assert.equal(ar.alerts[0].id,f.assignment);assert.deepEqual(ar.alerts[0].flags,['MISSING_IN']);
  assert.equal((await f.call(alerts,'staff',{method:'GET',query})).status,403);
- const d=await (await f.call(reports,'manager',{method:'GET',query})).json();assert.deepEqual(d.branches.map(b=>b.branch_id),['BM-001']);
+ const d=await (await f.call(reports,'manager',{method:'GET',query})).json();assert.deepEqual(d.branches.map(b=>b.branch_id),['BM-001']);assert.ok(Number.isFinite(d.computed_at));assert.deepEqual(d.rows[0].exception_flags,['MISSING_IN']);
  const all=await (await f.call(reports,'admin',{method:'GET',query})).json();assert.equal(all.branches.length,2);
  }finally{f.close()}});
