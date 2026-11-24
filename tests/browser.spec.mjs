@@ -9,7 +9,7 @@ const tomorrow=()=>dayVN(Date.now()+86400000);
 async function login(page,role='admin') {
   await page.goto('/');
   await page.getByLabel('Tên đăng nhập',{exact:true}).fill(username[role]);
-  await page.getByLabel('Mã truy cập',{exact:true}).fill(secret);
+  await page.getByLabel('Mật khẩu hoặc mã truy cập',{exact:true}).fill(secret);
   await page.getByTestId('login-submit').click();
   await expect(page.getByRole('heading',{name:'Chấm công hôm nay',exact:true})).toBeVisible();
   await expect(page.locator('#content .loading')).toHaveCount(0);
@@ -22,7 +22,7 @@ async function apiToken(request,role) {
 async function loginAccount(page,name,accessSecret) {
   await page.goto('/');
   await page.getByLabel('Tên đăng nhập',{exact:true}).fill(name);
-  await page.getByLabel('Mã truy cập',{exact:true}).fill(accessSecret);
+  await page.getByLabel('Mật khẩu hoặc mã truy cập',{exact:true}).fill(accessSecret);
   await page.getByTestId('login-submit').click();
   await expect(page.getByRole('heading',{name:'Chấm công hôm nay',exact:true})).toBeVisible();
   await expect(page.locator('#content .loading')).toHaveCount(0);
@@ -282,9 +282,9 @@ test.describe.serial('Cloudflare local frontend and actual D1/KV endpoints',()=>
       await page.getByRole('button',{name:'Quản trị',exact:true}).click();
       const employeeRow=page.getByRole('row').filter({hasText:employee.employee_code});
       await expect(employeeRow).toBeVisible();
-      await employeeRow.getByRole('button',{name:'Cấp lại mã',exact:true}).click();
+      await employeeRow.getByRole('button',{name:'Đặt lại mật khẩu / mã',exact:true}).click();
       const resetDialog=page.getByRole('dialog',{name:'Cấp lại mã truy cập',exact:true});
-      await resetDialog.getByRole('button',{name:'Cấp lại mã',exact:true}).click();
+      await resetDialog.getByRole('button',{name:'Đặt lại mật khẩu / mã',exact:true}).click();
       const issued=page.getByTestId('issued-secret');await issued.waitFor({state:'visible'});
       const newSecret=await issued.textContent();
       await page.getByRole('button',{name:'Đã lưu mã an toàn',exact:true}).click();

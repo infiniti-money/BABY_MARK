@@ -1,4 +1,5 @@
-// Only server-generated 192-bit random credentials are accepted. NOT a human password hash scheme.
+// Legacy random codes and browser-derived password keys use separate verifier domains.
+// Never hash a human password with credentialHash alone.
 import {jsonLimited} from './http.mjs';
 const enc=new TextEncoder();
 export const randomHex=n=>Array.from(crypto.getRandomValues(new Uint8Array(n)),x=>x.toString(16).padStart(2,'0')).join('');
@@ -7,6 +8,9 @@ export const usernameOf=s=>typeof s==='string'?s.trim().toLowerCase():'';
 export const validUsername=s=>/^[a-z0-9._-]{3,64}$/.test(s);
 export const validSecret=s=>typeof s==='string'&&/^[0-9a-f]{48}$/.test(s);
 export const credentialHash=(salt,secret)=>digest('babymark-credential-v1:'+salt+':'+secret);
+export const validPasswordKey=s=>typeof s==='string'&&/^[0-9a-f]{64}$/.test(s);
+export const validPasswordSalt=s=>typeof s==='string'&&/^[0-9a-f]{32}$/.test(s);
+export const passwordKeyHash=(salt,key)=>digest('babymark-password-key-v1:'+salt+':'+key);
 export async function generateCredential(){const secret=randomHex(24),salt=randomHex(16);return {secret,salt,hash:await credentialHash(salt,secret)}}
 export function equalHash(a,b){if(typeof a!=='string'||typeof b!=='string'||a.length!==64||b.length!==64)return false;let d=0;for(let i=0;i<64;i++)d|=a.charCodeAt(i)^b.charCodeAt(i);return d===0}
 export async function sessionUser(request,db){
