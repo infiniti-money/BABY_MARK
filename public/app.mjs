@@ -28,8 +28,9 @@ const badge = value => {
     ['LATE','EARLY','PENDING','MISSING','PARTIAL'].includes(value)||/muộn|sớm|thiếu|chờ/i.test(text)?'amber':'';
   return `<span class="tag ${tone}">${esc(text)}</span>`;
 };
-let saved;
-try { saved = JSON.parse(sessionStorage.getItem('babymark-session') || 'null'); } catch {}
+const SESSION_KEY='babymark-session';
+function readSaved(storage){try{const s=JSON.parse(storage.getItem(SESSION_KEY)||'null');if(s&&/^[0-9a-f]{64}$/.test(s.token)&&Number.isFinite(s.expires_at)&&s.expires_at>Date.now())return s;storage.removeItem(SESSION_KEY);}catch{}return null;}
+let saved=readSaved(localStorage)||readSaved(sessionStorage);
 const state = {token:saved?.expires_at>Date.now()?saved.token:null,user:null,view:'today',adminTab:'employees',assignments:[],attendances:[],admin:{},reports:[],requests:[],stream:null,renderId:0,sessionEpoch:0,filters:{from:monthStart(),to:today(),branch_id:'',user_id:''}};
 let noticeTimer, photoURLs = [],modalTicket=0,cameraTicket=0;
 
@@ -42,7 +43,9 @@ function setSession(session) {
   state.sessionEpoch++;state.renderId++;
   state.token=session?.token||null;
   state.assignments=[];state.attendances=[];state.admin={};state.reports=[];state.requests=[];state.handover=null;
-  try { session ? sessionStorage.setItem('babymark-session',JSON.stringify(session)) : sessionStorage.removeItem('babymark-session'); } catch {}
+  try{sessionStorage.removeItem(SESSION_KEY);}catch{}
+  try{localStorage.removeItem(SESSION_KEY);}catch{}
+  if(session){if(session.remember){try{localStorage.setItem(SESSION_KEY,JSON.stringify(session));return;}catch{}}try{sessionStorage.setItem(SESSION_KEY,JSON.stringify(session));}catch{}}
 }
 async function api(path,{body,method='GET',raw=false}={}) {
   const epoch=state.sessionEpoch;
@@ -55,7 +58,7 @@ async function api(path,{body,method='GET',raw=false}={}) {
     const result = await response.json().catch(()=>({}));
     if(epoch!==state.sessionEpoch)throw new Error('Tài khoản đã thay đổi. Vui lòng thử lại trong phiên hiện tại.');
     if (response.status===401 && state.user) { stopCamera(); state.user=null; setSession(null); renderLogin('Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.'); }
-    throw new Error(result.error||`Không thể xử lý yêu cầu (${response.status}).`);
+    const error=new Error(result.error||`Không thể xử lý yêu cầu (${response.status}).`);error.status=response.status;throw error;
   }
   if(raw)return response;
   const data=await response.json();
@@ -86,7 +89,7 @@ function showModal(title,body) {
   return modalTicket;
 }
 function renderLogin(error='') {
-  app.innerHTML=`<div class="login"><aside class="login-story"><div><div class="login-brand"><img src="/brand/logo.png" alt="BABY MARK"><div><strong>BABY MARK</strong><p class="muted">MOM & BABY</p></div></div><h1>Mỗi ngày làm việc.<br>Một dấu ấn tận tâm.</h1><p class="intro">Không gian chấm công và quản lý ca làm dành riêng cho đội ngũ BABY MARK.</p><div class="login-values"><div><strong>14</strong><span>Cửa hàng kết nối</span></div><div><strong>01</strong><span>Đội ngũ đồng hành</span></div></div></div><div class="login-foot">BABY MARK · Cổng nội bộ dành cho nhân viên được cấp tài khoản</div></aside><main id="main" class="login-panel"><section class="login-box"><p class="eyebrow">CHÀO MỪNG TRỞ LẠI</p><h2>Đăng nhập hệ thống</h2><p class="muted">Sử dụng tài khoản và mật khẩu hoặc mã truy cập do quản trị viên cấp.</p><form data-form="login" class="form-stack"><label>Tên đăng nhập<input name="username" autocomplete="username" required minlength="3" maxlength="64" placeholder="Ví dụ: bm001" autocapitalize="none" spellcheck="false"></label><label>Mật khẩu hoặc mã truy cập<input name="secret" type="password" autocomplete="current-password" required maxlength="128" placeholder="Mật khẩu hoặc mã 48 ký tự"></label><p id="login-error" class="error-text" role="alert" ${error?'':'hidden'}>${esc(error)}</p><button class="btn wide" type="submit" data-testid="login-submit">Đăng nhập ${icon('arrow')}</button></form><div class="login-note">${icon('shield')}<span>Tài khoản được cấp nội bộ. Nếu quên mật khẩu hoặc chưa có tài khoản, hãy liên hệ quản trị viên cửa hàng.</span></div><p class="hint">Camera và GPS cần HTTPS hoặc localhost. Trang chỉ xin quyền khi bạn bắt đầu chấm công.</p></section></main></div>`;
+  app.innerHTML=`<div class="login"><aside class="login-story"><div><div class="login-brand"><img src="/brand/logo.png" alt="BABY MARK"><div><strong>BABY MARK</strong><p class="muted">MOM & BABY</p></div></div><h1>Mỗi ngày làm việc.<br>Một dấu ấn tận tâm.</h1><p class="intro">Không gian chấm công và quản lý ca làm dành riêng cho đội ngũ BABY MARK.</p><div class="login-values"><div><strong>14</strong><span>Cửa hàng kết nối</span></div><div><strong>01</strong><span>Đội ngũ đồng hành</span></div></div></div><div class="login-foot">BABY MARK · Cổng nội bộ dành cho nhân viên được cấp tài khoản</div></aside><main id="main" class="login-panel"><section class="login-box"><p class="eyebrow">CHÀO MỪNG TRỞ LẠI</p><h2>Đăng nhập hệ thống</h2><p class="muted">Sử dụng tài khoản và mật khẩu hoặc mã truy cập do quản trị viên cấp.</p><form data-form="login" class="form-stack"><label>Tên đăng nhập<input name="username" autocomplete="username" required minlength="3" maxlength="64" placeholder="Ví dụ: bm001" autocapitalize="none" spellcheck="false"></label><label>Mật khẩu hoặc mã truy cập<input name="secret" type="password" autocomplete="current-password" required maxlength="128" placeholder="Mật khẩu hoặc mã 48 ký tự"></label><p id="login-error" class="error-text" role="alert" ${error?'':'hidden'}>${esc(error)}</p><label class="remember-device"><input type="checkbox" name="remember" checked> Ghi nhớ đăng nhập trên thiết bị này</label><p class="hint">Chỉ chọn trên thiết bị cá nhân. Nhân viên/quản lý: tối đa 30 ngày; Admin: tối đa 8 giờ. Không lưu mật khẩu.</p><button class="btn wide" type="submit" data-testid="login-submit">Đăng nhập ${icon('arrow')}</button></form><div class="login-note">${icon('shield')}<span>Tài khoản được cấp nội bộ. Nếu quên mật khẩu hoặc chưa có tài khoản, hãy liên hệ quản trị viên cửa hàng.</span></div><p class="hint">Camera và GPS cần HTTPS hoặc localhost. Trang chỉ xin quyền khi bạn bắt đầu chấm công.</p></section></main></div>`;
 }
 const navItems = () => [['today','camera','Chấm công'],['history','clock','Lịch sử'],['schedule','calendar','Lịch làm việc'],['requests','file','Yêu cầu công'],['extra','calendar','Ngoài lịch / thay ca'],['handover','file','Bàn giao ca'],['push','clock','Push điện thoại'],...(state.user.role==='admin'?[['admin','people','Quản trị']]:[]),...(['admin','manager'].includes(state.user.role)?[['reports','chart','Báo cáo'],['alerts','clock','Thông báo']]:[])];
 const titles = {today:'Chấm công hôm nay',history:'Lịch sử chấm công',schedule:'Lịch làm việc',requests:'Yêu cầu công',extra:'Chấm công ngoài lịch / thay ca',handover:'Sổ bàn giao ca',admin:'Quản trị hệ thống',reports:'Báo cáo chấm công',alerts:'Thông báo đi muộn',push:'Push điện thoại'};
@@ -366,6 +369,7 @@ document.addEventListener('click',async event=>{
   const action=button.dataset.action;if(!action)return;
   try {
     if(action==='mobile-menu'){mobileMenu(button.getAttribute('aria-expanded')!=='true');return;}
+    if(action==='session-retry')return await boot();
     if(action==='close-modal'){if(!pendingCapture?.sending)closeModal();return;}
     if(action==='capture-confirm')return await confirmCapture(button);
     if(action==='capture-retake'){if(pendingCapture?.sending)return;closeModal();await startCamera();return;}
@@ -541,6 +545,7 @@ document.addEventListener('submit',async event=>{
         const {salt}=await api('/api/auth/password-salt',{method:'POST',body:{username}});
         body={username,password_key:await derivePasswordKey(secret,salt)};
       }
+      body.remember=!!values.remember;
       const result=await api('/api/auth/login',{method:'POST',body});setSession(result);
       state.user=(await api('/api/auth/me')).user;await navigate('today');return;
     }
@@ -651,6 +656,7 @@ document.addEventListener('visibilitychange',()=>{if(document.hidden)stopCamera(
 async function boot(){
   if(!state.token)return renderLogin();
   try{state.user=(await api('/api/auth/me')).user;await navigate('today');}
-  catch(e){setSession(null);renderLogin(e.message);}
+  catch(e){if(e.status===401||e.status===403){setSession(null);renderLogin(e.message);}else{app.innerHTML='<main class="login-panel"><section class="login-box"><h2>Chưa thể kết nối BABY MARK</h2><p class="muted">Phiên đã lưu chưa bị xóa. Kiểm tra mạng và thử lại.</p><button class="btn" data-action="session-retry">Thử lại</button><button class="btn secondary" data-action="logout">Đăng xuất</button></section></main>';}}
 }
+window.addEventListener('storage',event=>{if(event.key!==SESSION_KEY&&event.key!==null)return;if(!state.token)return;let old=null;try{old=JSON.parse(event.oldValue||'null');}catch{}if(event.key!==null&&old?.token!==state.token)return;state.user=null;stopCamera();closeModal();state.sessionEpoch++;state.renderId++;state.token=null;state.assignments=[];state.attendances=[];state.admin={};state.reports=[];state.requests=[];state.handover=null;try{sessionStorage.removeItem(SESSION_KEY)}catch{}renderLogin('Phiên trên thiết bị đã thay đổi. Vui lòng mở lại ứng dụng hoặc đăng nhập.');});
 await boot();

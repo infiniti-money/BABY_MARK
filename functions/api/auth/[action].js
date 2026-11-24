@@ -2,7 +2,7 @@ import {randomHex,digest,usernameOf,validUsername,validSecret,credentialHash,gen
 import {HttpError} from '../../../cloudflare/lib/http.mjs';
 const validText=(v,n)=>typeof v==='string'&&v.trim().length>0&&v.length<=n;
 const uuid=v=>typeof v==='string'&&/^[0-9a-f-]{36}$/i.test(v);
-const HOURS=8;
+const HOURS=8, REMEMBER_HOURS=30*24;
 async function issuedCredential(b){
  if(b.password_key===undefined&&b.password_salt===undefined)return generateCredential();
  if(!validPasswordKey(b.password_key)||!validPasswordSalt(b.password_salt))return null;
@@ -41,15 +41,16 @@ export async function onRequestPost({request,env,params}){
  const username=usernameOf(b.username),secret=b.secret,key=b.password_key;
  const passwordMode=key!==undefined;
  if(!validUsername(username)||(passwordMode?(!validPasswordKey(key)||secret!==undefined):!validSecret(secret)))return reply({error:'Thông tin đăng nhập không đúng'},401);
- const c=await db.prepare('SELECT c.user_id,c.salt,c.secret_hash,c.version,p.active FROM credentials c JOIN profiles p ON p.id=c.user_id WHERE c.username=?').bind(username).first();
+ const c=await db.prepare('SELECT c.user_id,c.salt,c.secret_hash,c.version,p.active,p.role FROM credentials c JOIN profiles p ON p.id=c.user_id WHERE c.username=?').bind(username).first();
  if(!c||!c.active)return reply({error:'Thông tin đăng nhập không đúng'},401);
  const window=Math.floor(now/900000);
  const attempt=await db.prepare('INSERT INTO login_attempts(user_id,window_id,attempts) VALUES(?,?,1) ON CONFLICT(user_id) DO UPDATE SET attempts=CASE WHEN window_id=excluded.window_id THEN min(attempts+1,11) ELSE 1 END,window_id=excluded.window_id RETURNING attempts').bind(c.user_id,window).first();
  if(attempt.attempts>10)return reply({error:'Quá nhiều lần thử, hãy thử lại sau'},429);
  if(!equalHash(await (passwordMode?passwordKeyHash(c.salt,key):credentialHash(c.salt,secret)),c.secret_hash))return reply({error:'Thông tin đăng nhập không đúng'},401);
- const token=randomHex(32),hash=await digest('babymark-session-v1:'+token),expires=now+HOURS*3600000;
+ const remember=b.remember===true, hours=remember&&c.role!=='admin'?REMEMBER_HOURS:HOURS;
+ const token=randomHex(32),hash=await digest('babymark-session-v1:'+token),expires=now+hours*3600000;
  await db.batch([db.prepare('DELETE FROM sessions WHERE user_id=? AND expires_at<=?').bind(c.user_id,now),db.prepare('INSERT INTO sessions(token_hash,user_id,credential_version,created_at,expires_at) VALUES(?,?,?,?,?)').bind(hash,c.user_id,c.version,now,expires),db.prepare('DELETE FROM login_attempts WHERE user_id=?').bind(c.user_id)]);
- return reply({token,expires_at:expires});
+ return reply({token,expires_at:expires,remember});
  }
  const actor=await sessionUser(request,db);if(!actor)return reply({error:'Chưa đăng nhập'},401);
  if(action==='logout'){

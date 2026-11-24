@@ -324,14 +324,14 @@ test.describe.serial('Cloudflare local frontend and actual D1/KV endpoints',()=>
 
 test('offline logout still clears local account data and camera access',async({page,context})=>{
   await login(page,'staff');
-  expect(await page.evaluate(()=>Boolean(sessionStorage.getItem('babymark-session')))).toBeTruthy();
+  expect(await page.evaluate(()=>Boolean(localStorage.getItem('babymark-session')||sessionStorage.getItem('babymark-session')))).toBeTruthy();
   await page.getByRole('button',{name:'Bật camera',exact:true}).click();
   await expect.poll(()=>page.locator('#camera').evaluate(v=>v.readyState>=2)).toBeTruthy();
   await page.evaluate(()=>{window.__lastCameraTracks=[...document.querySelector('#camera').srcObject.getTracks()];});
   await context.setOffline(true);
   await page.getByRole('button',{name:'Đăng xuất tài khoản',exact:true}).click();
   await expect(page.getByTestId('login-submit')).toBeVisible();
-  expect(await page.evaluate(()=>sessionStorage.getItem('babymark-session'))).toBeNull();
+  expect(await page.evaluate(()=>localStorage.getItem('babymark-session')||sessionStorage.getItem('babymark-session'))).toBeNull();
   expect(await page.evaluate(()=>window.__lastCameraTracks.every(track=>track.readyState==='ended'))).toBeTruthy();
   await expect(page.getByRole('dialog')).not.toBeVisible();
   await context.setOffline(false);
@@ -434,4 +434,11 @@ test('device permission setup explicitly checks camera and GPS without uploading
  await page.getByRole('button',{name:'Cho phép / kiểm tra vị trí',exact:true}).click();
  await expect(page.locator('[data-permission-status="location"]')).toContainText('Đã kiểm tra GPS thành công');
  expect(requests).toEqual([]);
+});
+
+test('remembered staff session survives closing the tab',async({page,context})=>{
+ await login(page,'staff');
+ const expiry=await page.evaluate(()=>JSON.parse(localStorage.getItem('babymark-session')||'null')?.expires_at);
+ expect(expiry-Date.now()).toBeGreaterThan(29*86400000);
+ const next=await context.newPage();await next.goto('/');await expect(next.getByRole('button',{name:'Chấm công',exact:true})).toBeVisible();await expect(next.locator('form[data-form="login"]')).toHaveCount(0);await next.close();
 });
