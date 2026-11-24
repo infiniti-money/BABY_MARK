@@ -1,12 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {storeStampedPhoto,RETENTION_SECONDS} from '../lib/timemark-kv.mjs';
+import {validatePhoto,excessBytes,storeStampedPhoto,RETENTION_SECONDS,MAX_IMAGE_BYTES,STORAGE_BUDGET_BYTES} from '../lib/timemark-kv.mjs';
 const key='timemark/00000000-0000-4000-8000-000000000000.jpg';
-test('binary photo, 60-day expiry, no public URL',async()=>{
- const now=Date.now(),bytes=new Uint8Array([255,216,255,217]).buffer;
- let args;
- const out=await storeStampedPhoto({put:async(...a)=>{args=a}},key,bytes,now);
- assert.equal(args[0],key);assert.equal(args[1],bytes);assert.equal(args[2].expiration,Math.floor(now/1000)+RETENTION_SECONDS);assert.equal(out.photo_path,key);
-});
-test('reject oversize',async()=>assert.rejects(storeStampedPhoto({put:async()=>assert.fail()},key,new ArrayBuffer(100001),Date.now()),/INVALID_IMAGE_SIZE/));
-test('reject wrong JPEG signature',async()=>assert.rejects(storeStampedPhoto({put:async()=>assert.fail()},key,new ArrayBuffer(4),Date.now()),/INVALID_JPEG/));
+const jpeg=n=>{const a=new Uint8Array(n);a[0]=255;a[1]=216;a[n-2]=255;a[n-1]=217;return a.buffer};
+test('200 KB max, binary JPEG and 60 days',()=>{const now=Date.now();assert.equal(validatePhoto(key,jpeg(200000),now,now),Math.floor(now/1000)+RETENTION_SECONDS);assert.equal(MAX_IMAGE_BYTES,200000);assert.throws(()=>validatePhoto(key,jpeg(200001),now,now),/INVALID_IMAGE_SIZE/);assert.throws(()=>validatePhoto(key,new ArrayBuffer(4),now,now),/INVALID_JPEG/)});
+test('80 percent budget, no excess until next photo crosses cap',()=>{assert.equal(STORAGE_BUDGET_BYTES,800000000);assert.equal(excessBytes(799800000,200000),0);assert.equal(excessBytes(799900000,200000),100000)});
+test('busy storage never uploads or deletes',async()=>{const db={prepare(){return{bind(){return{first:async()=>null}}}}};const kv={put:async()=>assert.fail(),delete:async()=>assert.fail()};await assert.rejects(storeStampedPhoto(db,kv,key,jpeg(4),Date.now()),/PHOTO_STORAGE_BUSY/)});
+test('evict oldest before reservation and upload',async()=>{const calls=[],old='timemark/old.jpg';const db={prepare(sql){return {bind(...args){return {first:async()=>{if(sql.includes('RETURNING id'))return{id:1};if(sql.startsWith('SELECT photo_path FROM'))return null;if(sql.includes('SUM'))return{used:800000000};if(sql.includes('ORDER BY captured_at'))return{photo_path:old,byte_size:200000};throw Error(sql)},run:async()=>{calls.push(sql)}}}}}};const kv={delete:async k=>{assert.equal(k,old);calls.push('delete')},put:async(k,b,o)=>{assert.equal(k,key);assert.equal(b.byteLength,200000);assert.ok(o.expiration);calls.push('put')}};const r=await storeStampedPhoto(db,kv,key,jpeg(200000),Date.now());assert.equal(r.evicted_count,1);assert.ok(calls.indexOf('delete')<calls.indexOf('put'));assert.ok(calls.findIndex(x=>x.includes("INSERT INTO photo_inventory"))<calls.indexOf('put'))});
