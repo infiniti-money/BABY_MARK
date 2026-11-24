@@ -2,7 +2,7 @@
   "expo": {
     "name": "BABY_MARK Staff",
     "slug": "baby-mark-staff",
-    "version": "0.1.0",
+    "version": "0.2.0",
     "ios": {
       "bundleIdentifier": "com.infinitimoney.babymark",
       "supportsTablet": false
@@ -23,7 +23,8 @@
         {
           "locationWhenInUsePermission": "BABY_MARK cần vị trí khi chấm công."
         }
-      ]
+      ],
+      "expo-notifications"
     ]
   }
 }
