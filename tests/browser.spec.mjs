@@ -11,7 +11,7 @@ async function login(page,role='admin') {
   await page.getByLabel('Tên đăng nhập',{exact:true}).fill(username[role]);
   await page.getByLabel('Mật khẩu hoặc mã truy cập',{exact:true}).fill(secret);
   await page.getByTestId('login-submit').click();
-  await expect(page.getByRole('heading',{name:'Chấm công hôm nay',exact:true})).toBeVisible();
+  await expect(page.getByRole('heading',{name:role==='admin'?'Tổng quan quản trị':'Chấm công hôm nay',exact:true})).toBeVisible();
   await expect(page.locator('#content .loading')).toHaveCount(0);
 }
 async function apiToken(request,role) {
@@ -402,7 +402,7 @@ test('responsive admin navigation, readable records and forms at narrow, tablet 
  for(const size of [{width:390,height:844},{width:768,height:1024},{width:1024,height:768},{width:1440,height:900},{width:844,height:390}]){
   await page.setViewportSize(size);expect(await fits()).toBeTruthy();
  }
- await more.click();await expect(page.getByRole('button',{name:'Push điện thoại',exact:true})).toBeVisible();
+ await more.click();await expect(page.getByRole('button',{name:'Thiết bị & thông báo',exact:true})).toBeVisible();
  await page.keyboard.press('Escape');await expect(more).toHaveAttribute('aria-expanded','false');
 });
 test('mobile employee can reach own password settings without sideways scrolling',async({page})=>{
@@ -462,4 +462,15 @@ test('camera selection before opening and stop camera',async({page})=>{
  await expect(page.getByRole('button',{name:'Tắt camera',exact:true})).toBeVisible();
  await page.getByRole('button',{name:'Tắt camera',exact:true}).click();await expect(page.getByRole('button',{name:'Bật camera',exact:true})).toBeVisible();
  expect(await page.locator('#camera').evaluate(v=>v.srcObject===null)).toBeTruthy();
+});
+
+test('admin overview and role navigation do not duplicate primary modules',async({page})=>{
+ await login(page);
+ await expect(page.getByRole('heading',{name:'Việc cần xử lý'})).toBeVisible();
+ await expect(page.getByRole('button',{name:'Bật camera',exact:true})).toHaveCount(0);
+ await page.getByRole('button',{name:'Quản trị',exact:true}).click();
+ for(const name of ['Báo cáo','Bảng công & lương','Yêu cầu công','Thông báo'])await expect(page.getByRole('button',{name,exact:true})).toHaveCount(1);
+ await page.getByRole('button',{name:'Yêu cầu công',exact:true}).click();
+ await expect(page.getByRole('button',{name:'Nghỉ phép / điều chỉnh',exact:true})).toBeVisible();
+ await page.getByRole('button',{name:'Ca bổ sung / thay ca',exact:true}).click();await expect(page.getByRole('heading',{name:'Chấm công ngoài lịch / thay ca',exact:true})).toBeVisible();
 });
