@@ -7,25 +7,42 @@ const normalizeStoreName=s=>s.normalize('NFC').trim().replace(/\s+/g,' ').toLoca
 const url=process.env.NEXT_PUBLIC_SUPABASE_URL,key=process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
 const db=url&&key?createClient(url,key):null;
 const fmt=t=>t?new Date(t).toLocaleString('vi-VN',{timeZone:'Asia/Ho_Chi_Minh'}):'—';
+// Fetch stable pages instead of silently truncating at the API default row limit.
+async function fetchAll(query){
+ const rows=[];const size=200;
+ for(let offset=0;offset<200000;offset+=size){
+ const {data,error}=await query().range(offset,offset+size-1);if(error)throw error;
+ rows.push(...data);if(data.length<size)return rows;
+ }
+ throw Error('Báo cáo vượt giới hạn an toàn, hãy thu hẹp phạm vi.');
+}
 export default function Page(){
- const [session,S]=useState(null),[profile,P]=useState(null),[email,E]=useState(''),[password,W]=useState(''),[message,M]=useState(''),[month,Month]=useState(dayVN().slice(0,7)),[day,Day]=useState(dayVN()),[assignments,A]=useState([]),[records,R]=useState([]),[people,U]=useState([]),[branches,B]=useState([]),[shifts,H]=useState([]),[selected,Q]=useState(''),[photo,Photo]=useState(null),[busy,Busy]=useState(false),[camera,Cam]=useState(false),[form,F]=useState({}),[detail,D]=useState(null);
+ const [session,S]=useState(null),[profile,P]=useState(null),[email,E]=useState(''),[password,W]=useState(''),[message,M]=useState(''),[month,Month]=useState(dayVN().slice(0,7)),[day,Day]=useState(dayVN()),[allAssignments,A]=useState([]),[branchFilter,BranchFilter]=useState(''),[records,R]=useState([]),[people,U]=useState([]),[branches,B]=useState([]),[shifts,H]=useState([]),[selected,Q]=useState(''),[photo,Photo]=useState(null),[busy,Busy]=useState(false),[camera,Cam]=useState(false),[form,F]=useState({}),[detail,D]=useState(null);
  const video=useRef(null),stream=useRef(null);
- const [notices,Notices]=useState([]);
+ const [notices,Notices]=useState([]),[reportReady,ReportReady]=useState(false);
+ const assignments=branchFilter?allAssignments.filter(a=>a.branch_id===branchFilter):allAssignments;
+ const loadSeq=useRef(0);
  async function loadNotices(){const {data}=await db.from('attendance_notifications').select('id,kind,title,body,created_at').order('created_at',{ascending:false}).limit(30);Notices(data||[])}
  function closeCamera(){stream.current?.getTracks().forEach(t=>t.stop());stream.current=null;Cam(false)}
  useEffect(()=>{if(!db)return;db.auth.getSession().then(({data})=>S(data.session));const {data:{subscription}}=db.auth.onAuthStateChange((_,s)=>S(s));return()=>{subscription.unsubscribe();stream.current?.getTracks().forEach(t=>t.stop())}},[]);
- useEffect(()=>{P(null);A([]);R([]);D(null);Photo(null);Q('');if(session)db.from('profiles').select('*').eq('id',session.user.id).single().then(({data,error})=>{if(error)M(error.message);else P(data)})},[session?.user.id]);
+ useEffect(()=>{P(null);A([]);R([]);U([]);B([]);H([]);D(null);Photo(null);Q('');BranchFilter('');ReportReady(false);loadSeq.current++;if(session)db.from('profiles').select('*').eq('id',session.user.id).single().then(({data,error})=>{if(error)M(error.message);else P(data)})},[session?.user.id]);
  async function load(){
   if(!profile?.active)return;
   const start=month+'-01',n=new Date(month+'-01T00:00:00Z');n.setUTCMonth(n.getUTCMonth()+1);const end=n.toISOString().slice(0,10);
-  const res=await db.from('assignments').select('*').gte('work_date',start).lt('work_date',end).order('starts_at');
-  if(res.error){M(res.error.message);return} A(res.data);
-  const ar=await db.from('attendances').select('*').in('assignment_id',res.data.map(a=>a.id).concat('00000000-0000-0000-0000-000000000000'));
-  if(ar.error)M(ar.error.message);else R(ar.data);
-  const [u,b,h]=await Promise.all([db.from('profiles').select('*'),db.from('branches').select('*'),db.from('shifts').select('*')]);
-  U(u.data||[]);B(b.data||[]);H(h.data||[]);
+  const seq=++loadSeq.current;
+  try{
+   const [a,r,u,b,h]=await Promise.all([
+    fetchAll(()=>db.from('assignments').select('*').gte('work_date',start).lt('work_date',end).order('starts_at').order('id')),
+    fetchAll(()=>db.from('attendances').select('*,assignments!inner(work_date)').gte('assignments.work_date',start).lt('assignments.work_date',end).order('id')),
+    fetchAll(()=>db.from('profiles').select('*').order('id')),
+    fetchAll(()=>db.from('branches').select('*').order('id')),
+    fetchAll(()=>db.from('shifts').select('*').order('id'))
+   ]);
+   if(seq!==loadSeq.current)return;
+   A(a);R(r);U(u);B(b);H(h);ReportReady(true);
+  }catch(e){if(seq===loadSeq.current){ReportReady(false);M('Không tải đủ dữ liệu báo cáo: '+e.message)}}
  }
- useEffect(()=>{Notices([]);if(!profile?.active)return;load();loadNotices();const id=setInterval(()=>{load();loadNotices()},30000);const channel=db.channel('attendance-dashboard-'+profile.id).on('postgres_changes',{event:'INSERT',schema:'public',table:'attendances'},()=>load()).on('postgres_changes',{event:'INSERT',schema:'public',table:'attendance_notifications'},()=>loadNotices()).on('postgres_changes',{event:'INSERT',schema:'public',table:'assignments'},()=>load()).on('postgres_changes',{event:'UPDATE',schema:'public',table:'assignments'},()=>load()).subscribe();return()=>{clearInterval(id);db.removeChannel(channel)}},[profile,month]);
+ useEffect(()=>{Notices([]);ReportReady(false);if(!profile?.active)return;load();loadNotices();const id=setInterval(()=>{load();loadNotices()},30000);const channel=db.channel('attendance-dashboard-'+profile.id).on('postgres_changes',{event:'INSERT',schema:'public',table:'attendances'},()=>load()).on('postgres_changes',{event:'INSERT',schema:'public',table:'attendance_notifications'},()=>loadNotices()).on('postgres_changes',{event:'INSERT',schema:'public',table:'assignments'},()=>load()).on('postgres_changes',{event:'UPDATE',schema:'public',table:'assignments'},()=>load()).subscribe();return()=>{loadSeq.current++;clearInterval(id);db.removeChannel(channel)}},[profile,month]);
  useEffect(()=>{if(camera&&video.current)video.current.srcObject=stream.current},[camera]);
  async function login(e){e.preventDefault();M('');const {error}=await db.auth.signInWithPassword({email,password});if(error)M(error.message)}
  async function openCamera(){try{closeCamera();Photo(null);stream.current=await navigator.mediaDevices.getUserMedia({video:{facingMode:'user'},audio:false});Cam(true)}catch{M('Cần cấp quyền camera và truy cập qua HTTPS.')}}
@@ -55,6 +72,7 @@ export default function Page(){
  const stats=p=>assignments.filter(a=>a.user_id===p.id).map(summary).reduce((acc,v)=>({days:acc.days+v.days,minutes:acc.minutes+v.minutes,late:acc.late+v.late,early:acc.early+v.early}),{days:0,minutes:0,late:0,early:0});
  async function view(r){D(r);Photo(null);const {data,error}=await db.storage.from('attendance-private').createSignedUrl(r.photo_path,60);if(error)M(error.message);else Photo(data.signedUrl)}
  async function exportExcel(){
+ if(!reportReady)return M('Chưa tải đủ dữ liệu để xuất báo cáo.');
   try{const ExcelJS=(await import('exceljs')).default;const book=new ExcelJS.Workbook(),s=book.addWorksheet('Bảng công');
   s.addRow(['Mã NV','Họ tên','Ngày công','Giờ làm','Phút muộn','Phút sớm',...Array.from({length:days},(_,i)=>i+1)]);
   for(const p of people){const t=stats(p);s.addRow([p.employee_code,p.full_name,t.days,t.minutes/60,t.late,t.early,...Array.from({length:days},(_,i)=>assignments.filter(a=>a.user_id===p.id&&a.work_date===month+'-'+String(i+1).padStart(2,'0')).map(a=>summary(a).status).join('; '))])}
@@ -70,8 +88,8 @@ export default function Page(){
  if(!session)return <main><h1>BABY_MARK</h1><section><h2>Đăng nhập</h2><form onSubmit={login}><input type="email" required placeholder="Email" value={email} onChange={e=>E(e.target.value)}/><input type="password" required placeholder="Mật khẩu" value={password} onChange={e=>W(e.target.value)}/><button>Đăng nhập</button></form><p role="status">{message}</p></section></main>;
  return <main><header className="row"><h1>BABY_MARK</h1><span>{profile?.full_name||'Đang tải hồ sơ'}</span><button onClick={()=>{closeCamera();db.auth.signOut()}}>Đăng xuất</button></header><p role="status">{message}</p>
  {!profile?.active?<section>Tài khoản chưa có hồ sơ hoặc bị vô hiệu hóa.</section>:<>
- <section className="row"><label>Tháng <input type="month" value={month} onChange={e=>{if(e.target.value){Month(e.target.value);Day(e.target.value+'-01')}}}/></label><label>Ngày <input type="date" value={day} onChange={e=>{if(e.target.value){Day(e.target.value);Month(e.target.value.slice(0,7))}}}/></label><button onClick={load}>Làm mới</button></section>
- {profile.role==='staff'?<section><h2>Chấm công</h2><p>Chỉ lấy vị trí và ảnh khi chấm công. Web không xác minh được Fake GPS.</p><select aria-label="Ca làm việc" value={selected} onChange={e=>Q(e.target.value)}><option value="">Chọn ca được phân công</option>{assignments.map(a=><option key={a.id} value={a.id}>{a.work_date} · {branch(a.branch_id)} · {fmt(a.starts_at)}</option>)}</select><button disabled={busy} onClick={openCamera}>Mở camera trước</button>{camera&&<><video ref={video} autoPlay playsInline muted/><div><button disabled={busy||!selected} onClick={()=>capture('IN')}>Vào ca</button><button disabled={busy||!selected} onClick={()=>capture('OUT')}>Tan ca</button><button onClick={closeCamera}>Đóng camera</button></div></>}</section>:<section><h2>Quản lý ngày {day}</h2><div className="row"><strong>{daily.length} ca phân công</strong><span className="good">{daily.filter(a=>logs(a.id).some(r=>r.type==='IN')).length} đã vào</span><span className="warn">{daily.filter(a=>logs(a.id).some(r=>r.late_minutes>0)).length} đi muộn</span><span className="bad">{daily.filter(a=>!logs(a.id).some(r=>r.type==='IN')&&Date.parse(a.starts_at)<Date.now()).length} chưa vào sau giờ bắt đầu</span></div><button onClick={exportExcel}>Xuất Excel tháng</button></section>}
+ <section className="row"><label>Tháng <input type="month" value={month} onChange={e=>{if(e.target.value){Month(e.target.value);Day(e.target.value+'-01')}}}/></label><label>Ngày <input type="date" value={day} onChange={e=>{if(e.target.value){Day(e.target.value);Month(e.target.value.slice(0,7))}}}/></label>{profile.role==='admin'&&<label>Cửa hàng <select value={branchFilter} onChange={e=>BranchFilter(e.target.value)}><option value="">Tất cả cửa hàng</option>{branches.map(b=><option key={b.id} value={b.id}>{b.name}</option>)}</select></label>}<button onClick={load}>Làm mới</button></section>
+ {profile.role==='staff'?<section><h2>Chấm công</h2><p>Chỉ lấy vị trí và ảnh khi chấm công. Web không xác minh được Fake GPS.</p><select aria-label="Ca làm việc" value={selected} onChange={e=>Q(e.target.value)}><option value="">Chọn ca được phân công</option>{assignments.map(a=><option key={a.id} value={a.id}>{a.work_date} · {branch(a.branch_id)} · {fmt(a.starts_at)}</option>)}</select><button disabled={busy} onClick={openCamera}>Mở camera trước</button>{camera&&<><video ref={video} autoPlay playsInline muted/><div><button disabled={busy||!selected} onClick={()=>capture('IN')}>Vào ca</button><button disabled={busy||!selected} onClick={()=>capture('OUT')}>Tan ca</button><button onClick={closeCamera}>Đóng camera</button></div></>}</section>:<section><h2>Quản lý ngày {day}</h2><div className="row"><strong>{daily.length} ca phân công</strong><span className="good">{daily.filter(a=>logs(a.id).some(r=>r.type==='IN')).length} đã vào</span><span className="warn">{daily.filter(a=>logs(a.id).some(r=>r.late_minutes>0)).length} đi muộn</span><span className="bad">{daily.filter(a=>!logs(a.id).some(r=>r.type==='IN')&&Date.parse(a.starts_at)<Date.now()).length} chưa vào sau giờ bắt đầu</span></div><button disabled={!reportReady} onClick={exportExcel}>Xuất Excel tháng</button></section>}
  <section><h2>Thông báo gần đây</h2>{notices.length?notices.map(n=><div key={n.id} style={{borderBottom:'1px solid #e2e8f0',padding:'9px 0'}}><strong>{n.title}</strong><p>{n.body}</p><small>{fmt(n.created_at)}</small></div>):<p>Chưa có thông báo.</p>}</section>
  <section><h2>Lịch phân công và chấm công ngày</h2><div className="scroll"><table><thead><tr>{['Nhân viên','Chi nhánh','Bắt đầu','Kết thúc','Trạng thái','Ảnh'].map(x=><th key={x}>{x}</th>)}</tr></thead><tbody>{daily.map(a=><tr key={a.id}><td>{name(a.user_id)}</td><td>{branch(a.branch_id)}</td><td>{fmt(a.starts_at)}</td><td>{fmt(a.ends_at)}</td><td>{summary(a).status}</td><td>{logs(a.id).map(r=><button key={r.id} onClick={()=>view(r)}>{r.type} · {r.status}</button>)}</td></tr>)}</tbody></table></div></section>
  {detail&&<section><h2>Chi tiết lần chấm công</h2><p>{fmt(detail.server_timestamp)} · {detail.status} · Cách điểm {Math.round(detail.distance_m)} m · Sai số {Math.round(detail.accuracy_m)} m</p><p>{detail.address_text||'Chưa có địa chỉ'} · {detail.gps_lat}, {detail.gps_lng}</p>{photo&&<img src={photo} alt="Ảnh bằng chứng chấm công" width="300"/>}<p><a target="_blank" rel="noreferrer" href={'https://www.google.com/maps/search/?api=1&query='+detail.gps_lat+','+detail.gps_lng}>Xem vị trí trên bản đồ</a></p><button onClick={()=>{D(null);Photo(null)}}>Đóng</button></section>}
