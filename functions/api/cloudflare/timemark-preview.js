@@ -11,7 +11,7 @@ export async function onRequestPost({request,env}){
  if(a.latitude==null||a.longitude==null)return reply({error:'Cửa hàng chưa cấu hình GPS'},409);
  const distance=distanceMeters(lat,lng,a.latitude,a.longitude);
  const status=distance>a.allowed_radius?'Ngoài vùng':type==='IN'&&now>a.starts_at+a.grace_minutes*60000?'Đi muộn':type==='OUT'&&now<a.ends_at?'Về sớm':'Trong vùng';
- const metadata={serverTimestamp:now,shiftStart:a.starts_at,shiftEnd:a.ends_at,lat,lng,accuracy,distance,radius:a.allowed_radius,type,branchName:a.name,employeeName:user.full_name,employeeCode:user.employee_code,address:'',status};
+ const metadata={serverTimestamp:now,shiftStart:a.starts_at,shiftEnd:a.ends_at,lat,lng,accuracy,distance,radius:a.allowed_radius,type,branchName:a.name,employeeName:user.full_name,employeeCode:user.employee_code,address:'',graceMinutes:a.grace_minutes,status};
  return reply({metadata,svg:makeTimemark(metadata,{preview:true}),preview_only:true});
  }catch{return reply({error:'Không tạo được mẫu Timemark'},400)}
 }
