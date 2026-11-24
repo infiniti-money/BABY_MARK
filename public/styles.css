@@ -123,3 +123,5 @@ td,th{overflow-wrap:anywhere}
  .btn,.btn.small,.logout,.tabs button{min-height:44px}
 }
 @media(prefers-reduced-motion:reduce){.sidebar,.nav,.btn{transition:none!important}}
+
+.operations-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,240px),1fr));gap:12px}.operation-row{border:1px solid var(--line);border-radius:14px;padding:14px;display:flex;align-items:flex-start;justify-content:space-between;gap:10px;min-width:0}.operation-row>div{min-width:0;overflow-wrap:anywhere}.operation-row strong{font-size:13px}.operation-row .hint{margin-top:5px;font-size:12px}.operation-row .tag{white-space:normal;flex-shrink:0;max-width:40%}

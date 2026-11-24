@@ -1,0 +1,2 @@
+# Trung tâm vận hành
+Admin → Quản trị → Vận hành. Hiển thị trạng thái schema, GPS đã nhập, tài khoản, ca làm, ảnh, Push và lịch sử tác vụ. Kích hoạt tính năng an toàn bật cảnh báo trong ứng dụng và bật Push/nhắc ca nếu schema, VAPID và Cron Secret đã sẵn sàng. Không thay đổi giới hạn cửa hàng, chính sách xóa ảnh hoặc bảng công. Không kiểm chứng GPS thật, đăng ký thiết bị, Cron đang chạy hoặc thông báo đã hiển thị chỉ bằng trạng thái này. Không cần migration ngoài 0009 và 0010 đã có. Không cấp thêm quyền cho staff/manager.
