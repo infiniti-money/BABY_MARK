@@ -1,6 +1,6 @@
 {
   "id": "/",
-  "name": "BABY MARK – Chấm công",
+  "name": "BABY MARK",
   "short_name": "BABY MARK",
   "start_url": "/",
   "scope": "/",
@@ -9,7 +9,7 @@
   "theme_color": "#a6193c",
   "icons": [
     {
-      "src": "/brand/logo.png",
+      "src": "/apple-touch-icon.png?v=2",
       "sizes": "288x288",
       "type": "image/png",
       "purpose": "any"
