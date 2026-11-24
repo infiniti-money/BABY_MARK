@@ -9,3 +9,7 @@ dist/
 *.p8
 
 bootstrap-admin.local.sql
+.wrangler/
+test-results/
+playwright-report/
+work/

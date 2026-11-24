@@ -1,4 +1,5 @@
-// Trusted server-side pipeline helper. Do not expose as an anonymous upload API.
+// Private image storage with D1 reservations. The caller supplies client-rendered
+// bytes; this helper does not verify a visible Timemark, camera, or GPS evidence.
 export const RETENTION_SECONDS=60*86400;
 export const MAX_IMAGE_BYTES=200000;
 export const STORAGE_BUDGET_BYTES=900000000;
@@ -11,7 +12,7 @@ export function validatePhoto(key,bytes,capturedAt,now=Date.now()){
  return Math.floor(capturedAt/1000)+RETENTION_SECONDS;
 }
 export function excessBytes(used,incoming,budget=STORAGE_BUDGET_BYTES){return Math.max(0,used+incoming-budget)}
-export async function storeStampedPhoto(db,namespace,key,bytes,capturedAt){
+export async function storeStampedPhoto(db,namespace,key,bytes,capturedAt,{allowEviction=true}={}){
  if(!db||!namespace||typeof namespace.put!=='function'||typeof namespace.delete!=='function')throw Error('KV_NOT_CONFIGURED');
  const expiration=validatePhoto(key,bytes,capturedAt),now=Date.now(),owner=crypto.randomUUID();
  // Single writer with no automatic lease stealing. An interrupted worker requires an
@@ -24,6 +25,7 @@ export async function storeStampedPhoto(db,namespace,key,bytes,capturedAt){
   if(await db.prepare('SELECT photo_path FROM photo_inventory WHERE photo_path=?').bind(key).first())throw Error('PHOTO_KEY_ALREADY_USED');
   const usage=await db.prepare("SELECT COALESCE(SUM(byte_size),0) AS used FROM photo_inventory WHERE state IN ('pending','stored','evicting')").first();
   let needed=excessBytes(Number(usage.used),bytes.byteLength);
+  if(needed>0&&!allowEviction)throw Error('PHOTO_STORAGE_CAPACITY_EVICTION_DISABLED');
   let removed=0;
   while(needed>0){
    // Oldest first. Bound each request's work; caller can retry after reconciliation.

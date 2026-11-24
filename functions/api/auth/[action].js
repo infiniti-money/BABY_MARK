@@ -1,4 +1,5 @@
 import {randomHex,digest,usernameOf,validUsername,validSecret,credentialHash,generateCredential,equalHash,sessionUser,reply,bodyJSON} from '../../../cloudflare/lib/auth.mjs';
+import {HttpError} from '../../../cloudflare/lib/http.mjs';
 const validText=(v,n)=>typeof v==='string'&&v.trim().length>0&&v.length<=n;
 const uuid=v=>typeof v==='string'&&/^[0-9a-f-]{36}$/i.test(v);
 const HOURS=8;
@@ -52,5 +53,5 @@ export async function onRequestPost({request,env,params}){
  }
  if(typeof b.active!=='boolean')return reply({error:'Trạng thái không hợp lệ'},400);
  await db.batch([db.prepare('UPDATE profiles SET active=? WHERE id=? AND role<>?').bind(b.active?1:0,target.id,'admin'),db.prepare('DELETE FROM sessions WHERE user_id=?').bind(target.id),audit(target.id,b.active?'ENABLE':'DISABLE')]);return reply({ok:true});
- }catch(e){return reply({error:'Không thể xử lý yêu cầu; kiểm tra dữ liệu hoặc trùng mã tài khoản'},409)}
+ }catch(e){if(e instanceof HttpError)return reply({error:e.message},e.status);return reply({error:'Không thể xử lý; kiểm tra mã trùng hoặc giới hạn 50 tài khoản hoạt động'},409)}
 }

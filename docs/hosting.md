@@ -1,12 +1,10 @@
 # Hosting BABY MARK
-## GitHub Pages — tài liệu giới thiệu, không phải hệ thống nghiệp vụ
-Settings → Pages → Build and deployment → Deploy from a branch → main → /docs → Save.
-URL dự kiến: https://infiniti-money.github.io/BABY_MARK/
-Trang docs/index.html và logo.png đã chuẩn bị. Không thu thập GPS, ảnh, thông tin đăng nhập hoặc dữ liệu nhân sự tại Pages. Không xuất Next.js API sang static export. GitHub Pages không chạy route handlers hoặc sharp.
-Chính sách: https://docs.github.com/en/pages/getting-started-with-github-pages/github-pages-limits
-## Next.js pilot server
-Render Web Service có thể chạy bản thử nghiệm: kết nối repo, root directory apps/web, build command npm install && npm run build, start command npm start -- --hostname 0.0.0.0 --port $PORT. Chọn Node 22 và Free nếu thử nghiệm. Đặt env theo apps/web/.env.example; secret chỉ ở server. Free có cold start, không khuyến nghị production. Không cấu hình cron để lách sleep. Chọn tên babymark-attendance nếu khả dụng; URL do Render cấp, không đảm bảo tên đã được giữ. Chưa tạo service.
-## Tên miền
-Ảnh thương hiệu có babymark.vn; nếu doanh nghiệp sở hữu và quản lý DNS, có thể dùng chamcong.babymark.vn cho ứng dụng thật và docs.babymark.vn cho Pages, không cần mua tên miền mới. Không đặt CNAME khi chưa xác minh quyền kiểm soát DNS, hostname đích và domain ownership. Không sửa bản ghi website chính.
-GitHub Pages custom domain: https://docs.github.com/en/pages/configuring-a-custom-domain-for-your-github-pages-site/about-custom-domains-and-github-pages
-Tên miền phụ do dịch vụ cung cấp không phải tên miền đăng ký sở hữu riêng, không bảo đảm miễn phí vĩnh viễn.
+The active application is Cloudflare Pages static assets plus root Pages Functions, D1 and Workers KV. Repository root is the project root; build command `npm ci && npm run build`; output directory `dist`. Do not publish `docs` or set the project root to `apps/web`. Root `functions/` is compiled by Pages. No R2, Supabase, Images, external Node service or native addon is required.
+
+`wrangler.toml` contains deliberately unusable all-zero production IDs and destructive-policy flags set to false. They are placeholders for reviewed configuration, not resources to create automatically. D1 binding is `DB`; KV binding is `TIMEMARKS`. Apply only unapplied `cloudflare/d1/0001` through `0008` migrations after backup/preflight. Do not run remote migration, deployment, provisioning or retention merely to verify source. See [operations](cloudflare-operations.md).
+
+The requested hostname is `babymark.pages.dev`; availability, ownership, bindings and a live deployment were not verified in this audit. A GitHub-connected Pages project may automatically deploy main or preview branches. Review its deployment controls before publishing refs; source verification itself does not require a deployment.
+
+Legacy `apps/web`, `apps/mobile`, and `supabase` are historical references, not supported deployment paths for this target. `docs/index.html` is documentation only. Earlier Next.js/Render/GitHub Pages instructions do not operate the new attendance application.
+
+The verification workflow runs local tests, static build, Functions compilation and browser acceptance; it contains no Cloudflare authentication, deployment or remote-data steps.
