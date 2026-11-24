@@ -12,15 +12,38 @@ export function pushEndpoint(value){
   return u.href;
  }catch{return null}
 }
-export function vapidConfig(env){
+// Report only fixed diagnostic codes, never the secret, parser error or JWT.
+function inspectVapid(env){
+ const raw=env.PUSH_VAPID_JWK;
+ if(typeof raw!=='string'||!raw.trim())return {code:'JWK_MISSING'};
+ let jwk;
+ try{jwk=JSON.parse(raw.trim());}catch{return {code:'JWK_JSON'};}
+ if(!jwk||typeof jwk!=='object'||Array.isArray(jwk)||jwk.kty!=='EC'||jwk.crv!=='P-256')return {code:'JWK_CURVE'};
+ if(!jwk.d)return {code:'JWK_PRIVATE_MISSING'};
+ let x,y,d;
+ try{x=decode64(jwk.x);y=decode64(jwk.y);d=decode64(jwk.d);}catch{return {code:'JWK_FIELDS'};}
+ if(x.length!==32||y.length!==32||d.length!==32)return {code:'JWK_FIELDS'};
+ let subject=typeof env.PUSH_VAPID_SUBJECT==='string'?env.PUSH_VAPID_SUBJECT.trim():'';
+ if(!subject)return {code:'SUBJECT_MISSING'};
+ // Accept a bare contact email as well as the standard mailto URI.
+ if(/^[^\s:@/]+@[^\s@/]+\.[^\s@/]+$/.test(subject))subject='mailto:'+subject;
+ if(!(/^mailto:[^\s@]+@[^\s@]+$/.test(subject)||/^https:\/\/[^\s]+$/.test(subject)))return {code:'SUBJECT_INVALID'};
+ if(subject.startsWith('https://')){try{const u=new URL(subject);if(u.username||u.password||u.hostname==='localhost')return {code:'SUBJECT_INVALID'};}catch{return {code:'SUBJECT_INVALID'};}}
+ return {code:'FORMAT_OK',config:{jwk:{kty:'EC',crv:'P-256',x:jwk.x,y:jwk.y,d:jwk.d,ext:true},publicKey:b64url(Uint8Array.from([4,...x,...y])),subject}};
+}
+export function vapidConfig(env){return inspectVapid(env).config||null}
+export async function vapidDiagnosis(env){
+ const result=inspectVapid(env);
+ if(!result.config)return {ready:false,code:result.code};
+ const {config}=result;
  try{
-  const jwk=JSON.parse(env.PUSH_VAPID_JWK||'');
-  const x=decode64(jwk.x),y=decode64(jwk.y),d=decode64(jwk.d);
-  if(jwk.kty!=='EC'||jwk.crv!=='P-256'||x.length!==32||y.length!==32||d.length!==32)return null;
-  const subject=env.PUSH_VAPID_SUBJECT;
-  if(typeof subject!=='string'||!(/^mailto:[^\s@]+@[^\s@]+$/.test(subject)||/^https:\/\/[^\s]+$/.test(subject)))return null;
-  return {jwk:{kty:'EC',crv:'P-256',x:jwk.x,y:jwk.y,d:jwk.d,ext:true},publicKey:b64url(Uint8Array.from([4,...x,...y])),subject};
- }catch{return null}
+  const privateKey=await crypto.subtle.importKey('jwk',config.jwk,{name:'ECDSA',namedCurve:'P-256'},false,['sign']);
+  const publicKey=await crypto.subtle.importKey('raw',decode64(config.publicKey),{name:'ECDSA',namedCurve:'P-256'},false,['verify']);
+  const msg=enc.encode('babymark-vapid-check-v1');
+  const sig=await crypto.subtle.sign({name:'ECDSA',hash:'SHA-256'},privateKey,msg);
+  if(sig.byteLength!==64||!await crypto.subtle.verify({name:'ECDSA',hash:'SHA-256'},publicKey,sig,msg))return {ready:false,code:'KEY_PAIR_MISMATCH'};
+  return {ready:true,code:'OK'};
+ }catch{return {ready:false,code:'KEY_CRYPTO_INVALID'};}
 }
 export async function vapidAuthorization(config,endpoint,now=Date.now()){
  const aud=new URL(endpoint).origin,header=b64url(enc.encode(JSON.stringify({typ:'JWT',alg:'ES256'}))),payload=b64url(enc.encode(JSON.stringify({aud,exp:Math.floor(now/1000)+3600,sub:config.subject})));

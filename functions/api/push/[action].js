@@ -1,11 +1,12 @@
 import {actorFor,apiFailure,invalid,ApiError,managementAudit} from '../../../cloudflare/lib/access.mjs';
 import {reply,bodyJSON} from '../../../cloudflare/lib/auth.mjs';
-import {pushSettings,pushEndpoint,vapidConfig,sendEmptyPush} from '../../../cloudflare/lib/web-push.mjs';
+import {pushSettings,pushEndpoint,vapidConfig,vapidDiagnosis,sendEmptyPush} from '../../../cloudflare/lib/web-push.mjs';
 export async function onRequestGet({request,env,params}){
  try{
   const actor=await actorFor(request,env),settings=await pushSettings(env);
   if(params.action!=='config')return reply({error:'Không tìm thấy'},404);
-  return reply({settings,public_key:vapidConfig(env)?.publicKey||null,admin:actor.role==='admin'});
+  const diagnostic=actor.role==='admin'?await vapidDiagnosis(env):null;
+  return reply({settings:diagnostic?{...settings,configured:diagnostic.ready}:settings,public_key:vapidConfig(env)?.publicKey||null,admin:actor.role==='admin',...(diagnostic?{vapid_code:diagnostic.code}:{})});
  }catch(e){return apiFailure(e)}
 }
 export async function onRequestPost({request,env,params}){
@@ -15,7 +16,7 @@ export async function onRequestPost({request,env,params}){
   if(action==='settings'){
    if(actor.role!=='admin')throw new ApiError(403,'Chỉ Admin');
    if(!['enabled','reminders','late_alerts'].every(k=>typeof b[k]==='boolean'))invalid();
-   if(b.enabled&&!settings.configured)throw new ApiError(409,'Chưa cấu hình VAPID');
+   if(b.enabled){const check=await vapidDiagnosis(env);if(!check.ready)throw new ApiError(409,'VAPID chưa hợp lệ: '+check.code);}
    await db.batch([db.prepare('UPDATE web_push_settings SET enabled=?,reminders=?,late_alerts=? WHERE id=1').bind(+b.enabled,+b.reminders,+b.late_alerts),managementAudit(db,actor,'push','1','UPDATE',{enabled:b.enabled,reminders:b.reminders,late_alerts:b.late_alerts})]);
    return reply({settings:await pushSettings(env)});
   }

@@ -1,7 +1,7 @@
 import {actorFor,apiFailure,ApiError,managementAudit} from '../../../cloudflare/lib/access.mjs';
 import {reply,bodyJSON} from '../../../cloudflare/lib/auth.mjs';
 import {policy} from '../../../cloudflare/lib/policy.mjs';
-import {pushSettings,vapidConfig,vapidAuthorization} from '../../../cloudflare/lib/web-push.mjs';
+import {pushSettings,vapidDiagnosis} from '../../../cloudflare/lib/web-push.mjs';
 
 async function readiness(env){
  const db=env.DB,p=await policy(env),push=await pushSettings(env),now=Date.now();
@@ -13,15 +13,15 @@ async function readiness(env){
  const missing=(await db.prepare('SELECT id,code,name FROM branches WHERE '+active+' AND (latitude IS NULL OR longitude IS NULL) ORDER BY code').all()).results;
  const photos=await db.prepare("SELECT COALESCE(SUM(byte_size),0) AS bytes,COUNT(*) AS records FROM photo_inventory WHERE state IN ('pending','stored','evicting') AND expires_at>?").bind(now-120000).first();
  const lastRetention=await db.prepare('SELECT started_at,assignments_removed FROM retention_runs ORDER BY started_at DESC LIMIT 1').first();
- let devices=0,lastPush=null,pushSchema=push.available,vapidReady=false;
+ let devices=0,lastPush=null,pushSchema=push.available;
+ const vapid=await vapidDiagnosis(env);
  if(push.available){
   try{
    devices=(await db.prepare('SELECT COUNT(*) AS n FROM web_push_subscriptions s JOIN profiles p ON p.id=s.user_id WHERE p.active=1').first()).n;
    lastPush=await db.prepare('SELECT claimed_at,state FROM web_push_receipts ORDER BY claimed_at DESC LIMIT 1').first();
   }catch(e){if(!/no such table/i.test(String(e?.message)))throw e;pushSchema=false;}
  }
- if(push.configured){try{await vapidAuthorization(vapidConfig(env),'https://web.push.apple.com/',now);vapidReady=true}catch{}}
- return {admin_ready:p.available,branches:counts.branches,gps_ready:counts.gps_ready||0,missing_gps:missing,branch_limit:p.branch_limit,employees:people.employees,accounts:people.accounts||0,shifts:shifts.total,scheduled:scheduled.total,late_alerts:p.late_alerts,photo_eviction:p.photo_eviction,attendance_retention:p.attendance_retention,retention_secret_ready:p.retention_secret_configured,photo_bytes:photos.bytes,photo_records:photos.records,last_retention:lastRetention,push_schema_ready:pushSchema,push_enabled:push.enabled,vapid_ready:vapidReady,push_cron_secret_ready:typeof env.PUSH_CRON_SECRET==='string'&&env.PUSH_CRON_SECRET.length>=32,push_devices:devices,last_push:lastPush,kv_bound:!!env.TIMEMARKS};
+ return {admin_ready:p.available,branches:counts.branches,gps_ready:counts.gps_ready||0,missing_gps:missing,branch_limit:p.branch_limit,employees:people.employees,accounts:people.accounts||0,shifts:shifts.total,scheduled:scheduled.total,late_alerts:p.late_alerts,photo_eviction:p.photo_eviction,attendance_retention:p.attendance_retention,retention_secret_ready:p.retention_secret_configured,photo_bytes:photos.bytes,photo_records:photos.records,last_retention:lastRetention,push_schema_ready:pushSchema,push_enabled:push.enabled,vapid_ready:vapid.ready,vapid_code:vapid.code,push_cron_secret_ready:typeof env.PUSH_CRON_SECRET==='string'&&env.PUSH_CRON_SECRET.length>=32,push_devices:devices,last_push:lastPush,kv_bound:!!env.TIMEMARKS};
 }
 
 export async function onRequestGet({request,env}){
