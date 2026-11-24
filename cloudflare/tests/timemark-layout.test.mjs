@@ -1,0 +1,5 @@
+import test from 'node:test';import assert from 'node:assert/strict';
+import {makeTimemark,distanceMeters,MAX_BYTES} from '../lib/timemark-layout.mjs';
+const m={serverTimestamp:Date.parse('2026-11-24T01:02:15Z'),shiftStart:Date.parse('2026-11-24T01:00:00Z'),shiftEnd:Date.parse('2026-11-24T09:00:00Z'),lat:20.1,lng:106.1,accuracy:8,distance:22,radius:100,type:'IN',branchName:'BABYMARK LUXURY XUÂN QUAN',employeeName:'Nguyễn & A <script>',employeeCode:'BM001',address:'Địa chỉ ví dụ',status:'Đi muộn'};
+test('Vietnam time, original logo, shift and safe escaping',()=>{const s=makeTimemark(m,{preview:true});assert.match(s,/08:02:15/);assert.match(s,/24\/11\/2026/);assert.match(s,/08:00 – 16:00/);assert.match(s,/XUÂN QUAN/);assert.match(s,/data:image\/png;base64,/);assert.match(s,/&lt;script&gt;/);assert.doesNotMatch(s,/<script>/);assert.match(s,/KHÔNG PHẢI BẰNG CHỨNG/);assert.equal(MAX_BYTES,200000)});
+test('invalid gps fails and distance zero',()=>{assert.throws(()=>makeTimemark({...m,lat:91}),/INVALID/);assert.equal(distanceMeters(20,106,20,106),0)});
