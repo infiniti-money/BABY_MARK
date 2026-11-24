@@ -57,6 +57,7 @@ td,th{overflow-wrap:anywhere}
  .topbar{padding:calc(12px + env(safe-area-inset-top)) max(16px,env(safe-area-inset-right)) 12px max(16px,env(safe-area-inset-left));min-height:66px;gap:12px}
  .topbar .mobile-logout{display:inline-flex;min-width:44px;min-height:44px}
  .main{padding:22px max(16px,env(safe-area-inset-right)) 28px max(16px,env(safe-area-inset-left))}
+ .stats{grid-template-columns:repeat(2,minmax(0,1fr))}
  .two-col{grid-template-columns:minmax(0,1fr)}
  .camera-frame{max-height:min(460px,55dvh);min-height:210px;aspect-ratio:4/5}
  .camera-placeholder{max-width:100%;padding:14px;gap:8px}
@@ -88,13 +89,13 @@ td,th{overflow-wrap:anywhere}
  .responsive-table thead{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap}
  .responsive-table tbody{display:grid;gap:12px}
  .responsive-table tr{display:block;border:1px solid var(--line);border-radius:12px;padding:8px 12px;background:white}
- .responsive-table td{display:grid;grid-template-columns:minmax(75px,38%) minmax(0,1fr);gap:4px 10px;padding:9px 0;border-top:1px solid #f0e9ee;line-height:1.5;font-size:13px;text-align:left}
+ .responsive-table td{position:relative;display:block;min-height:38px;padding:9px 0 9px 42%;border-top:1px solid #f0e9ee;line-height:1.5;font-size:13px;text-align:left;overflow-wrap:anywhere}
  .responsive-table td:first-child{border-top:0}
- .responsive-table td::before{content:attr(data-label);grid-column:1;grid-row:1/span 50;font-weight:650;color:#766573;font-size:11px;overflow-wrap:anywhere}
- .responsive-table td>*{grid-column:2;min-width:0;max-width:100%}
+ .responsive-table td::before{content:attr(data-label);position:absolute;left:0;top:9px;width:38%;font-weight:650;color:#766573;font-size:11px;overflow-wrap:anywhere}
+ .responsive-table td>*{min-width:0;max-width:100%}
  .responsive-table td .btn{width:100%;margin:2px 0}
  .responsive-table td small{font-size:11px;color:#766573}
- .responsive-table td .tag{white-space:normal;justify-self:start}
+ .responsive-table td .tag{white-space:normal}
  .request-reason{max-width:none}
  .table-footer{padding:12px 14px}
  .modal-body,.modal-head{padding:16px}
