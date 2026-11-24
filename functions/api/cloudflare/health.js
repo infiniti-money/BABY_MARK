@@ -1,4 +1,5 @@
 import {policy} from '../../../cloudflare/lib/policy.mjs';
+import {hrReadiness} from '../../../cloudflare/lib/hr-readiness.mjs';
 // Only confirms configured bindings and schema; no private data or secrets.
 export async function onRequestGet({env}){
  const headers={'Cache-Control':'no-store'};
@@ -7,8 +8,8 @@ export async function onRequestGet({env}){
  await env.DB.prepare('SELECT a.stamp_issued_at,a.photo_source,c.plan_hash,b.address_text,i.state FROM attendances a LEFT JOIN attendance_challenges c ON c.attendance_id=a.id LEFT JOIN photo_inventory i ON i.photo_path=a.photo_path JOIN assignments s ON s.id=a.assignment_id JOIN branches b ON b.id=s.branch_id LIMIT 1').first();
  await env.DB.prepare('SELECT details_json FROM management_audit LIMIT 1').first();
  await env.TIMEMARKS.get('_health_probe_nonexistent','arrayBuffer');
- const p=await policy(env);
+ const [p,hr]=await Promise.all([policy(env),hrReadiness(env.DB)]);
  const schema=(await env.DB.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name IN ('web_push_settings','branch_rosters','extra_attendance','shift_handover','roster_automation','payroll_closings')").all()).results.map(r=>r.name);
- return Response.json({ready:true,mode:'pages-d1-kv',image_composition:'CLIENT_RENDERED',retention_enabled:p.attendance_retention,eviction_enabled:p.photo_eviction,admin_controls_ready:p.available,push_schema_ready:schema.includes('web_push_settings'),roster_schema_ready:schema.includes('branch_rosters'),extra_attendance_ready:schema.includes('extra_attendance'),handover_ready:schema.includes('shift_handover'),hr_ready:schema.includes('roster_automation')&&schema.includes('payroll_closings')},{headers});}
+ return Response.json({ready:true,mode:'pages-d1-kv',image_composition:'CLIENT_RENDERED',retention_enabled:p.attendance_retention,eviction_enabled:p.photo_eviction,admin_controls_ready:p.available,push_schema_ready:schema.includes('web_push_settings'),roster_schema_ready:schema.includes('branch_rosters'),extra_attendance_ready:schema.includes('extra_attendance'),handover_ready:schema.includes('shift_handover'),hr_ready:hr.ready},{headers});}
  catch{return Response.json({ready:false,reason:'Storage not initialized'},{status:503,headers})}
 }
