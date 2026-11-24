@@ -29,7 +29,7 @@ export async function onRequestPost({request,env,params}){
    const now=Date.now();
    const r=await db.prepare(`INSERT INTO web_push_subscriptions(endpoint,user_id,created_at,updated_at)
     SELECT ?,?,?,? WHERE (SELECT COUNT(*) FROM web_push_subscriptions WHERE user_id=? AND endpoint<>?)<3
-    ON CONFLICT(endpoint) DO UPDATE SET user_id=excluded.user_id,updated_at=excluded.updated_at,last_test_at=0 RETURNING endpoint`).bind(endpoint,actor.id,now,now,actor.id,endpoint).first();
+    ON CONFLICT(endpoint) DO UPDATE SET user_id=excluded.user_id,updated_at=excluded.updated_at RETURNING endpoint`).bind(endpoint,actor.id,now,now,actor.id,endpoint).first();
    if(!r)throw new ApiError(409,'Tối đa 3 thiết bị mỗi tài khoản; tắt Push trên thiết bị cũ');
    return reply({ok:true});
   }

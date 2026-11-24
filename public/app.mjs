@@ -1,7 +1,7 @@
 import {cameraFrame,composeTimemark,currentPosition} from './capture.mjs';
 import {isLegacyCode,derivePasswordKey,newPasswordCredential} from './password.mjs';
 import {pushRegistration,publicKeyBytes,disableDevicePush} from './push.mjs';
-let pushReg=null,pushConfig=null;
+let pushReg=null,pushConfig=null,pushSub=null;
 
 const $ = s => document.querySelector(s);
 const app = $('#app'), modal = $('#modal');
@@ -119,11 +119,11 @@ function attendanceTable(rows) {
   return rows.length?`<div class="table-wrap"><table><thead><tr><th>Nhân viên / Cửa hàng</th><th>Thời gian máy chủ</th><th>Loại</th><th>Trạng thái</th><th>Vị trí</th><th>Ảnh</th></tr></thead><tbody>${rows.map(r=>`<tr><td><strong>${esc(r.full_name||state.user.full_name)}</strong><small>${esc(r.branch_name||r.assignment_id)}</small></td><td>${dt(r.server_timestamp)}</td><td>${r.type==='IN'?'Vào ca':'Tan ca'}</td><td>${badge(r.status)}${r.late_minutes?`<small>Muộn ${r.late_minutes} phút</small>`:''}${r.early_minutes?`<small>Sớm ${r.early_minutes} phút</small>`:''}</td><td>${Math.round(r.distance_m)} m<small>Sai số ±${Math.round(r.accuracy_m)} m</small></td><td><button class="btn secondary small" data-action="photo" data-id="${esc(r.id)}">Xem ảnh</button></td></tr>`).join('')}</tbody></table></div><p class="table-footer">Thời gian hiển thị theo Việt Nam · Ảnh có thể hết hạn trước bản ghi công.</p>`:empty();
 }
 async function renderPush(id){
- const data=await api('/api/push/config');if(id!==state.renderId)return;pushConfig=data;pushReg=null;
+ const data=await api('/api/push/config');if(id!==state.renderId)return;pushConfig=data;pushReg=null;pushSub=null;
  const settings=data.settings,ready=settings.available&&settings.configured&&settings.enabled;
  if(ready){try{pushReg=await pushRegistration()}catch{}}
  if(id!==state.renderId)return;
- let subscribed=false;if(pushReg){const sub=await pushReg.pushManager.getSubscription();if(sub){try{subscribed=(await api('/api/push/status',{method:'POST',body:{endpoint:sub.endpoint}})).subscribed}catch{}}}
+ let subscribed=false;if(pushReg){const sub=await pushReg.pushManager.getSubscription();pushSub=sub;if(sub){try{subscribed=(await api('/api/push/status',{method:'POST',body:{endpoint:sub.endpoint}})).subscribed}catch{}}}
  if(id!==state.renderId)return;
  $('#content').innerHTML=`<section class="card"><div class="card-head"><h2>Thông báo khi đóng ứng dụng</h2></div><div class="card-body form-stack"><p>iPhone/iPad: thêm BABY MARK vào màn hình chính, mở từ biểu tượng rồi bật Push. Android: dùng trình duyệt hỗ trợ hoặc cài ứng dụng web.</p><p class="hint">${!settings.available?'Cần migration 0010.':!settings.configured?'Chưa cấu hình VAPID.':!settings.enabled?'Admin chưa bật Push.':!pushReg?'Thiết bị chưa hỗ trợ Push hoặc chưa cài PWA.':subscribed?'Thiết bị này đã đăng ký nhận Push.':'Thiết bị sẵn sàng đăng ký.'}</p>${pushReg?`<button class="btn" data-action="push-enable">${subscribed?'Đăng ký lại':'Bật Push trên thiết bị'}</button><button class="btn secondary" data-action="push-test" ${subscribed?'':'disabled'}>Gửi thông báo thử</button><button class="btn secondary" data-action="push-disable">Tắt Push trên thiết bị</button>`:''}<p class="hint">Thông báo trên màn hình khóa không chứa tên, GPS hay dữ liệu nhân viên.</p></div></section>${data.admin&&settings.available?`<section class="card section-gap"><div class="card-head"><h2>Cài đặt Push toàn hệ thống</h2></div><form class="card-body form-stack" data-form="push-settings"><label><input type="checkbox" name="enabled" ${settings.enabled?'checked':''} ${settings.configured?'':'disabled'}> Bật Push</label><label><input type="checkbox" name="reminders" ${settings.reminders?'checked':''}> Nhắc trước ca 10 phút</label><label><input type="checkbox" name="late_alerts" ${settings.late_alerts?'checked':''}> Cảnh báo quản lý đi muộn (cần bật thông báo đi muộn trong Cài đặt)</label><p class="hint">Cần Worker Cron riêng đã cấu hình để gửi tự động; giờ gửi không được bảo đảm tuyệt đối.</p><p class="error-text" data-form-error hidden></p><button class="btn" type="submit">Lưu cài đặt Push</button></form></section>`:''}`;
 }
@@ -270,10 +270,9 @@ document.addEventListener('click',async event=>{
     if(action==='push-enable'){
       if(!pushReg||!pushConfig?.public_key)throw Error('Push chưa sẵn sàng.');
       const epoch=state.sessionEpoch;
-      const permission=await Notification.requestPermission();
-      if(permission!=='granted')throw Error('Chưa được cấp quyền thông báo.');
-      let sub=await pushReg.pushManager.getSubscription();
-      if(!sub)sub=await pushReg.pushManager.subscribe({userVisibleOnly:true,applicationServerKey:publicKeyBytes(pushConfig.public_key)});
+      // Call subscribe directly in the click gesture; Safari requires user activation.
+      if(Notification.permission==='denied')throw Error('Chưa được cấp quyền thông báo. Hãy bật trong cài đặt thiết bị.');
+      const sub=pushSub||await pushReg.pushManager.subscribe({userVisibleOnly:true,applicationServerKey:publicKeyBytes(pushConfig.public_key)});
       if(epoch!==state.sessionEpoch){await sub.unsubscribe();return;}
       await api('/api/push/subscribe',{method:'POST',body:{endpoint:sub.endpoint}});
       try{localStorage.setItem('babymark-push-endpoint',sub.endpoint)}catch{}
