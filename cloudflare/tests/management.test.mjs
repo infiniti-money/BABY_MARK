@@ -174,3 +174,28 @@ test('expanded admin controls preserve historic stores, enforce configurable act
   assert.equal((await act('shifts',{id:'night',action:'delete-unused'})).status,200);
  }finally{f.close()}
 });
+
+import {policy} from '../lib/policy.mjs';
+import * as alerts from '../../functions/api/alerts.js';
+test('settings fall back to deployment flags on old schema; new settings override them',async()=>{
+ const db=await createD1({migrate:false});try{
+  const env={DB:db,PHOTO_EVICTION_ENABLED:'true'};
+  assert.equal((await policy(env)).available,false);assert.equal((await policy(env)).photo_eviction,true);
+ }finally{db.close()}
+ const f=await fixture();try{
+  assert.equal((await policy({DB:f.db,PHOTO_EVICTION_ENABLED:'true'})).photo_eviction,true);
+  f.sqlite.prepare('UPDATE system_settings SET photo_eviction=0 WHERE id=1').run();
+  assert.equal((await policy({DB:f.db,PHOTO_EVICTION_ENABLED:'true'})).photo_eviction,false);
+ }finally{f.close()}
+});
+test('late alert page obeys setting and manager store scope',async()=>{
+ const f=await fixture();try{
+  const now=Date.now(),day=new Date(now+7*3600000).toISOString().slice(0,10);
+  for(const [id,user,branch] of [['a','staff','BM-001'],['b','other','BM-002']])f.sqlite.prepare('INSERT INTO assignments(id,user_id,branch_id,shift_id,work_date,starts_at,ends_at) VALUES(?,?,?,?,?,?,?)').run(id,user,branch,'day',day,now-3600000,now+3600000);
+  assert.equal((await f.call(alerts,'staff')).status,403);
+  assert.deepEqual((await (await f.call(alerts,'manager')).json()).alerts,[]);
+  f.sqlite.prepare('UPDATE system_settings SET late_alerts=1 WHERE id=1').run();
+  const result=await (await f.call(alerts,'manager')).json();assert.equal(result.enabled,true);assert.deepEqual(result.alerts.map(a=>a.id),['a']);
+  assert.equal((await (await f.call(alerts,'admin')).json()).alerts.length,2);
+ }finally{f.close()}
+});

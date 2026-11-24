@@ -1,0 +1,42 @@
+name: BABY MARK scheduled retention
+on:
+  schedule:
+    - cron: '0 20 * * *'
+  workflow_dispatch:
+permissions: {}
+concurrency:
+  group: babymark-attendance-retention
+  cancel-in-progress: false
+jobs:
+  retention:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      RETENTION_SECRET: ${{ secrets.BABYMARK_RETENTION_SECRET }}
+    steps:
+      - name: Run bounded cleanup only if configured and enabled
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ -z "${RETENTION_SECRET:-}" ]]; then
+            echo "Skipped: repository retention secret not configured."
+            exit 0
+          fi
+          for attempt in 1 2 3 4 5; do
+            response="$(mktemp)"
+            status="$(curl --silent --show-error --max-time 30 --output "$response" --write-out '%{http_code}' --request POST --header "Authorization: Bearer $RETENTION_SECRET" 'https://babymark.pages.dev/api/maintenance/attendance-retention')"
+            if [[ "$status" == 503 ]] && jq -e '.error == "Retention disabled"' "$response" >/dev/null; then
+              rm -f "$response"
+              echo "Skipped: retention policy disabled."
+              exit 0
+            fi
+            if [[ "$status" != 200 ]]; then
+              rm -f "$response"
+              echo "Retention endpoint returned HTTP $status." >&2
+              exit 1
+            fi
+            count="$(jq -er '.assignments_removed | select(type == "number" and . >= 0 and . <= 50)' "$response")"
+            rm -f "$response"
+            echo "Batch completed: $count old assignments."
+            if [[ "$count" -lt 50 ]]; then break; fi
+          done

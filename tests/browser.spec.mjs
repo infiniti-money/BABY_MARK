@@ -352,3 +352,21 @@ test('administrator creates and resets a chosen password and staff logs in throu
   await loginAccount(page,name,next);
   await expect(page.getByRole('button',{name:'Quản trị',exact:true})).toHaveCount(0);
 });
+
+test('admin settings and branch lifecycle are available after migration 0009',async({page})=>{
+ await login(page);
+ await page.getByRole('button',{name:'Quản trị',exact:true}).click();
+ await page.getByRole('tab',{name:'Cài đặt',exact:true}).click();
+ await page.getByLabel('Giới hạn cửa hàng hoạt động (1–50)',{exact:true}).fill('15');
+ await page.getByLabel('Thông báo đi muộn trong ứng dụng',{exact:true}).check();
+ await page.getByRole('button',{name:'Lưu cài đặt',exact:true}).click();
+ await expect(page.getByLabel('Giới hạn cửa hàng hoạt động (1–50)',{exact:true})).toHaveValue('15');
+ await page.getByRole('tab',{name:'Cửa hàng',exact:true}).click();
+ const row=page.getByRole('row').filter({hasText:'BABYMARK LUXURY KEO'});
+ await row.getByRole('button',{name:'Ngừng hoạt động',exact:true}).click();
+ await page.getByRole('dialog').getByRole('button',{name:'Xác nhận',exact:true}).click();
+ await expect(row.getByRole('button',{name:'Khôi phục',exact:true})).toBeVisible();
+ await row.getByRole('button',{name:'Khôi phục',exact:true}).click();
+ await page.getByRole('dialog').getByRole('button',{name:'Xác nhận',exact:true}).click();
+ await expect(row.getByRole('button',{name:'Ngừng hoạt động',exact:true})).toBeVisible();
+});
