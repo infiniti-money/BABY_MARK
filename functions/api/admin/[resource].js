@@ -40,8 +40,8 @@ export async function onRequestPost({request,env,params}){
   if(resource==='branches'){
    if(b.action==='set-radius-all'){
     if(!(await policy(env)).available)throw new ApiError(409,'Cần migration 0009');
-    if(b.allowed_radius!==200)invalid('Bán kính áp dụng toàn hệ thống là 200 m');
-    const result=await db.batch([db.prepare("UPDATE branches SET allowed_radius=200 WHERE active=1 AND allowed_radius<>200"),managementAudit(db,actor,'branches','ALL_ACTIVE','SET_RADIUS_ALL',{allowed_radius:200})]);
+    const radius=b.allowed_radius;if(!Number.isInteger(radius)||radius<20||radius>1000)invalid('Bán kính phải là số nguyên từ 20 đến 1.000 m');
+    const result=await db.batch([db.prepare("UPDATE branches SET allowed_radius=? WHERE active=1 AND allowed_radius<>?").bind(radius,radius),managementAudit(db,actor,'branches','ALL_ACTIVE','SET_RADIUS_ALL',{allowed_radius:radius})]);
     return reply({updated:result[0].meta.changes});
    }
    if(b.action==='set-active'){
