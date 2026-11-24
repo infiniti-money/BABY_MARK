@@ -442,3 +442,24 @@ test('remembered staff session survives closing the tab',async({page,context})=>
  expect(expiry-Date.now()).toBeGreaterThan(29*86400000);
  const next=await context.newPage();await next.goto('/');await expect(next.getByRole('button',{name:'Chấm công',exact:true})).toBeVisible();await expect(next.locator('form[data-form="login"]')).toHaveCount(0);await next.close();
 });
+
+test('admin directory loads on demand and filters locally',async({page})=>{
+ await login(page);
+ const requests=[];page.on('request',r=>{if(r.method()==='GET'&&r.url().includes('/api/admin/'))requests.push(new URL(r.url()).pathname);});
+ await page.getByRole('button',{name:'Quản trị',exact:true}).click();
+ await expect(page.getByRole('heading',{name:'Nhân viên',exact:true})).toBeVisible();
+ expect(requests).toContain('/api/admin/employees');expect(requests).not.toContain('/api/admin/assignments');
+ await page.getByRole('searchbox',{name:'Tìm kiếm'}).fill('zz-nonexistent-employee');await expect(page.getByText('Không tìm thấy kết quả.',{exact:true})).toBeVisible();
+ await page.getByRole('searchbox',{name:'Tìm kiếm'}).fill('');
+ await page.getByRole('tab',{name:'Cửa hàng',exact:true}).click();await expect(page.getByRole('heading',{name:'Cửa hàng',exact:true})).toBeVisible();
+ expect(requests).toContain('/api/admin/branches');expect(requests).not.toContain('/api/admin/assignments');
+});
+test('camera selection before opening and stop camera',async({page})=>{
+ await login(page,'staff');
+ await page.getByRole('button',{name:'Đổi camera',exact:true}).click();await expect(page.locator('#camera-facing')).toHaveText('Camera sau');
+ await page.getByRole('button',{name:'Đổi camera',exact:true}).click();await expect(page.locator('#camera-facing')).toHaveText('Camera trước');
+ await page.getByRole('button',{name:'Bật camera',exact:true}).click();
+ await expect(page.getByRole('button',{name:'Tắt camera',exact:true})).toBeVisible();
+ await page.getByRole('button',{name:'Tắt camera',exact:true}).click();await expect(page.getByRole('button',{name:'Bật camera',exact:true})).toBeVisible();
+ expect(await page.locator('#camera').evaluate(v=>v.srcObject===null)).toBeTruthy();
+});

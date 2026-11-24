@@ -41,7 +41,7 @@ function notify(message,error=false) {
 function setSession(session) {
   stopCamera();closeModal();
   state.sessionEpoch++;state.renderId++;
-  state.token=session?.token||null;
+  state.token=session?.token||null;cameraFacing='user';adminList={tab:'',search:'',page:1};
   state.assignments=[];state.attendances=[];state.admin={};state.reports=[];state.requests=[];state.handover=null;state.payrollData=null;state.payrollMonth=null;state.payrollRevision=null;
   try{sessionStorage.removeItem(SESSION_KEY);}catch{}
   try{localStorage.removeItem(SESSION_KEY);}catch{}
@@ -72,13 +72,16 @@ const loading = () => '<div class="loading" role="status">Đang tải dữ liệ
 const errorHTML = message => `<div class="table-error"><p class="error-text" role="alert">${esc(message)}</p><button class="btn secondary section-gap" data-action="refresh">Thử lại</button></div>`;
 const rowOptions = (rows,selected,label='name') => rows.map(r=>`<option value="${esc(r.id)}" ${r.id===selected?'selected':''}>${esc(r[label]||r.full_name||r.id)}${label==='full_name'?' · '+esc(r.employee_code):''}</option>`).join('');
 
-let captureAbort=null;
+let captureAbort=null,cameraFacing='user',cameraOpening=false;
 function stopCamera() {
   captureAbort?.abort();
-  cameraTicket++;
+  cameraTicket++;cameraOpening=false;
   state.stream?.getTracks().forEach(t=>t.stop()); state.stream=null;
+  const video=$('#camera');if(video)video.srcObject=null;
+  const toggle=$('[data-action="camera-switch"]');if(toggle)toggle.disabled=!!captureAbort&&!captureAbort.signal.aborted;
   if($('#camera-placeholder'))$('#camera-placeholder').hidden=false;
   if($('#camera-live'))$('#camera-live').hidden=true;
+  const stop=$('[data-action="camera-stop"]');if(stop)stop.hidden=true;
 }
 function clearPhotos() { photoURLs.forEach(URL.revokeObjectURL); photoURLs=[]; }
 let pendingCapture=null,confirmationTimer=null;
@@ -112,7 +115,7 @@ async function renderToday(id) {
   state.assignments=own;
   const dayRows=own.filter(a=>a.work_date===today()||Number(a.ends_at)>Date.now()-6*3600000);
   const complete=dayRows.filter(a=>a.in_id&&a.out_id).length;
-  $('#content').innerHTML=`<div class="stats">${stat('Ca làm hôm nay',dayRows.length,'Theo lịch đã được phân','calendar')}${stat('Đã vào ca',dayRows.filter(a=>a.in_id).length,'Dữ liệu lưu trên máy chủ','check')}${stat('Ca đã hoàn tất',complete,'Đã có lượt vào và tan ca','clock')}${stat('Ảnh chấm công','200 KB','Timemark · Nền thông tin mờ 40%','camera')}</div><div class="two-col"><section class="card"><div class="card-head"><div><h2>Ghi nhận chấm công</h2><p class="muted">Camera trực tiếp · GPS hiện tại · Giờ máy chủ</p></div><span class="tag">TIMEMARK</span></div><div class="card-body"><div class="camera-frame"><video id="camera" autoplay muted playsinline aria-label="Camera chấm công"></video><div id="camera-placeholder" class="camera-placeholder">${icon('camera')}<strong>Sẵn sàng cho ca làm mới</strong><p>Bật camera, giữ rõ khuôn mặt và kiểm tra ca làm trước khi chụp.</p><button class="btn" data-action="camera-start">Bật camera</button></div><span class="camera-corner tl"></span><span class="camera-corner br"></span><span id="camera-live" class="camera-live" hidden><span class="dot"></span>CAMERA TRỰC TIẾP</span></div><div class="section-gap"><button class="btn secondary" data-action="extra-create">Chấm công ngoài lịch / thay ca</button></div><label class="assignment-select">Chọn ca làm<select id="capture-assignment" ${!dayRows.length?'disabled':''}><option value="">Chọn ca được phân công</option>${dayRows.map(a=>`<option value="${esc(a.id)}">${esc(a.branch_name)} · ${dateVN(a.work_date)} ${hm(a.starts_at)}–${hm(a.ends_at)}</option>`).join('')}</select></label><div class="camera-actions"><button class="btn" data-action="capture" data-type="IN" data-testid="attendance-in" ${!dayRows.length?'disabled':''}>${icon('camera')} Chụp vào ca</button><button class="btn secondary" data-action="capture" data-type="OUT" data-testid="attendance-out" ${!dayRows.length?'disabled':''}>${icon('camera')} Chụp tan ca</button></div><p class="camera-note">${icon('shield')}<span>Ảnh Timemark được ghép trên thiết bị từ thông tin máy chủ. Giờ đóng dấu được cấp trước lúc lưu tối đa 90 giây. Máy chủ xác thực bản ghi; ảnh và GPS không chứng minh tuyệt đối sự hiện diện.</span></p><p id="capture-status" class="hint" role="status" aria-live="polite"></p></div></section><div><section class="card"><div class="card-head"><div><h2>Ca làm của bạn</h2><p class="muted">Bao gồm ca qua đêm còn gần thời gian làm việc</p></div><button class="btn quiet small" data-view="schedule">Xem lịch</button></div><div class="card-body">${assignmentCards(dayRows)}<button class="btn secondary section-gap" data-view="handover">Đọc lời nhắn ca trước / bàn giao ca</button><div data-handover-preview></div></div></section><aside class="policy"><h3>${icon('pin')} Để chấm công chính xác</h3><p>Cho phép camera và vị trí chính xác. GPS cần sai số tối đa 50 m. Thời gian công lấy từ máy chủ; ngoài vùng được ghi cờ để quản lý xem xét.</p><button class="btn secondary" data-view="push">Thiết lập quyền thiết bị</button></aside></div></div>`;
+  $('#content').innerHTML=`<div class="stats">${stat('Ca làm hôm nay',dayRows.length,'Theo lịch đã được phân','calendar')}${stat('Đã vào ca',dayRows.filter(a=>a.in_id).length,'Dữ liệu lưu trên máy chủ','check')}${stat('Ca đã hoàn tất',complete,'Đã có lượt vào và tan ca','clock')}${stat('Ảnh chấm công','200 KB','Timemark · Nền thông tin mờ 40%','camera')}</div><div class="two-col"><section class="card"><div class="card-head"><div><h2>Ghi nhận chấm công</h2><p class="muted">Camera trực tiếp · GPS hiện tại · Giờ máy chủ</p></div><span class="tag">TIMEMARK</span></div><div class="card-body"><div class="camera-frame"><video id="camera" autoplay muted playsinline aria-label="Camera chấm công"></video><div id="camera-placeholder" class="camera-placeholder">${icon('camera')}<strong>Sẵn sàng cho ca làm mới</strong><p>Bật camera, giữ rõ khuôn mặt và kiểm tra ca làm trước khi chụp.</p><button class="btn" data-action="camera-start">Bật camera</button></div><span class="camera-corner tl"></span><span class="camera-corner br"></span><span id="camera-live" class="camera-live" hidden><span class="dot"></span>CAMERA TRỰC TIẾP</span></div><div class="camera-toolbar"><span id="camera-facing" class="camera-facing" aria-live="polite">${cameraFacing==='environment'?'Camera sau':'Camera trước'}</span><button type="button" class="btn secondary small" data-action="camera-switch">${icon('refresh')} Đổi camera</button><button type="button" class="btn quiet small" data-action="camera-stop" hidden>Tắt camera</button></div><div class="section-gap"><button class="btn secondary" data-action="extra-create">Chấm công ngoài lịch / thay ca</button></div><label class="assignment-select">Chọn ca làm<select id="capture-assignment" ${!dayRows.length?'disabled':''}><option value="">Chọn ca được phân công</option>${dayRows.map(a=>`<option value="${esc(a.id)}">${esc(a.branch_name)} · ${dateVN(a.work_date)} ${hm(a.starts_at)}–${hm(a.ends_at)}</option>`).join('')}</select></label><div class="camera-actions"><button class="btn" data-action="capture" data-type="IN" data-testid="attendance-in" ${!dayRows.length?'disabled':''}>${icon('camera')} Chụp vào ca</button><button class="btn secondary" data-action="capture" data-type="OUT" data-testid="attendance-out" ${!dayRows.length?'disabled':''}>${icon('camera')} Chụp tan ca</button></div><p class="camera-note">${icon('shield')}<span>Ảnh Timemark được ghép trên thiết bị từ thông tin máy chủ. Giờ đóng dấu được cấp trước lúc lưu tối đa 90 giây. Máy chủ xác thực bản ghi; ảnh và GPS không chứng minh tuyệt đối sự hiện diện.</span></p><p id="capture-status" class="hint" role="status" aria-live="polite"></p></div></section><div><section class="card"><div class="card-head"><div><h2>Ca làm của bạn</h2><p class="muted">Bao gồm ca qua đêm còn gần thời gian làm việc</p></div><button class="btn quiet small" data-view="schedule">Xem lịch</button></div><div class="card-body">${assignmentCards(dayRows)}<button class="btn secondary section-gap" data-view="handover">Đọc lời nhắn ca trước / bàn giao ca</button><div data-handover-preview></div></div></section><aside class="policy"><h3>${icon('pin')} Để chấm công chính xác</h3><p>Cho phép camera và vị trí chính xác. GPS cần sai số tối đa 50 m. Thời gian công lấy từ máy chủ; ngoài vùng được ghi cờ để quản lý xem xét.</p><button class="btn secondary" data-view="push">Thiết lập quyền thiết bị</button></aside></div></div>`;
   if(dayRows.length===1)$('#capture-assignment').value=dayRows[0].id;
   try{const h=await api('/api/handover?'+query({from:dayString(Date.now()-2*86400000),to:today()}));if(id===state.renderId&&h.available){state.handover=h;const panel=$('[data-handover-preview]');if(panel)panel.innerHTML=handoverCards(h.rows.filter(r=>dayRows.some(a=>a.branch_id===r.branch_id&&a.id!==r.assignment_id&&a.starts_at>r.starts_at)).slice(0,5));}}catch{/* Attendance remains usable if optional handover unavailable. */}
 }
@@ -150,19 +153,43 @@ async function renderPush(id){
  $('#content').innerHTML=devicePermissionPanel(camera,location)+`<section class="card section-gap"><div class="card-head"><h2>Thông báo khi đóng ứng dụng</h2></div><div class="card-body form-stack"><p>iPhone/iPad: thêm BABY MARK vào màn hình chính, mở từ biểu tượng rồi bật Push. Android: dùng trình duyệt hỗ trợ hoặc cài ứng dụng web.</p><p class="hint">${!settings.available?'Cần migration 0010.':!settings.configured?(data.admin?esc(vapidHint(data.vapid_code)):'Admin cần cấu hình VAPID.'):!settings.enabled?'Admin chưa bật Push.':!pushReg?'Thiết bị chưa hỗ trợ Push hoặc chưa cài PWA.':subscribed?'Thiết bị này đã đăng ký nhận Push.':'Thiết bị sẵn sàng đăng ký.'}</p>${pushReg?`<button class="btn" data-action="push-enable">${subscribed?'Đăng ký lại':'Bật Push trên thiết bị'}</button><button class="btn secondary" data-action="push-test" ${subscribed?'':'disabled'}>Gửi thông báo thử</button><button class="btn secondary" data-action="push-disable">Tắt Push trên thiết bị</button>`:''}<p class="hint">Thông báo trên màn hình khóa không chứa tên, GPS hay dữ liệu nhân viên.</p></div></section>${data.admin&&settings.available?`<section class="card section-gap"><div class="card-head"><h2>Cài đặt Push toàn hệ thống</h2></div><form class="card-body form-stack" data-form="push-settings"><label><input type="checkbox" name="enabled" ${settings.enabled?'checked':''} ${settings.configured?'':'disabled'}> Bật Push</label><label><input type="checkbox" name="reminders" ${settings.reminders?'checked':''}> Nhắc trước ca 10 phút</label><label><input type="checkbox" name="late_alerts" ${settings.late_alerts?'checked':''}> Cảnh báo quản lý đi muộn (cần bật thông báo đi muộn trong Cài đặt)</label><p class="hint">Cần Worker Cron riêng đã cấu hình để gửi tự động; giờ gửi không được bảo đảm tuyệt đối.</p><p class="error-text" data-form-error hidden></p><button class="btn" type="submit">Lưu cài đặt Push</button></form></section>`:''}`;
 }
 async function renderAlerts(id){const data=await api('/api/alerts');if(id!==state.renderId)return;$('#content').innerHTML=`<section class="card"><div class="card-head"><div><h2>Thông báo đi muộn</h2><p class="muted">Cập nhật khi mở hoặc làm mới trang; không phải push nền.</p></div><button class="btn secondary" data-action="refresh">Làm mới</button></div><div class="card-body">${!data.enabled?empty('Quản trị viên chưa bật thông báo đi muộn.'):data.alerts.length?data.alerts.map(a=>`<article class="assignment-card"><strong>${esc(a.full_name)} · ${esc(a.employee_code)}</strong><p>${esc(a.branch_name)} · ${dateVN(a.work_date)} · ${hm(a.starts_at)}</p><p>${badge(a.in_at==null?'Chưa vào ca':'Đi muộn')} ${a.minutes} phút</p></article>`).join(''):empty('Không có cảnh báo trong phạm vi quản lý.')}</div></section>`;}
-async function loadAdmin() {
-  const resources=['branches','employees','shifts','assignments','manager-branches','settings'];
-  const responses=await Promise.all(resources.map(r=>api(`/api/admin/${r}?${query(dateFilters())}`)));
-  resources.forEach((r,i)=>state.admin[r.replace('-','_')]=responses[i][r.replace('-','_')]);
+const ADMIN_GROUPS=[
+ ['Nhân sự',[['employees','people','Nhân viên','Tài khoản và bộ phận'],['branches','store','Cửa hàng','GPS và bán kính']]],
+ ['Lịch làm việc',[['shifts','clock','Ca làm','Mẫu giờ làm'],['assignments','calendar','Phân ca','Lịch từng nhân viên'],['rosters','calendar','Ca cố định','Luân phiên và tự động']]],
+ ['Hệ thống',[['settings','shield','Cài đặt','Chính sách và giới hạn'],['operations','shield','Vận hành','Kiểm tra hệ thống']]]
+];
+const ADMIN_TABS=ADMIN_GROUPS.flatMap(g=>g[1]),ADMIN_RESOURCES={employees:['employees'],branches:['branches','settings'],shifts:['shifts'],assignments:['employees','branches','shifts','assignments'],rosters:['employees','branches','shifts','rosters'],settings:['settings'],operations:['operations']};
+let adminList={tab:'',search:'',page:1};
+async function loadAdmin(resources,id=state.renderId){
+ const results=await Promise.all(resources.map(async r=>[r,await api('/api/admin/'+r+(r==='assignments'?'?'+query(dateFilters()):''))]));
+ if(id!==state.renderId)return false;
+ for(const [r,d] of results){const k=r.replace('-','_');state.admin[r==='rosters'?'rosterData':k]=['rosters','operations'].includes(r)?d:d[k];}
+ return true;
+}
+function normalizedSearch(value){return String(value??'').normalize('NFD').replace(/\p{Mark}/gu,'').toLowerCase().replace(/đ/g,'d').trim();}
+function renderAdminList(){
+ const host=$('#admin-list');if(!host)return;
+ const rows=state.admin[state.adminTab]||[],needle=normalizedSearch(adminList.search);
+ const fields={employees:['employee_code','full_name','department','username','role'],branches:['code','name','address_text'],shifts:['name','start_time','end_time'],assignments:['employee_code','full_name','branch_name','shift_name','work_date']}[state.adminTab]||[];
+ const found=rows.filter(r=>!needle||fields.some(f=>normalizedSearch(r[f]).includes(needle)));
+ const pageSize=25,pages=Math.max(1,Math.ceil(found.length/pageSize));adminList.page=Math.min(pages,Math.max(1,adminList.page));
+ const visible=found.slice((adminList.page-1)*pageSize,adminList.page*pageSize);
+ host.innerHTML=found.length?adminTable(visible)+`<div class="admin-pager"><span>${(adminList.page-1)*pageSize+1}–${Math.min(found.length,adminList.page*pageSize)} / ${found.length} kết quả · ${rows.length} bản ghi</span><div><button class="btn secondary small" data-action="admin-prev" ${adminList.page<=1?'disabled':''}>Trước</button><span>Trang ${adminList.page}/${pages}</span><button class="btn secondary small" data-action="admin-next" ${adminList.page>=pages?'disabled':''}>Sau</button></div></div>`:empty(needle?'Không tìm thấy kết quả.':'Chưa có dữ liệu. Dùng nút Thêm mới để bắt đầu.');
+ prepareResponsiveTables();
 }
 async function renderAdmin(id) {
-  await loadAdmin(); if(id!==state.renderId)return;
-  const tabs=[['employees','people','Nhân viên'],['branches','store','Cửa hàng'],['shifts','clock','Ca làm'],['assignments','calendar','Phân ca'],['rosters','calendar','Ca cố định'],['settings','shield','Cài đặt'],['operations','shield','Vận hành']];
-  if(state.adminTab==='operations'){state.admin.operations=await api('/api/admin/operations');if(id!==state.renderId)return;}
-  if(state.adminTab==='rosters'){state.admin.rosterData=await api('/api/admin/rosters');if(id!==state.renderId)return;}
-  const rows=state.admin[state.adminTab]||[];
-  const tabName=tabs.find(t=>t[0]===state.adminTab)[2];
-  $('#content').innerHTML=`<div class="stats">${stat('Nhân viên',state.admin.employees.filter(p=>p.active&&p.role!=='admin').length,'Tài khoản đang hoạt động','people')}${stat('Cửa hàng',state.admin.branches.filter(b=>b.active!==0).length,'Đang hoạt động','store')}${stat('Ca làm',state.admin.shifts.length,'Mẫu giờ làm việc','clock')}${stat('Lịch phân công',state.admin.assignments.length,'Trong khoảng ngày đang chọn','calendar')}</div><div class="tabs" role="tablist" aria-label="Danh mục quản trị">${tabs.map(([key,ic,name])=>`<button role="tab" aria-selected="${state.adminTab===key}" data-admin-tab="${key}" class="${state.adminTab===key?'active':''}">${name}</button>`).join('')}</div><section class="card"><div class="card-head"><div><h2>${tabName}</h2><p class="muted">Quản lý tập trung · Chỉ quản trị viên được chỉnh sửa</p></div>${['settings','operations','rosters'].includes(state.adminTab)?'':`<button class="btn" data-action="admin-add" ${state.adminTab==='branches'&&state.admin.branches.filter(b=>b.active!==0).length>=state.admin.settings.branch_limit?'disabled title="Đã đạt giới hạn cửa hàng"':''}>${icon('plus')} ${state.adminTab==='employees'?'Cấp tài khoản':'Thêm mới'}</button>`}</div>${state.adminTab==='branches'?'<div class="card-body"><button class="btn secondary" data-action="radius-all">Cài đặt bán kính cho phép</button></div>':''}${state.adminTab==='assignments'?filterBar()+'<div class="card-body"><button class="btn secondary" data-action="bulk-assign">Phân ca hàng loạt</button></div>':''}${state.adminTab==='settings'?settingsForm():state.adminTab==='operations'?operationsPanel():state.adminTab==='rosters'?rosterPanel():adminTable(rows)}</section>`;
+ if(state.user.role!=='admin')throw Error('Không có quyền quản trị.');
+ const tab=ADMIN_TABS.find(t=>t[0]===state.adminTab)||ADMIN_TABS[0];state.adminTab=tab[0];
+ if(adminList.tab!==tab[0])adminList={tab:tab[0],search:'',page:1};
+ const groups=ADMIN_GROUPS.map(([name,tabs])=>`<div class="admin-nav-group"><span>${name}</span><div role="tablist" aria-label="${name}">${tabs.map(([key,ic,label])=>`<button role="tab" aria-selected="${tab[0]===key}" data-admin-tab="${key}" class="${tab[0]===key?'active':''}">${icon(ic)}<span>${label}</span></button>`).join('')}</div></div>`).join('');
+ $('#content').innerHTML=`<div class="admin-layout"><aside class="admin-nav"><p class="eyebrow">TRUNG TÂM QUẢN TRỊ</p>${groups}<div class="admin-nav-group"><span>Đối soát</span><div><button data-view="reports">${icon('chart')} Báo cáo công</button><button data-view="payroll">${icon('file')} Bảng công & lương</button><button data-view="requests">${icon('calendar')} Yêu cầu công</button><button data-view="alerts">${icon('clock')} Cảnh báo</button></div></div></aside><div class="admin-work" id="admin-work">${loading()}</div></div>`;
+ if(!await loadAdmin(ADMIN_RESOURCES[tab[0]],id)||id!==state.renderId)return;
+ const rows=state.admin[tab[0]]||[],special=['settings','operations','rosters'].includes(tab[0]);
+ const count=special?'':`<span class="admin-count">${rows.length} bản ghi</span>`;
+ const add=special?'':`<button class="btn" data-action="admin-add" ${tab[0]==='branches'&&rows.filter(b=>b.active!==0).length>=state.admin.settings.branch_limit?'disabled title="Đã đạt giới hạn cửa hàng"':''}>${icon('plus')} ${tab[0]==='employees'?'Cấp tài khoản':'Thêm mới'}</button>`;
+ const controls=tab[0]==='branches'?'<div class="card-body admin-tools"><button class="btn secondary" data-action="radius-all">Cài đặt bán kính cho phép</button></div>':tab[0]==='assignments'?filterBar()+'<div class="card-body admin-tools"><button class="btn secondary" data-action="bulk-assign">Phân ca hàng loạt</button></div>':'';
+ $('#admin-work').innerHTML=`<section class="card admin-panel"><div class="card-head"><div><p class="eyebrow">BABY MARK · QUẢN TRỊ</p><h2>${tab[2]}</h2><p class="muted">${tab[3]} · Quản trị viên</p></div>${count}${add}<button class="btn quiet small" data-action="refresh" aria-label="Làm mới dữ liệu" title="Làm mới">${icon('refresh')}</button></div>${controls}${special?(tab[0]==='settings'?settingsForm():tab[0]==='operations'?operationsPanel():rosterPanel()):`<div class="admin-search"><label>Tìm kiếm<input type="search" id="admin-search" placeholder="Tìm theo tên, mã hoặc thông tin" value="${esc(adminList.search)}" autocomplete="off"></label></div><div id="admin-list"></div>`}</section>`;
+ if(!special)renderAdminList();
 }
 const vapidHints={JWK_MISSING:'Pages chưa nhận PUSH_VAPID_JWK. Kiểm tra môi trường Production và triển khai lại.',JWK_JSON:'PUSH_VAPID_JWK không phải JSON hợp lệ. Dán nguyên JSON khóa riêng, không kèm dấu nháy ngoài hoặc tên biến.',JWK_CURVE:'Khóa cần EC / P-256.',JWK_PRIVATE_MISSING:'Đã nhập khóa công khai thay vì JWK khóa riêng (thiếu d).',JWK_FIELDS:'Các trường x, y, d không đúng định dạng khóa P-256.',SUBJECT_MISSING:'Pages chưa nhận PUSH_VAPID_SUBJECT.',SUBJECT_INVALID:'PUSH_VAPID_SUBJECT cần email liên hệ hợp lệ hoặc URL HTTPS.',KEY_PAIR_MISMATCH:'Khóa công khai và khóa riêng không khớp.',KEY_CRYPTO_INVALID:'Không thể xác thực cặp khóa P-256 trong Web Crypto. Kiểm tra JWK gốc.',OK:'Cặp khóa VAPID ký và xác minh thành công.'};
 const vapidHint=code=>vapidHints[code]||'Kiểm tra Secret VAPID của môi trường Production.';
@@ -226,7 +253,7 @@ function credentialModal(result) {
   showModal('Mã truy cập vừa được cấp',`<p class="muted">Gửi riêng mã này cho đúng nhân viên. Mã chỉ hiển thị trong lần cấp này; đóng cửa sổ sẽ không thể xem lại.</p><div class="credential">Tên đăng nhập<strong> ${esc(result.username)}</strong><br>Mã truy cập<code data-testid="issued-secret">${esc(result.secret)}</code></div><p class="hint">Nhân viên dùng nguyên mã 48 ký tự để đăng nhập. Sau khi cấp lại, mã và phiên cũ không còn hiệu lực.</p><div class="modal-actions"><button class="btn" data-action="close-modal">Đã lưu mã an toàn</button></div>`);
 }
 async function renderReports(id) {
-  if(state.user.role==='admin'&&!state.admin.branches)await loadAdmin();
+  if(state.user.role==='admin'&&!await loadAdmin(['branches','employees'],id))return;
   const data=await api(`/api/reports?${query(state.filters)}`); if(id!==state.renderId)return;
   state.reports=data.rows;
   const s=data.summary||{};
@@ -290,31 +317,54 @@ async function navigate(view=state.view) {
   try {
     await ({today:renderToday,history:renderHistory,schedule:renderSchedule,admin:renderAdmin,reports:renderReports,requests:renderRequests,alerts:renderAlerts,extra:renderExtra,handover:renderHandover,push:renderPush,sessions:renderSessions,payroll:renderPayroll}[view])(id);
     if(id===state.renderId)prepareResponsiveTables();
-  } catch(e) { if(id===state.renderId&&$('#content'))$('#content').innerHTML=errorHTML(e.message); }
+  } catch(e) { if(id===state.renderId&&$('#content'))($('#admin-work')||$('#content')).innerHTML=errorHTML(e.message); }
 }
 
-async function startCamera() {
-  if(!navigator.mediaDevices?.getUserMedia)throw new Error('Camera cần HTTPS hoặc localhost và trình duyệt có hỗ trợ camera.');
-  stopCamera();
-  const ticket=cameraTicket,epoch=state.sessionEpoch;
-  const stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:'user',width:{ideal:1200},height:{ideal:1600}},audio:false});
-  if(ticket!==cameraTicket||epoch!==state.sessionEpoch){stream.getTracks().forEach(t=>t.stop());return;}
-  state.stream=stream;
-  const video=$('#camera');
-  if(!video){stopCamera();return;}
-  video.srcObject=state.stream;await video.play();$('#camera-placeholder').hidden=true;$('#camera-live').hidden=false;
+function cameraControls(){
+ const busy=cameraOpening||!!(captureAbort&&!captureAbort.signal.aborted);
+ document.querySelectorAll('[data-action="camera-start"],[data-action="camera-switch"],[data-action="camera-stop"]').forEach(b=>b.disabled=busy);
+ const label=$('#camera-facing');if(label)label.textContent=cameraFacing==='environment'?'Camera sau':'Camera trước';
+ const stop=$('[data-action="camera-stop"]');if(stop)stop.hidden=!state.stream;
+}
+async function startCamera(facing=cameraFacing,{strict=false}={}) {
+ if(!navigator.mediaDevices?.getUserMedia)throw Error('Camera cần HTTPS và trình duyệt hỗ trợ camera.');
+ if(cameraOpening||captureAbort&&!captureAbort.signal.aborted)return;
+ stopCamera();const ticket=cameraTicket,epoch=state.sessionEpoch;cameraOpening=true;cameraControls();
+ try{
+  const stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:strict?{exact:facing}:{ideal:facing},width:{ideal:1200},height:{ideal:1600}},audio:false});
+  if(ticket!==cameraTicket||epoch!==state.sessionEpoch||document.hidden){stream.getTracks().forEach(t=>t.stop());return;}
+  const video=$('#camera');if(!video){stream.getTracks().forEach(t=>t.stop());return;}
+  state.stream=stream;video.srcObject=stream;
+  try{await video.play();}catch(e){if(ticket===cameraTicket)stopCamera();throw e;}
+  if(ticket!==cameraTicket||epoch!==state.sessionEpoch)return;
+  const actual=stream.getVideoTracks()[0]?.getSettings?.().facingMode;
+  cameraFacing=['user','environment'].includes(actual)?actual:facing;
+  $('#camera-placeholder').hidden=true;$('#camera-live').hidden=false;
+ }finally{if(ticket===cameraTicket){cameraOpening=false;cameraControls();}}
+}
+async function switchCamera(){
+ if(cameraOpening||captureAbort&&!captureAbort.signal.aborted)return;
+ const previous=cameraFacing,next=previous==='user'?'environment':'user',epoch=state.sessionEpoch,render=state.renderId;
+ if(!state.stream){cameraFacing=next;cameraControls();return;}
+ try{await startCamera(next,{strict:true});}
+ catch(e){
+  if(epoch!==state.sessionEpoch||render!==state.renderId||document.hidden)return;
+  cameraFacing=previous;
+  try{await startCamera(previous);}catch{}
+  notify('Không thể chuyển camera. Thiết bị có thể chỉ có một camera hoặc chưa cấp quyền.',true);
+ }
 }
 async function capture(type,button) {
   const epoch=state.sessionEpoch;
   const assignment_id=$('#capture-assignment').value;
   if(!assignment_id)throw new Error('Vui lòng chọn ca làm trước khi chụp.');
-  if(!state.stream)throw new Error('Bật camera và đợi hình ảnh xuất hiện trước khi chụp.');
+  if(cameraOpening||!state.stream)throw new Error('Bật camera và đợi hình ảnh xuất hiện trước khi chụp.');
   const a=state.assignments.find(r=>r.id===assignment_id);
   if(type==='IN'&&a.in_id)throw new Error('Ca này đã có lượt vào ca.');
   if(type==='OUT'&&!a.in_id)throw new Error('Cần ghi nhận vào ca trước khi tan ca.');
   if(type==='OUT'&&a.out_id)throw new Error('Ca này đã có lượt tan ca.');
   if(captureAbort)throw new Error('Đang xử lý một lượt chấm công.');
-  const run=new AbortController();captureAbort=run;
+  const run=new AbortController();captureAbort=run;cameraControls();
   const renderId=state.renderId,stream=state.stream;
   const stillCurrent=()=>{if(run.signal.aborted||epoch!==state.sessionEpoch||renderId!==state.renderId||state.stream!==stream||document.hidden||$('#capture-assignment')?.value!==assignment_id)throw new Error('Ca hoặc camera đã thay đổi. Vui lòng chấm lại.');};
   const status=$('#capture-status');
@@ -338,7 +388,7 @@ async function capture(type,button) {
     const expires=Number(prepared.expires_at);
     const tick=()=>{if(!pendingCapture||pendingCapture.ticket!==ticket)return;const left=Math.max(0,Math.ceil((expires-Date.now())/1000));const el=$('[data-confirm-expiry]');if(el)el.textContent=left?'Còn '+left+' giây để xác nhận.':'Ảnh đã hết hạn. Hãy chụp lại.';const b=$('[data-action="capture-confirm"]');if(b&&!left&&!pendingCapture.sending)b.disabled=true;};
     tick();confirmationTimer=setInterval(tick,500);
-  } finally { if(captureAbort===run)captureAbort=null;if(status.isConnected){status.textContent='';document.querySelectorAll('[data-action="capture"]').forEach(b=>b.disabled=false);} }
+  } finally { if(captureAbort===run)captureAbort=null;cameraControls();if(status.isConnected){status.textContent='';document.querySelectorAll('[data-action="capture"]').forEach(b=>b.disabled=false);} }
 }
 async function confirmCapture(button){
  const p=pendingCapture;
@@ -380,6 +430,7 @@ document.addEventListener('click',async event=>{
   if(button.dataset.adminTab){state.adminTab=button.dataset.adminTab;return void navigate('admin');}
   const action=button.dataset.action;if(!action)return;
   try {
+    if(action==='admin-prev'||action==='admin-next'){adminList.page+=action==='admin-next'?1:-1;renderAdminList();return;}
     if(action==='mobile-menu'){mobileMenu(button.getAttribute('aria-expanded')!=='true');return;}
     if(action==='sessions-revoke'){showModal('Đăng xuất tất cả phiên khác',`<form data-form="sessions-revoke" class="form-stack"><p>Thu hồi mọi phiên đăng nhập khác của chính tài khoản này. Phiên hiện tại vẫn hoạt động.</p><p class="error-text" data-form-error hidden></p><button class="btn" type="submit">Xác nhận thu hồi</button></form>`);return;}
     if(action==='leave-range'){showModal('Xin nghỉ nhiều ngày',`<form data-form="leave-range" class="form-stack"><label>Từ ngày<input name="from" type="date" min="${today()}" required></label><label>Đến ngày<input name="to" type="date" min="${today()}" required></label><label>Lý do<textarea name="reason" minlength="5" maxlength="1000" required></textarea></label><p class="hint">Tạo yêu cầu cho từng ca tương lai đã có lịch và chưa có yêu cầu đang xử lý; ngày chưa có lịch không được giữ chỗ. Quản lý duyệt từng ca.</p><p class="error-text" data-form-error hidden></p><button class="btn" type="submit">Gửi yêu cầu</button></form>`);return;}
@@ -450,6 +501,8 @@ document.addEventListener('click',async event=>{
       showModal('Xem xét ca bổ sung',`<form data-form="extra-decide" data-id="${esc(button.dataset.id)}" class="form-stack"><label>Quyết định<select name="state"><option value="APPROVED">Duyệt</option><option value="REJECTED">Từ chối</option></select></label><label>Ghi chú (bắt buộc nếu từ chối)<textarea name="note" maxlength="500"></textarea></label><p class="hint">Giữ nguyên ảnh, GPS và giờ gốc; không sửa lịch người được thay.</p><p class="error-text" data-form-error hidden></p><button type="submit" class="btn">Lưu quyết định</button></form>`);return;
     }
     if(action==='camera-start'){button.disabled=true;await startCamera();return;}
+    if(action==='camera-switch')return await switchCamera();
+    if(action==='camera-stop'){stopCamera();cameraControls();return;}
     if(action==='capture')return await capture(button.dataset.type,button);
     if(action==='photo')return await showPhoto(button.dataset.id);
     if(action==='export')return await exportReports();
@@ -533,6 +586,7 @@ document.addEventListener('click',async event=>{
       showModal(employee.active?'Khóa tài khoản':'Mở khóa tài khoản',`<p class="muted">${employee.active?'Nhân viên sẽ được đăng xuất và không thể đăng nhập cho đến khi mở khóa.':'Nhân viên có thể đăng nhập lại bằng mã truy cập đang được cấp.'}</p><p class="hint">${esc(employee.full_name)} · ${esc(employee.employee_code)}</p><form data-form="toggle-account" data-id="${esc(employee.id)}" data-active="${employee.active?'false':'true'}"><p class="error-text inline-error" data-form-error hidden></p><div class="modal-actions"><button class="btn secondary" type="button" data-action="close-modal">Hủy</button><button class="btn" type="submit">${employee.active?'Khóa tài khoản':'Mở khóa'}</button></div></form>`);return;
     }
     if(action==='manager-scope'){
+      const id=state.renderId;button.disabled=true;if(!await loadAdmin(['branches','manager-branches'],id)||id!==state.renderId)return;
       const scope=state.admin.manager_branches.filter(r=>r.user_id===employee.id).map(r=>r.branch_id);
       showModal('Phạm vi quản lý cửa hàng',`<form data-form="manager-scope" data-id="${esc(employee.id)}"><p class="muted">${esc(employee.full_name)} chỉ được xem báo cáo và duyệt yêu cầu trong các cửa hàng được chọn.</p><div class="checklist section-gap">${state.admin.branches.map(b=>`<label><input type="checkbox" name="branch_ids" value="${esc(b.id)}" ${scope.includes(b.id)?'checked':''}>${esc(b.name)}</label>`).join('')}</div><p class="error-text inline-error" data-form-error hidden></p><div class="modal-actions"><button class="btn secondary" type="button" data-action="close-modal">Hủy</button><button class="btn" type="submit">Lưu phạm vi</button></div></form>`);return;
     }
@@ -550,6 +604,7 @@ document.addEventListener('keydown',event=>{
 document.addEventListener('pointerdown',event=>{
  if($('.sidebar.menu-open')&&!event.target.closest('.sidebar'))mobileMenu(false);
 });
+document.addEventListener('input',event=>{if(event.target.id==='admin-search'){adminList.search=event.target.value;adminList.page=1;renderAdminList();}});
 document.addEventListener('change',event=>{
   if(event.target.id==='request-kind') {
     const correction=event.target.value==='CORRECTION';$('#correction-times').hidden=!correction;

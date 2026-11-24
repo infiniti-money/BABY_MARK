@@ -125,3 +125,25 @@ td,th{overflow-wrap:anywhere}
 @media(prefers-reduced-motion:reduce){.sidebar,.nav,.btn{transition:none!important}}
 
 .operations-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,240px),1fr));gap:12px}.operation-row{border:1px solid var(--line);border-radius:14px;padding:14px;display:flex;align-items:flex-start;justify-content:space-between;gap:10px;min-width:0}.operation-row>div{min-width:0;overflow-wrap:anywhere}.operation-row strong{font-size:13px}.operation-row .hint{margin-top:5px;font-size:12px}.operation-row .tag{white-space:normal;flex-shrink:0;max-width:40%}
+
+/* Compact management workspace; native controls, no external UI dependencies. */
+.admin-layout{display:grid;grid-template-columns:minmax(164px,205px) minmax(0,1fr);gap:18px;align-items:start}
+.admin-nav{background:#fff;border:1px solid var(--line);border-radius:16px;padding:14px;min-width:0}
+.admin-nav>.eyebrow{margin:4px 2px 14px;font-size:10px}
+.admin-nav-group{margin:0 0 15px}.admin-nav-group:last-child{margin-bottom:0}
+.admin-nav-group>span{display:block;font-size:10px;font-weight:700;color:#806879;text-transform:uppercase;letter-spacing:.7px;margin:0 3px 6px}
+.admin-nav-group>div{display:grid;gap:4px}
+.admin-nav button{display:flex;align-items:center;gap:8px;text-align:left;background:transparent;color:#60485a;min-height:40px;padding:9px 10px;border-radius:9px;font-weight:600;font-size:13px;line-height:1.35}
+.admin-nav button.active{background:#f8e8ef;color:var(--wine);box-shadow:inset 3px 0 var(--wine)}
+.admin-nav button:hover{background:#f8edf3}.admin-nav .icon{width:18px;height:18px;flex:0 0 18px}
+.admin-work,.admin-panel{min-width:0}.admin-panel .card-head{align-items:center;gap:10px}.admin-panel .card-head h2{font-size:20px}.admin-panel .card-head .eyebrow{margin-bottom:5px}
+.admin-count{font-size:12px;color:#796375;white-space:nowrap}.admin-search{padding:14px 20px;border-bottom:1px solid var(--line);background:#fcfafb}
+.admin-search label{display:block;max-width:440px}.admin-search input{margin-top:6px;width:100%}
+.admin-tools{border-bottom:1px solid var(--line);padding-top:12px;padding-bottom:12px}
+.admin-pager{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;padding:12px 18px;border-top:1px solid var(--line);font-size:12px;color:#766573}
+.admin-pager>div{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.admin-panel td{padding:11px 14px}.admin-panel th{padding:12px 14px}
+.admin-panel .table-footer{display:none}.admin-panel td:last-child .btn{margin:2px 3px 2px 0}
+.camera-toolbar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:10px}.camera-toolbar .btn{min-height:44px}.camera-facing{flex:1;min-width:90px;color:#674158;font-size:13px;font-weight:650}
+@media(max-width:1250px){.admin-layout{grid-template-columns:minmax(0,1fr)}.admin-nav{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}.admin-nav>.eyebrow{grid-column:1/-1;margin-bottom:0}.admin-nav-group{margin:0}.admin-nav-group>div{display:flex;flex-wrap:wrap}.admin-nav-group button{flex:1 1 auto;min-height:44px}}
+@media(max-width:620px){.admin-layout{gap:12px}.admin-nav{padding:10px;gap:12px}.admin-nav-group>div{display:grid;grid-template-columns:1fr}.admin-nav button{font-size:12px;padding:7px 9px;min-height:44px}.admin-nav .icon{width:16px;height:16px;flex-basis:16px}.admin-search{padding:12px}.admin-panel .card-head h2{font-size:18px}.admin-panel .responsive-table td{padding:9px 0 9px 42%}.admin-panel .responsive-table td:last-child .btn{margin:3px 0}.admin-pager{padding:12px}.admin-pager .btn{min-height:44px}}
