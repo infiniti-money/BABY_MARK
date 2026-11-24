@@ -8,8 +8,8 @@ export async function readAssignments(db,actor,url){
  }
  const extra=!!await db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='extra_attendance'").first();
  const sql=`SELECT a.*,${extra?'x.kind AS extra_kind,x.state AS extra_state,x.replaced_name,x.reason AS extra_reason,':''}p.employee_code,p.full_name,p.department,b.name AS branch_name,b.code AS branch_code,b.address_text,b.latitude,b.longitude,b.allowed_radius,s.name AS shift_name,
- i.id AS in_id,i.server_timestamp AS in_at,i.status AS in_status,i.late_minutes AS in_late,i.distance_m AS in_distance_m,i.photo_source AS in_photo_source,
- o.id AS out_id,o.server_timestamp AS out_at,o.status AS out_status,o.early_minutes AS out_early,o.distance_m AS out_distance_m,o.photo_source AS out_photo_source,
+ i.id AS in_id,i.server_timestamp AS in_at,i.status AS in_status,i.late_minutes AS in_late,i.distance_m AS in_distance_m,i.accuracy_m AS in_accuracy_m,i.photo_source AS in_photo_source,
+ o.id AS out_id,o.server_timestamp AS out_at,o.status AS out_status,o.early_minutes AS out_early,o.distance_m AS out_distance_m,o.accuracy_m AS out_accuracy_m,o.photo_source AS out_photo_source,
  r.id AS request_id,r.kind AS request_kind,r.state AS request_state,r.proposed_in,r.proposed_out,r.decided_by,r.decided_at
  FROM assignments a JOIN profiles p ON p.id=a.user_id JOIN branches b ON b.id=a.branch_id JOIN shifts s ON s.id=a.shift_id
 ${extra?' LEFT JOIN extra_attendance x ON x.assignment_id=a.id':''}

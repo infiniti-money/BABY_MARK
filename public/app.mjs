@@ -66,7 +66,9 @@ const loading = () => '<div class="loading" role="status">Đang tải dữ liệ
 const errorHTML = message => `<div class="table-error"><p class="error-text" role="alert">${esc(message)}</p><button class="btn secondary section-gap" data-action="refresh">Thử lại</button></div>`;
 const rowOptions = (rows,selected,label='name') => rows.map(r=>`<option value="${esc(r.id)}" ${r.id===selected?'selected':''}>${esc(r[label]||r.full_name||r.id)}${label==='full_name'?' · '+esc(r.employee_code):''}</option>`).join('');
 
+let captureAbort=null;
 function stopCamera() {
+  captureAbort?.abort();
   cameraTicket++;
   state.stream?.getTracks().forEach(t=>t.stop()); state.stream=null;
   if($('#camera-placeholder'))$('#camera-placeholder').hidden=false;
@@ -213,7 +215,7 @@ async function renderReports(id) {
   const data=await api(`/api/reports?${query(state.filters)}`); if(id!==state.renderId)return;
   state.reports=data.rows;
   const s=data.summary||{};
-  $('#content').innerHTML=`<div class="stats">${stat('Ca hoàn tất',s.shifts??0,'Các ca đủ dữ liệu công','check')}${stat('Giờ làm ghi nhận',(Number(s.minutes||0)/60).toFixed(1),'Chưa bao gồm quy tắc tính lương','clock')}${stat('Đi muộn',s.late??0,'Tổng phút theo bảng công','calendar')}${stat('Ngày nghỉ được duyệt',s.leaveDays??0,'Theo đơn đã phê duyệt','file')}</div><section class="card"><div class="card-head"><h2>Bảng công theo ca</h2><span class="tag">${data.rows.length} CA</span></div>${filterBar({reports:true})}${data.rows.length?`<div class="table-wrap"><table><thead><tr><th>Nhân viên</th><th>Ngày / Cửa hàng</th><th>Ca làm</th><th>Vào / Tan ca</th><th>Phút công</th><th>Trạng thái</th></tr></thead><tbody>${data.rows.map(r=>`<tr><td><strong>${esc(r.full_name)}</strong><small>${esc(r.employee_code)}</small></td><td>${dateVN(r.work_date)}<small>${esc(r.branch_name)}</small></td><td>${esc(r.shift_name)}<small>${hm(r.starts_at)} – ${hm(r.ends_at)}</small></td><td>${r.summary?.adjusted?`${hm(r.proposed_in)} / ${hm(r.proposed_out)}<small>Đã duyệt · Gốc: ${hm(r.in_at)} / ${hm(r.out_at)}</small>`:`${hm(r.in_at)} / ${hm(r.out_at)}`}</td><td>${r.summary?.minutes??0}<small>Muộn ${r.summary?.late??0} · Sớm ${r.summary?.early??0}</small></td><td>${badge(r.summary?.status)}</td></tr>`).join('')}</tbody></table></div><p class="table-footer">Dữ liệu tham khảo đối soát. CSV mở được trong Excel; chưa áp dụng quy tắc lương, nghỉ giữa ca và ngày lễ.</p>`:empty()}</section>`;
+  $('#content').innerHTML=`<div class="stats">${stat('Ca hoàn tất',s.shifts??0,'Các ca đủ dữ liệu công','check')}${stat('Giờ làm ghi nhận',(Number(s.minutes||0)/60).toFixed(1),'Chưa bao gồm quy tắc tính lương','clock')}${stat('Đi muộn',s.late??0,'Tổng phút theo bảng công','calendar')}${stat('Ngày nghỉ được duyệt',s.leaveDays??0,'Theo đơn đã phê duyệt','file')}</div><section class="card"><div class="card-head"><h2>Bảng công theo ca</h2><span class="tag">${data.rows.length} CA</span></div>${filterBar({reports:true})}${data.rows.length?`<div class="table-wrap"><table><thead><tr><th>Nhân viên</th><th>Ngày / Cửa hàng</th><th>Ca làm</th><th>Vào / Tan ca</th><th>Phút công</th><th>Trạng thái</th><th>Đối soát ảnh / GPS</th></tr></thead><tbody>${data.rows.map(r=>`<tr><td><strong>${esc(r.full_name)}</strong><small>${esc(r.employee_code)}</small></td><td>${dateVN(r.work_date)}<small>${esc(r.branch_name)}</small></td><td>${esc(r.shift_name)}<small>${hm(r.starts_at)} – ${hm(r.ends_at)}</small></td><td>${r.summary?.adjusted?`${hm(r.proposed_in)} / ${hm(r.proposed_out)}<small>Đã duyệt · Gốc: ${hm(r.in_at)} / ${hm(r.out_at)}</small>`:`${hm(r.in_at)} / ${hm(r.out_at)}`}</td><td>${r.summary?.minutes??0}<small>Muộn ${r.summary?.late??0} · Sớm ${r.summary?.early??0}</small></td><td>${badge(r.summary?.status)}</td><td>${['in','out'].map(type=>r[type+'_id']?`<div><small>${type==='in'?'Vào':'Ra'} · ${r[type+'_distance_m']==null?'—':Math.round(r[type+'_distance_m'])+' m'} · sai số ${r[type+'_accuracy_m']==null?'—':'±'+Math.round(r[type+'_accuracy_m'])+' m'}</small><button class="btn secondary small" data-action="photo" data-id="${esc(r[type+'_id'])}">Ảnh ${type==='in'?'vào':'ra'}</button></div>`:'').join('')||'—'}</td></tr>`).join('')}</tbody></table></div><p class="table-footer">Dữ liệu tham khảo đối soát. CSV mở được trong Excel; chưa áp dụng quy tắc lương, nghỉ giữa ca và ngày lễ.</p>`:empty()}</section>`;
 }
 function handoverCards(rows){
  return rows.map(r=>`<article class="assignment-card"><strong>${esc(r.branch_name)} · ${esc(r.shift_name)}</strong><p class="hint">${esc(r.full_name)} · ${dt(r.created_at)}</p><p class="request-reason">${esc(r.message)}</p></article>`).join('');
@@ -289,28 +291,34 @@ async function capture(type,button) {
   if(type==='IN'&&a.in_id)throw new Error('Ca này đã có lượt vào ca.');
   if(type==='OUT'&&!a.in_id)throw new Error('Cần ghi nhận vào ca trước khi tan ca.');
   if(type==='OUT'&&a.out_id)throw new Error('Ca này đã có lượt tan ca.');
+  if(captureAbort)throw new Error('Đang xử lý một lượt chấm công.');
+  const run=new AbortController();captureAbort=run;
+  const renderId=state.renderId,stream=state.stream;
+  const stillCurrent=()=>{if(run.signal.aborted||epoch!==state.sessionEpoch||renderId!==state.renderId||state.stream!==stream||document.hidden||$('#capture-assignment')?.value!==assignment_id)throw new Error('Ca hoặc camera đã thay đổi. Vui lòng chấm lại.');};
   const status=$('#capture-status');
   document.querySelectorAll('[data-action="capture"]').forEach(b=>b.disabled=true);
   try {
     status.textContent='Đang lấy vị trí chính xác…';
-    const location=await currentPosition();
-    if(epoch!==state.sessionEpoch)throw new Error('Tài khoản đã thay đổi. Vui lòng chụp lại.');
+    const location=await currentPosition({signal:run.signal,onProgress:m=>{if(status.isConnected)status.textContent='Đang cải thiện độ chính xác GPS: ±'+Math.round(m)+' m (cần ≤ 50 m)…';}});
+    stillCurrent();
     const frame=cameraFrame($('#camera'));
     status.textContent='Đang xác thực ca làm và thời gian máy chủ…';
     const prepared=await api('/api/attendance/prepare',{method:'POST',body:{assignment_id,type,...location}});
+    stillCurrent();
     status.textContent='Đang ghép Timemark và nén ảnh…';
     const photo=await composeTimemark(frame,prepared.metadata);
-    if(epoch!==state.sessionEpoch)throw new Error('Tài khoản đã thay đổi. Vui lòng chụp lại.');
+    stillCurrent();
     const form=new FormData();form.set('challenge_id',prepared.challenge_id);form.set('photo',photo,'timemark.jpg');
     status.textContent='Đang lưu bản ghi công và ảnh. Vui lòng chờ…';
     const result=await api('/api/attendance/submit',{method:'POST',body:form});
+    if(epoch!==state.sessionEpoch||renderId!==state.renderId)return;
     const url=URL.createObjectURL(photo);
     stopCamera();
-    showModal('Đã ghi nhận '+(type==='IN'?'vào ca':'tan ca'),`<p class="muted">Bản ghi đã được lưu trên máy chủ. Ảnh bên dưới được ghép trên thiết bị từ thông tin máy chủ. Giờ đóng dấu có thể sớm hơn giờ ghi nhận tối đa 90 giây.</p><div class="review-meta"><div>Thời gian máy chủ<strong>${dt(result.attendance?.server_timestamp||prepared.metadata.serverTimestamp)}</strong></div><div>Dung lượng ảnh<strong>${(photo.size/1000).toFixed(1)} KB / 200 KB</strong></div></div><img class="result-photo" src="${url}" alt="Ảnh Timemark vừa ghi nhận">${type==='OUT'&&state.handover?.available?handoverForm(assignment_id):''}<div class="modal-actions"><button class="btn" data-action="close-modal">Hoàn tất</button></div>`);
+    showModal('Đã ghi nhận '+(type==='IN'?'vào ca':'tan ca'),`<p class="muted">Bản ghi đã được lưu trên máy chủ. Ảnh bên dưới được ghép trên thiết bị từ thông tin máy chủ. Giờ đóng dấu có thể sớm hơn giờ ghi nhận tối đa 90 giây.</p><div class="review-meta"><div>Thời gian máy chủ<strong>${dt(result.attendance?.server_timestamp||prepared.metadata.serverTimestamp)}</strong></div><div>Dung lượng ảnh<strong>${(photo.size/1000).toFixed(1)} KB / 200 KB</strong></div><div>Khoảng cách<strong>${Math.round(prepared.metadata.distance)} / ${prepared.metadata.radius} m</strong></div><div>Sai số GPS<strong>±${Math.round(prepared.metadata.accuracy)} m</strong></div></div>${prepared.metadata.distance>prepared.metadata.radius?'<p class="error-text">Ngoài vùng: ảnh và giờ vẫn được lưu, chưa cộng công tự động.</p>':'<p class="hint">Trong bán kính cửa hàng theo vị trí báo cáo.</p>'}<img class="result-photo" src="${url}" alt="Ảnh Timemark vừa ghi nhận">${type==='OUT'&&state.handover?.available?handoverForm(assignment_id):''}<div class="modal-actions"><button class="btn" data-action="close-modal">Hoàn tất</button></div>`);
     // Keep the current preview alive until the dialog closes.
     photoURLs.push(url);
     await navigate('today');
-  } finally { if(status.isConnected)status.textContent=''; document.querySelectorAll('[data-action="capture"]').forEach(b=>b.disabled=false); }
+  } finally { if(captureAbort===run)captureAbort=null;if(status.isConnected){status.textContent='';document.querySelectorAll('[data-action="capture"]').forEach(b=>b.disabled=false);} }
 }
 async function showPhoto(id) {
   const epoch=state.sessionEpoch,ticket=showModal('Ảnh chấm công',loading());
