@@ -284,7 +284,7 @@ test.describe.serial('Cloudflare local frontend and actual D1/KV endpoints',()=>
       await expect(employeeRow).toBeVisible();
       await employeeRow.getByRole('button',{name:'Đặt lại mật khẩu / mã',exact:true}).click();
       const resetDialog=page.getByRole('dialog',{name:'Cấp lại mã truy cập',exact:true});
-      await resetDialog.getByRole('button',{name:'Đặt lại mật khẩu / mã',exact:true}).click();
+      await resetDialog.getByRole('button',{name:'Cấp lại mã',exact:true}).click();
       const issued=page.getByTestId('issued-secret');await issued.waitFor({state:'visible'});
       const newSecret=await issued.textContent();
       await page.getByRole('button',{name:'Đã lưu mã an toàn',exact:true}).click();
@@ -326,4 +326,29 @@ test('offline logout still clears local account data and camera access',async({p
   expect(await page.evaluate(()=>window.__lastCameraTracks.every(track=>track.readyState==='ended'))).toBeTruthy();
   await expect(page.getByRole('dialog')).not.toBeVisible();
   await context.setOffline(false);
+});
+
+test('administrator creates and resets a chosen password and staff logs in through the browser',async({page})=>{
+  const name='test-human-'+Date.now().toString(36).slice(-6),pwd='Local test passphrase 2026!',next='Second local test passphrase!';
+  await login(page);
+  await page.getByRole('button',{name:'Quản trị',exact:true}).click();
+  await page.getByRole('button',{name:'Cấp tài khoản',exact:true}).click();
+  await page.getByLabel('Mã nhân viên',{exact:true}).fill(name.toUpperCase());
+  await page.getByLabel('Họ và tên',{exact:true}).fill('Nhân viên mật khẩu thử nghiệm');
+  await page.getByLabel('Tên đăng nhập',{exact:true}).fill(name);
+  await page.getByLabel('Mật khẩu nhân viên (không bắt buộc)',{exact:true}).fill(pwd);
+  await page.getByRole('button',{name:'Tạo và cấp mã truy cập',exact:true}).click();
+  const row=page.getByRole('row').filter({hasText:name.toUpperCase()});await expect(row).toBeVisible();
+  await page.getByRole('button',{name:'Đăng xuất tài khoản',exact:true}).click();
+  await loginAccount(page,name,pwd);
+  await page.getByRole('button',{name:'Đăng xuất tài khoản',exact:true}).click();
+  await login(page);
+  await page.getByRole('button',{name:'Quản trị',exact:true}).click();
+  await row.getByRole('button',{name:'Đặt lại mật khẩu / mã',exact:true}).click();
+  await page.getByLabel('Mật khẩu nhân viên (không bắt buộc)',{exact:true}).fill(next);
+  await page.getByRole('dialog').getByRole('button',{name:'Cấp lại mã',exact:true}).click();
+  await expect(page.getByRole('dialog')).not.toBeVisible();
+  await page.getByRole('button',{name:'Đăng xuất tài khoản',exact:true}).click();
+  await loginAccount(page,name,next);
+  await expect(page.getByRole('button',{name:'Quản trị',exact:true})).toHaveCount(0);
 });
