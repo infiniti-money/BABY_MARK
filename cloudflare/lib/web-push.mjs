@@ -72,13 +72,17 @@ export async function dispatchPush(env,now=Date.now(),fetcher=fetch){
  // 15-minute catch-up for late alerts; 10-minute lead time for upcoming shifts.
  // No personal payload, only a generic wake-up. Existing in-app policy is respected.
  const inApp=await db.prepare('SELECT late_alerts FROM system_settings WHERE id=1').first();
+ // Migration 0012 is optional until production has been migrated. Do not
+ // send scheduled reminders or late alerts for unapproved additional shifts.
+ const extra=!!await db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='extra_attendance'").first();
+ const approvedExtra=extra?" AND NOT EXISTS(SELECT 1 FROM extra_attendance x WHERE x.assignment_id=a.id AND x.state<>'APPROVED')":"";
  const {results}=await db.prepare(`
  WITH candidates AS (
   SELECT a.id||':REMINDER' AS event_key,a.user_id AS recipient FROM assignments a
    JOIN profiles p ON p.id=a.user_id AND p.active=1 JOIN branches b ON b.id=a.branch_id AND b.active=1
    WHERE ?=1 AND a.starts_at>? AND a.starts_at<=?
     AND NOT EXISTS(SELECT 1 FROM attendances t WHERE t.assignment_id=a.id AND t.type='IN')
-    AND NOT EXISTS(SELECT 1 FROM workforce_requests w WHERE w.assignment_id=a.id AND w.kind='LEAVE' AND w.state='APPROVED')
+    AND NOT EXISTS(SELECT 1 FROM workforce_requests w WHERE w.assignment_id=a.id AND w.kind='LEAVE' AND w.state='APPROVED')${approvedExtra}
   UNION
   SELECT a.id||':LATE',p.id FROM assignments a JOIN profiles employee ON employee.id=a.user_id AND employee.active=1
    JOIN branches b ON b.id=a.branch_id AND b.active=1
@@ -86,7 +90,7 @@ export async function dispatchPush(env,now=Date.now(),fetcher=fetch){
    WHERE ?=1 AND a.starts_at BETWEEN ? AND ?
     AND a.starts_at+a.grace_minutes*60000<? AND a.starts_at+a.grace_minutes*60000>=? AND a.ends_at>?
     AND NOT EXISTS(SELECT 1 FROM attendances t WHERE t.assignment_id=a.id AND t.type='IN' AND t.late_minutes=0)
-    AND NOT EXISTS(SELECT 1 FROM workforce_requests w WHERE w.assignment_id=a.id AND w.kind='LEAVE' AND w.state='APPROVED')
+    AND NOT EXISTS(SELECT 1 FROM workforce_requests w WHERE w.assignment_id=a.id AND w.kind='LEAVE' AND w.state='APPROVED')${approvedExtra}
  )
  SELECT DISTINCT c.event_key,s.endpoint,s.user_id FROM candidates c JOIN web_push_subscriptions s ON s.user_id=c.recipient
  WHERE NOT EXISTS(SELECT 1 FROM web_push_receipts r WHERE r.event_key=c.event_key AND r.endpoint=s.endpoint)

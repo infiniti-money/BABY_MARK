@@ -21,3 +21,19 @@ test('VAPID diagnostics distinguish missing, malformed, public-only and bad subj
  const bad=await vapidDiagnosis({...env,PUSH_VAPID_JWK:JSON.stringify(broken)});
  assert.equal(bad.ready,false);assert.ok(['KEY_PAIR_MISMATCH','KEY_CRYPTO_INVALID'].includes(bad.code));
 });
+
+test('unapproved extra shifts do not emit reminder or late pushes; approved ones do',async()=>{
+ const f=await appFixture();try{
+ const env={...f.env,...await keyEnv()},now=Date.now(),db=f.db;
+ await db.prepare('UPDATE web_push_settings SET enabled=1 WHERE id=1').run();
+ await db.prepare('UPDATE system_settings SET late_alerts=1 WHERE id=1').run();
+ await db.prepare('UPDATE assignments SET starts_at=?,ends_at=? WHERE id=?').bind(now-360000,now+3600000,f.assignment).run();
+ await db.prepare('UPDATE assignments SET starts_at=?,ends_at=? WHERE id=?').bind(now+300000,now+3600000,f.otherAssignment).run();
+ await db.prepare("INSERT INTO extra_attendance(assignment_id,kind,reason,created_at) VALUES(?,'EXTRA','Ca bổ sung',?)").bind(f.assignment,now).run();
+ await db.prepare("INSERT INTO extra_attendance(assignment_id,kind,reason,state,created_at,decided_by,decided_at) VALUES(?,'EXTRA','Ca bổ sung','REJECTED',?,?,?)").bind(f.otherAssignment,now,f.ids.admin,now).run();
+ for(const role of ['admin','manager','other'])await db.prepare('INSERT INTO web_push_subscriptions(endpoint,user_id,created_at,updated_at) VALUES(?,?,?,?)').bind('https://fcm.googleapis.com/fcm/send/'+role,f.ids[role],now,now).run();
+ const send=async()=>({status:201});assert.equal((await dispatchPush(env,now,send)).claimed,0);
+ await db.prepare("UPDATE extra_attendance SET state='APPROVED',decided_by=?,decided_at=? WHERE assignment_id=?").bind(f.ids.admin,now,f.assignment).run();
+ assert.equal((await dispatchPush(env,now,send)).accepted,2);
+ }finally{f.close()}
+});
