@@ -415,3 +415,17 @@ test('PWA header rules preserve HTML, JavaScript, manifest and image MIME types'
   expect(response.headers()['content-type']).toContain(mime);
  }
 });
+
+test('device permission setup explicitly checks camera and GPS without uploading attendance',async({page})=>{
+ await login(page,'staff');
+ await page.getByRole('button',{name:'Thiết lập quyền thiết bị',exact:true}).click();
+ await expect(page.getByRole('heading',{name:'Thiết lập quyền thiết bị',exact:true})).toBeVisible();
+ // Wait for final Push panel so permission results aren't replaced by initial loading.
+ await expect(page.getByRole('heading',{name:'Thông báo khi đóng ứng dụng',exact:true})).toBeVisible();
+ const requests=[];page.on('request',r=>{if(r.url().includes('/api/attendance/')&&r.method()==='POST')requests.push(r.url());});
+ await page.getByRole('button',{name:'Cho phép / kiểm tra camera',exact:true}).click();
+ await expect(page.locator('[data-permission-status="camera"]')).toContainText('Đã kiểm tra camera thành công');
+ await page.getByRole('button',{name:'Cho phép / kiểm tra vị trí',exact:true}).click();
+ await expect(page.locator('[data-permission-status="location"]')).toContainText('Đã kiểm tra GPS thành công');
+ expect(requests).toEqual([]);
+});
