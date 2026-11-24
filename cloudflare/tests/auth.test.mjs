@@ -35,3 +35,20 @@ test('admin chosen password login and reset preserve legacy code compatibility a
   assert.ok(validSecret(issued));assert.equal((await call('login',{username:'test-password',secret:issued})).status,200);
  }finally{db.close()}
 });
+
+test('employee can change own password with existing secret, not another user, and old session is revoked',async()=>{
+ const db=await createD1();try{
+  const id=crypto.randomUUID(),c=await generateCredential(),now=Date.now();
+  db.sqlite.prepare("INSERT INTO profiles(id,employee_code,full_name,role) VALUES(?,?,?,'staff')").run(id,'SELF','Self');
+  db.sqlite.prepare("INSERT INTO credentials(user_id,username,salt,secret_hash,created_at,updated_at) VALUES(?,?,?,?,?,?)").run(id,'self-test',c.salt,c.hash,now,now);
+  const call=(action,body,token)=>authApi.onRequestPost({request:new Request('https://test.invalid/api/auth/'+action,{method:'POST',headers:{'content-type':'application/json',...(token?{Authorization:'Bearer '+token}:{})},body:JSON.stringify(body)}),env:{DB:db},params:{action}});
+  const token=(await (await call('login',{username:'self-test',secret:c.secret})).json()).token;
+  const material=await newPasswordCredential('Local employee test password!');
+  assert.equal((await call('change-password',{...material,current_secret:'1'.repeat(48)},token)).status,403);
+  assert.equal((await call('change-password',{...material,current_secret:c.secret,user_id:'other'},token)).status,200);
+  assert.equal(await sessionUser(new Request('https://test.invalid',{headers:{Authorization:'Bearer '+token}}),db),null);
+  assert.equal((await call('login',{username:'self-test',secret:c.secret})).status,401);
+  assert.equal((await call('login',{username:'self-test',password_key:material.password_key})).status,200);
+  assert.equal(db.sqlite.prepare("SELECT COUNT(*) n FROM auth_audit WHERE actor_id=target_id AND action='RESET'").get().n,1);
+ }finally{db.close()}
+});

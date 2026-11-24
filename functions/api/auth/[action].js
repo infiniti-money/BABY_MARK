@@ -14,6 +14,10 @@ export async function onRequestGet({request,env,params}){
  try{
  const actor=await sessionUser(request,env.DB);if(!actor)return reply({error:'Chưa đăng nhập'},401);
  if(params.action==='me')return reply({user:actor});
+ if(params.action==='self-salt'&&actor.role!=='admin'){
+  const c=await env.DB.prepare('SELECT salt FROM credentials WHERE user_id=?').bind(actor.id).first();
+  return reply({salt:c.salt});
+ }
  if(params.action==='accounts'&&actor.role==='admin'){
  const {results}=await env.DB.prepare('SELECT p.id,p.employee_code,p.full_name,p.role,p.department,p.active,c.username FROM profiles p JOIN credentials c ON c.user_id=p.id ORDER BY p.employee_code LIMIT 500').all();return reply({accounts:results});
  }
@@ -50,6 +54,30 @@ export async function onRequestPost({request,env,params}){
  const actor=await sessionUser(request,db);if(!actor)return reply({error:'Chưa đăng nhập'},401);
  if(action==='logout'){
  const token=request.headers.get('authorization').slice(7);await db.prepare('DELETE FROM sessions WHERE token_hash=?').bind(await digest('babymark-session-v1:'+token)).run();return reply({ok:true});
+ }
+ if(action==='change-password'){
+  if(actor.role==='admin')return reply({error:'Chức năng này dành cho nhân viên và quản lý'},403);
+  const c=await db.prepare('SELECT salt,secret_hash,version FROM credentials WHERE user_id=?').bind(actor.id).first();
+  if(!c)return reply({error:'Thông tin đăng nhập không đúng'},403);
+  const next=await issuedCredential(b);
+  if(!next?.password_configured||next.salt===c.salt)return reply({error:'Mật khẩu mới không hợp lệ'},400);
+  const key=b.current_key,secret=b.current_secret;
+  if((key!==undefined?(!validPasswordKey(key)||secret!==undefined):!validSecret(secret)))return reply({error:'Thông tin đăng nhập không đúng'},403);
+  const window=Math.floor(now/900000);
+  const attempt=await db.prepare('INSERT INTO login_attempts(user_id,window_id,attempts) VALUES(?,?,1) ON CONFLICT(user_id) DO UPDATE SET attempts=CASE WHEN window_id=excluded.window_id THEN min(attempts+1,11) ELSE 1 END,window_id=excluded.window_id RETURNING attempts').bind(actor.id,window).first();
+  if(attempt.attempts>10)return reply({error:'Quá nhiều lần thử, hãy thử lại sau'},429);
+  if(!equalHash(await (key!==undefined?passwordKeyHash(c.salt,key):credentialHash(c.salt,secret)),c.secret_hash))return reply({error:'Thông tin đăng nhập hiện tại không đúng'},403);
+  const sessionHash=await digest('babymark-session-v1:'+request.headers.get('authorization').slice(7));
+  const changed='EXISTS(SELECT 1 FROM credentials WHERE user_id=? AND version=? AND salt=? AND secret_hash=?)';
+  const args=[actor.id,c.version+1,next.salt,next.hash];
+  const result=await db.batch([
+   db.prepare("UPDATE credentials SET salt=?,secret_hash=?,version=version+1,updated_at=? WHERE user_id=? AND version=? AND EXISTS(SELECT 1 FROM sessions s JOIN profiles p ON p.id=s.user_id AND p.active=1 AND p.role<>'admin' WHERE s.user_id=credentials.user_id AND s.token_hash=? AND s.credential_version=credentials.version AND s.expires_at>?) RETURNING user_id").bind(next.salt,next.hash,now,actor.id,c.version,sessionHash,Date.now()),
+   db.prepare("INSERT INTO auth_audit(id,actor_id,target_id,action,created_at) SELECT ?,?,?,'RESET',? WHERE changes()=1").bind(crypto.randomUUID(),actor.id,actor.id,now),
+   db.prepare('DELETE FROM sessions WHERE user_id=? AND credential_version<? AND '+changed).bind(actor.id,c.version+1,...args),
+   db.prepare('DELETE FROM login_attempts WHERE user_id=? AND '+changed).bind(actor.id,...args)
+  ]);
+  if(result[0].meta.changes!==1)return reply({error:'Phiên hoặc mật khẩu đã thay đổi; đăng nhập lại'},409);
+  return reply({ok:true,reauthenticate:true});
  }
  if(actor.role!=='admin')return reply({error:'Không có quyền'},403);
  const audit=(id,action)=>db.prepare('INSERT INTO auth_audit(id,actor_id,target_id,action,created_at) VALUES(?,?,?,?,?)').bind(crypto.randomUUID(),actor.id,id,action,now);
