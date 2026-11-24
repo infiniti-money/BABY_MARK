@@ -102,11 +102,25 @@ export async function onRequestPost({request,env,params}){
  return reply({id,username,...issuedResponse(c)},201);
  }
  if(!['reset','set-active'].includes(action)||!uuid(b.user_id))return reply({error:'Yêu cầu không hợp lệ'},400);
- const target=await db.prepare('SELECT p.id,p.role,c.username FROM profiles p JOIN credentials c ON p.id=c.user_id WHERE p.id=?').bind(b.user_id).first();
+ const target=await db.prepare('SELECT p.id,p.role,c.username,c.version FROM profiles p JOIN credentials c ON p.id=c.user_id WHERE p.id=?').bind(b.user_id).first();
  if(!target||target.role==='admin')return reply({error:'Chỉ quản lý tài khoản nhân viên hoặc quản lý cửa hàng'},403);
  if(action==='reset'){
- const c=await issuedCredential(b);if(!c)return reply({error:'Thông tin mật khẩu không hợp lệ'},400);await db.batch([db.prepare('UPDATE credentials SET salt=?,secret_hash=?,version=version+1,updated_at=? WHERE user_id=?').bind(c.salt,c.hash,now,target.id),db.prepare('DELETE FROM sessions WHERE user_id=?').bind(target.id),db.prepare('DELETE FROM login_attempts WHERE user_id=?').bind(target.id),audit(target.id,'RESET')]);
- return reply({username:target.username,...issuedResponse(c)});
+ const username=b.username===undefined?target.username:usernameOf(b.username);
+ if(!validUsername(username))return reply({error:'Tên đăng nhập cần 3–64 ký tự: chữ không dấu, số, dấu . _ -'},400);
+ const duplicate=await db.prepare('SELECT user_id FROM credentials WHERE username=? AND user_id<>?').bind(username,target.id).first();
+ if(duplicate)return reply({error:'Tên đăng nhập đã được sử dụng'},409);
+ const c=await issuedCredential(b);if(!c)return reply({error:'Thông tin mật khẩu không hợp lệ'},400);
+ const sessionHash=await digest('babymark-session-v1:'+request.headers.get('authorization').slice(7));
+ const changed='EXISTS(SELECT 1 FROM credentials WHERE user_id=? AND version=? AND salt=? AND secret_hash=? AND username=?)';
+ const args=[target.id,target.version+1,c.salt,c.hash,username];
+ const result=await db.batch([
+ db.prepare("UPDATE credentials SET username=?,salt=?,secret_hash=?,version=version+1,updated_at=? WHERE user_id=? AND version=? AND EXISTS(SELECT 1 FROM profiles p WHERE p.id=credentials.user_id AND p.role<>'admin') AND EXISTS(SELECT 1 FROM sessions s JOIN credentials ac ON ac.user_id=s.user_id AND ac.version=s.credential_version JOIN profiles ap ON ap.id=s.user_id AND ap.active=1 AND ap.role='admin' WHERE s.token_hash=? AND s.user_id=? AND s.expires_at>?)").bind(username,c.salt,c.hash,now,target.id,target.version,sessionHash,actor.id,Date.now()),
+ db.prepare("INSERT INTO auth_audit(id,actor_id,target_id,action,created_at) SELECT ?,?,?,'RESET',? WHERE changes()=1").bind(crypto.randomUUID(),actor.id,target.id,now),
+ db.prepare('DELETE FROM sessions WHERE user_id=? AND credential_version<? AND '+changed).bind(target.id,target.version+1,...args),
+ db.prepare('DELETE FROM login_attempts WHERE user_id=? AND '+changed).bind(target.id,...args)
+ ]);
+ if(result[0].meta.changes!==1)return reply({error:'Phiên hoặc tài khoản đã thay đổi; tải lại danh sách'},409);
+ return reply({username,...issuedResponse(c)});
  }
  if(typeof b.active!=='boolean')return reply({error:'Trạng thái không hợp lệ'},400);
  await db.batch([db.prepare('UPDATE profiles SET active=? WHERE id=? AND role<>?').bind(b.active?1:0,target.id,'admin'),db.prepare('DELETE FROM sessions WHERE user_id=?').bind(target.id),audit(target.id,b.active?'ENABLE':'DISABLE')]);return reply({ok:true});

@@ -291,9 +291,9 @@ test.describe.serial('Cloudflare local frontend and actual D1/KV endpoints',()=>
       await page.getByRole('button',{name:'Quản trị',exact:true}).click();
       const employeeRow=page.getByRole('row').filter({hasText:employee.employee_code});
       await expect(employeeRow).toBeVisible();
-      await employeeRow.getByRole('button',{name:'Đặt lại mật khẩu / mã',exact:true}).click();
-      const resetDialog=page.getByRole('dialog',{name:'Cấp lại mã truy cập',exact:true});
-      await resetDialog.getByRole('button',{name:'Cấp lại mã',exact:true}).click();
+      await employeeRow.getByRole('button',{name:'Đổi tên đăng nhập / mật khẩu',exact:true}).click();
+      const resetDialog=page.getByRole('dialog',{name:'Đổi tên đăng nhập và mật khẩu',exact:true});
+      await resetDialog.getByRole('button',{name:'Lưu thông tin đăng nhập',exact:true}).click();
       const issued=page.getByTestId('issued-secret');await issued.waitFor({state:'visible'});
       const newSecret=await issued.textContent();
       await page.getByRole('button',{name:'Đã lưu mã an toàn',exact:true}).click();
@@ -353,9 +353,9 @@ test('administrator creates and resets a chosen password and staff logs in throu
   await page.getByRole('button',{name:'Đăng xuất tài khoản',exact:true}).click();
   await login(page);
   await page.getByRole('button',{name:'Quản trị',exact:true}).click();
-  await row.getByRole('button',{name:'Đặt lại mật khẩu / mã',exact:true}).click();
+  await row.getByRole('button',{name:'Đổi tên đăng nhập / mật khẩu',exact:true}).click();
   await page.getByLabel('Mật khẩu nhân viên (không bắt buộc)',{exact:true}).fill(next);
-  await page.getByRole('dialog').getByRole('button',{name:'Cấp lại mã',exact:true}).click();
+  await page.getByRole('dialog').getByRole('button',{name:'Lưu thông tin đăng nhập',exact:true}).click();
   await expect(page.getByRole('dialog')).not.toBeVisible();
   await page.getByRole('button',{name:'Đăng xuất tài khoản',exact:true}).click();
   await loginAccount(page,name,next);

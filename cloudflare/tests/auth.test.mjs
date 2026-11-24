@@ -60,3 +60,24 @@ test('password length is at least eight and preserves existing longer passwords'
  assert.match(key,/^[0-9a-f]{64}$/);
  assert.match(await derivePasswordKey('long existing password',salt),/^[0-9a-f]{64}$/);
 });
+
+import {appFixture} from './helpers/app.mjs';
+test('admin renames and resets employee credentials atomically, preserving identity',async()=>{
+ const f=await appFixture();try{
+ const call=(action,body,who='admin')=>f.call(authApi,who,{action,body});
+ const target=f.ids.staff,newName='renamed-staff';
+ assert.equal((await call('reset',{user_id:target,username:newName},'manager')).status,403);
+ assert.equal((await call('reset',{user_id:target,username:'test-other'})).status,409);
+ assert.equal((await call('reset',{user_id:target,username:'x !'})).status,400);
+ assert.equal((await call('reset',{user_id:f.ids.admin,username:newName})).status,403);
+ const original=await f.db.prepare('SELECT employee_code,full_name FROM profiles WHERE id=?').bind(target).first();
+ const material=await newPasswordCredential('Local renamed employee password!');
+ const response=await call('reset',{user_id:target,username:newName,...material});assert.equal(response.status,200);assert.equal((await response.json()).username,newName);
+ assert.deepEqual(await f.db.prepare('SELECT employee_code,full_name FROM profiles WHERE id=?').bind(target).first(),original);
+ assert.ok(await f.db.prepare('SELECT id FROM assignments WHERE id=? AND user_id=?').bind(f.assignment,target).first());
+ assert.equal(await sessionUser(new Request('https://test.invalid',{headers:{Authorization:'Bearer '+f.tokens.staff}}),f.db),null);
+ assert.ok(await sessionUser(new Request('https://test.invalid',{headers:{Authorization:'Bearer '+f.tokens.other}}),f.db));
+ assert.equal((await call('login',{username:'test-staff',password_key:material.password_key},null)).status,401);
+ assert.equal((await call('login',{username:newName,password_key:material.password_key},null)).status,200);
+ }finally{f.close()}
+});
