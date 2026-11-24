@@ -1,6 +1,7 @@
 import {actorFor,apiFailure,ApiError,identifier,invalid,validDay,dayVN,shiftInterval,managementAudit} from '../../../cloudflare/lib/access.mjs';
 import {reply,bodyJSON} from '../../../cloudflare/lib/auth.mjs';
 import {isRetailStaff} from '../../../public/retail-staff.mjs';
+import {weeklyStaff,ROTATION_ANCHOR} from '../../../public/weekly-rotation.mjs';
 const presets=[['BM-MORNING','Ca sáng cửa hàng','07:00','15:00',5],['BM-EVENING','Ca tối cửa hàng','15:00','21:30',5],['BM-OFFICE','Ca hành chính','08:00','17:00',5]];
 const missing=e=>/no such table: (?:main\.)?branch_rosters/i.test(String(e?.message));
 async function read(db){try{return {available:true,rosters:(await db.prepare('SELECT * FROM branch_rosters ORDER BY branch_id').all()).results}}catch(e){if(missing(e))return {available:false,rosters:[]};throw e}}
@@ -49,7 +50,8 @@ export async function onRequestPost({request,env}){
    else if(roster.handover==='evening_arrives')z.starts_at-=1800000;
    else{a.ends_at+=900000;z.starts_at-=900000;}
    if(a.ends_at-a.starts_at>86400000||z.ends_at-z.starts_at>86400000||a.starts_at<Date.now()||z.starts_at<Date.now())invalid('Không tạo ca đã bắt đầu hoặc ca vượt 24 giờ. Chọn ngày tương lai.');
-   for(const [user,shift,interval] of [[roster.morning_user_id,m,a],[roster.evening_user_id,e,z]])rows.push({id:crypto.randomUUID(),user,shift:shift.id,work_date,...interval,grace:shift.grace_period});
+   const staff=weeklyStaff(roster,work_date);
+   for(const [user,shift,interval] of [[staff.morning,m,a],[staff.evening,e,z]])rows.push({id:crypto.randomUUID(),user,shift:shift.id,work_date,...interval,grace:shift.grace_period});
   }
   if(!rows.length)invalid('Không có ngày làm việc được chọn');
   // A single atomic insertion. Existing overlap triggers reject the entire batch.
@@ -57,7 +59,7 @@ export async function onRequestPost({request,env}){
   // Any differing overlapping assignment still aborts this entire branch batch.
   const skip=b.action==='generate-missing';
   const sql="INSERT INTO assignments(id,user_id,branch_id,shift_id,work_date,starts_at,ends_at,grace_minutes) SELECT json_extract(j.value,'$.id'),json_extract(j.value,'$.user'),?,json_extract(j.value,'$.shift'),json_extract(j.value,'$.work_date'),json_extract(j.value,'$.starts_at'),json_extract(j.value,'$.ends_at'),json_extract(j.value,'$.grace') FROM json_each(?) j"+(skip?" WHERE NOT EXISTS(SELECT 1 FROM assignments a WHERE a.user_id=json_extract(j.value,'$.user') AND a.branch_id=? AND a.shift_id=json_extract(j.value,'$.shift') AND a.work_date=json_extract(j.value,'$.work_date') AND a.starts_at=json_extract(j.value,'$.starts_at') AND a.ends_at=json_extract(j.value,'$.ends_at') AND a.grace_minutes=json_extract(j.value,'$.grace'))":"");
-  const result=await db.batch([db.prepare(sql).bind(branch,JSON.stringify(rows),...(skip?[branch]:[])),managementAudit(db,actor,'rosters',branch,skip?'GENERATE_MISSING':'GENERATE',{from:b.from,to:b.to,weekdays:b.weekdays,handover:roster.handover,requested:rows.length})]);
+  const result=await db.batch([db.prepare(sql).bind(branch,JSON.stringify(rows),...(skip?[branch]:[])),managementAudit(db,actor,'rosters',branch,skip?'GENERATE_MISSING':'GENERATE',{from:b.from,to:b.to,weekdays:b.weekdays,handover:roster.handover,rotation_anchor:ROTATION_ANCHOR,requested:rows.length})]);
   return reply({created:result[0].meta.changes,existing:rows.length-result[0].meta.changes},201);
  }catch(e){return apiFailure(e)}
 }

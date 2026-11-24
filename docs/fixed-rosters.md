@@ -4,3 +4,6 @@ Tạo lịch nhiều cửa hàng: chọn các cửa hàng đã có cấu hình, 
 
 ## Cấu hình nhân viên Bán hàng
 Hai vị trí cố định mỗi cửa hàng chỉ chọn tài khoản đang hoạt động thuộc bộ phận Bán hàng (hoặc Nhân viên bán hàng). Không chọn nhân viên đã được cấu hình cố định ở cửa hàng khác. Cấu hình cũ không đủ điều kiện vẫn được giữ nguyên, nhưng cần sửa bộ phận hoặc chọn lại nhân viên trước khi tạo lịch mới. Mỗi đợt chọn ngày làm thực tế; tạo lại một cửa hàng cũng bỏ qua ca giống hệt. Không tự xóa hoặc thay thế lịch cũ.
+
+## Luân phiên hàng tuần
+Mốc cố định thứ Hai 30/11/2026 (ngày Việt Nam): nhân viên A sáng, B tối. Tuần kế tiếp đổi ngược, tiếp tục xen kẽ không reset theo tháng hoặc năm. Mọi lịch mới dùng cùng quy tắc, không cần migration. Các ca đã lưu không được tự đổi; kiểm tra và xử lý ca tương lai xung đột trước khi tạo lại. Admin tạo lịch trước tối đa 31 ngày/lần và chọn ngày làm thực tế. Không có tác vụ tự động tạo thêm lịch khi hết khoảng ngày; việc đổi ca nằm trong quá trình tạo lịch trước. Không tự giả định ngày nghỉ hoặc làm việc liên tục.

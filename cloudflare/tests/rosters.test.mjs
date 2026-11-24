@@ -33,3 +33,19 @@ test('fixed roster creates two shifts with explicit 30-minute overlap and never 
  assert.equal((await f.db.prepare('SELECT COUNT(*) AS n FROM assignments WHERE work_date=?').bind(from).first()).n,2);
  }finally{f.close()}
 });
+
+test('weekly rotation changes staff on Monday even in a multi-week batch',async()=>{
+ const f=await appFixture();try{
+ const call=body=>f.call(api,'admin',{body});
+ await call({action:'presets'});
+ await f.db.prepare("UPDATE profiles SET department='Bán hàng' WHERE id IN (?,?)").bind(f.ids.staff,f.ids.other).run();
+ assert.equal((await call({action:'save',branch_id:'BM-001',morning_user_id:f.ids.staff,evening_user_id:f.ids.other,morning_shift_id:'BM-MORNING',evening_shift_id:'BM-EVENING',handover:'split'})).status,200);
+ const t=Date.parse(dayVN(Date.now()+86400000)+'T00:00:00Z'),d=new Date(t),monday=t+((8-(d.getUTCDay()||7))%7)*86400000;
+ const from=new Date(monday).toISOString().slice(0,10),to=new Date(monday+8*86400000).toISOString().slice(0,10);
+ const body={action:'generate-missing',branch_id:'BM-001',from,to,weekdays:[1,2,3,4,5,6,7]};
+ assert.equal((await call(body)).status,201);
+ const rows=(await f.db.prepare("SELECT work_date,user_id FROM assignments WHERE branch_id='BM-001' AND shift_id='BM-MORNING' AND work_date BETWEEN ? AND ? ORDER BY work_date").bind(from,to).all()).results;
+ assert.equal(rows.length,9);assert.equal(rows[0].user_id,rows[6].user_id);assert.notEqual(rows[6].user_id,rows[7].user_id);assert.equal(rows[7].user_id,rows[8].user_id);
+ assert.deepEqual(await (await call(body)).json(),{created:0,existing:18});
+ }finally{f.close()}
+});
