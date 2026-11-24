@@ -176,7 +176,7 @@ const departmentField=(value='')=>{
  const choices=[...new Set([...departmentChoices,...(state.admin.employees||[]).map(e=>e.department).filter(Boolean),...(value?[value]:[])])];
  return `<label class="full">Bộ phận<input name="department" list="employee-departments" maxlength="100" value="${esc(value)}" placeholder="Chọn hoặc nhập bộ phận"></label><datalist id="employee-departments">${choices.map(d=>`<option value="${esc(d)}"></option>`).join('')}</datalist><p class="hint full">Có thể chọn bộ phận có sẵn hoặc nhập tên bộ phận mới. Bộ phận không làm thay đổi quyền truy cập.</p>`;
 };
-const passwordField=()=>'<label class="full">Mật khẩu nhân viên (không bắt buộc)<input type="password" name="password" minlength="9" maxlength="128" autocomplete="new-password" placeholder="Tối thiểu 9 ký tự; để trống để cấp mã ngẫu nhiên"></label><p class="hint full">Dùng mật khẩu riêng cho BABY MARK. Không đặt mã 48 ký tự hex làm mật khẩu. Hệ thống không lưu mật khẩu gốc.</p>';
+const passwordField=()=>'<label class="full">Mật khẩu nhân viên (không bắt buộc)<input type="password" name="password" minlength="8" maxlength="128" autocomplete="new-password" placeholder="Tối thiểu 8 ký tự; để trống để cấp mã ngẫu nhiên"></label><p class="hint full">Dùng mật khẩu riêng cho BABY MARK. Không đặt mã 48 ký tự hex làm mật khẩu. Hệ thống không lưu mật khẩu gốc.</p>';
 function adminForm(row={}) {
   const tab=state.adminTab, isNew=!row.id;
   let fields='';
@@ -326,7 +326,7 @@ document.addEventListener('click',async event=>{
       else{try{await api('/api/push/unsubscribe',{method:'POST',body:{endpoint:sub.endpoint}});}finally{await sub.unsubscribe();try{localStorage.removeItem('babymark-push-endpoint')}catch{}}await navigate('push');notify('Đã tắt Push trên thiết bị.');}return;
     }
     if(action==='self-password'){
-      showModal('Đổi mật khẩu của bạn',`<form data-form="self-password" class="form-stack"><label>Mật khẩu hoặc mã hiện tại<input type="password" name="current" autocomplete="current-password" required maxlength="128"></label><label>Mật khẩu mới<input type="password" name="next" autocomplete="new-password" required minlength="9" maxlength="128"></label><label>Nhập lại mật khẩu mới<input type="password" name="confirm" autocomplete="new-password" required minlength="9" maxlength="128"></label><p class="hint">Tối thiểu 9 ký tự. Sau khi đổi, tất cả phiên cũ sẽ bị thu hồi.</p><p class="error-text inline-error" data-form-error hidden></p><div class="modal-actions"><button class="btn secondary" type="button" data-action="close-modal">Hủy</button><button class="btn" type="submit">Đổi mật khẩu</button></div></form>`);return;
+      showModal('Đổi mật khẩu của bạn',`<form data-form="self-password" class="form-stack"><label>Mật khẩu hoặc mã hiện tại<input type="password" name="current" autocomplete="current-password" required maxlength="128"></label><label>Mật khẩu mới<input type="password" name="next" autocomplete="new-password" required minlength="8" maxlength="128"></label><label>Nhập lại mật khẩu mới<input type="password" name="confirm" autocomplete="new-password" required minlength="8" maxlength="128"></label><p class="hint">Tối thiểu 8 ký tự. Sau khi đổi, tất cả phiên cũ sẽ bị thu hồi.</p><p class="error-text inline-error" data-form-error hidden></p><div class="modal-actions"><button class="btn secondary" type="button" data-action="close-modal">Hủy</button><button class="btn" type="submit">Đổi mật khẩu</button></div></form>`);return;
     }
     if(action==='logout'){
       const token=state.token;let endpoint;
@@ -417,7 +417,7 @@ document.addEventListener('submit',async event=>{
       const username=values.username.trim().toLowerCase(),secret=values.secret;
       let body={username,secret};
       if(!isLegacyCode(secret)){
-        if(secret.length<9||secret.length>128)throw new Error('Thông tin đăng nhập không đúng');
+        if(secret.length<8||secret.length>128)throw new Error('Thông tin đăng nhập không đúng');
         const {salt}=await api('/api/auth/password-salt',{method:'POST',body:{username}});
         body={username,password_key:await derivePasswordKey(secret,salt)};
       }

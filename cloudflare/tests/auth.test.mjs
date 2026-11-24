@@ -53,10 +53,10 @@ test('employee can change own password with existing secret, not another user, a
  }finally{db.close()}
 });
 
-test('password length is strictly above eight and preserves existing longer passwords',async()=>{
+test('password length is at least eight and preserves existing longer passwords',async()=>{
  const salt='a'.repeat(32);
- await assert.rejects(derivePasswordKey('A1234567',salt));
- const key=await derivePasswordKey('A12345678',salt);
+ await assert.rejects(derivePasswordKey('A123456',salt));
+ const key=await derivePasswordKey('A1234567',salt);
  assert.match(key,/^[0-9a-f]{64}$/);
  assert.match(await derivePasswordKey('long existing password',salt),/^[0-9a-f]{64}$/);
 });

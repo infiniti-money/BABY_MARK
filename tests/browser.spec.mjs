@@ -332,7 +332,7 @@ test('offline logout still clears local account data and camera access',async({p
 });
 
 test('administrator creates and resets a chosen password and staff logs in through the browser',async({page})=>{
-  const name='test-human-'+Date.now().toString(36).slice(-6),pwd='Test9!abc',next='Second local test passphrase!';
+  const name='test-human-'+Date.now().toString(36).slice(-6),pwd='Test8!ab',next='Second local test passphrase!';
   await login(page);
   await page.getByRole('button',{name:'Quản trị',exact:true}).click();
   await page.getByRole('button',{name:'Cấp tài khoản',exact:true}).click();
