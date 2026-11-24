@@ -73,7 +73,7 @@ test.describe.serial('Cloudflare local frontend and actual D1/KV endpoints',()=>
     await page.getByRole('tab',{name:'Cửa hàng',exact:true}).click();
     const store=page.getByRole('row').filter({hasText:'BABYMARK LUXURY LIÊN NGHĨA'});
     await store.getByRole('button',{name:'Sửa',exact:true}).click();
-    await page.getByLabel('Tọa độ từ Google Maps',{exact:true}).fill('20, 106');
+    await page.getByLabel('Tọa độ hoặc liên kết Google Maps',{exact:true}).fill('https://www.google.com/maps/search/?api=1&query=20%2C106');
     await page.getByRole('button',{name:'Điền tọa độ',exact:true}).click();
     await expect(page.getByLabel('Vĩ độ',{exact:true})).toHaveValue('20');
     await expect(page.getByLabel('Kinh độ',{exact:true})).toHaveValue('106');
