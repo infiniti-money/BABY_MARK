@@ -18,6 +18,12 @@ test('fixed roster creates two shifts with explicit 30-minute overlap and never 
  const rows=(await f.db.prepare('SELECT * FROM assignments WHERE branch_id=? AND work_date=? ORDER BY starts_at').bind('BM-001',from).all()).results;
  assert.equal(rows.length,2);assert.equal(rows[0].ends_at-rows[1].starts_at,1800000);
  assert.equal((await call(batch)).status,409);
+ const repeat=await call({...batch,action:'generate-missing'});
+ assert.equal(repeat.status,201);assert.deepEqual(await repeat.json(),{created:0,existing:2});
+ const next=dayVN(Date.now()+3*86400000);
+ const extended=await call({...batch,action:'generate-missing',to:next});assert.equal(extended.status,201);assert.deepEqual(await extended.json(),{created:2,existing:2});
+ const collision=await call({...data,handover:'evening_arrives'});assert.equal(collision.status,200);
+ assert.equal((await call({...batch,action:'generate-missing',to:next})).status,409);
  assert.equal((await call({action:'remove',branch_id:'BM-001'})).status,200);
  assert.equal((await f.db.prepare('SELECT COUNT(*) AS n FROM assignments WHERE work_date=?').bind(from).first()).n,2);
  }finally{f.close()}

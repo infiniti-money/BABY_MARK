@@ -158,7 +158,8 @@ function rosterPanel(){
  const data=state.admin.rosterData;
  const person=id=>state.admin.employees.find(e=>e.id===id)?.full_name||'Chưa chọn';
  const shift=id=>state.admin.shifts.find(s=>s.id===id)?.name||'Chưa chọn';
- return `<div class="card-body form-stack"><h3>Hai nhân viên cố định mỗi cửa hàng</h3><p class="hint">Mẫu gốc: sáng 07:00–15:00, tối 15:00–21:30. Chọn cách giao ca 30 phút trước khi tạo lịch. Ca hành chính tham khảo 08:00–17:00, sửa trong Ca làm; kho, lái xe, kế toán và bộ phận khác dùng phân ca hàng loạt.</p><button class="btn secondary" data-action="roster-presets">Bổ sung 3 mẫu ca chuẩn</button>${!data.available?'<p class="hint">Cần chạy migration 0011 để lưu nhân viên cố định.</p>':state.admin.branches.filter(b=>b.active!==0).map(b=>{const r=data.rosters.find(r=>r.branch_id===b.id);return `<article class="assignment-card"><h3>${esc(b.name)}</h3><p>${r?esc(person(r.morning_user_id)+' · '+shift(r.morning_shift_id)+' / '+person(r.evening_user_id)+' · '+shift(r.evening_shift_id)):'Chưa phân hai nhân viên cố định'}</p><div class="modal-actions"><button class="btn secondary small" data-action="roster-edit" data-id="${esc(b.id)}">Thiết lập</button>${r?`<button class="btn small" data-action="roster-generate" data-id="${esc(b.id)}">Tạo lịch tuần/tháng</button><button class="btn quiet small" data-action="roster-remove" data-id="${esc(b.id)}">Bỏ cấu hình</button>`:''}</div></article>`}).join('')}</div>`;
+ const active=state.admin.branches.filter(b=>b.active!==0),configured=active.filter(b=>data.rosters.some(r=>r.branch_id===b.id));
+ return `<div class="card-body form-stack"><h3>Hai nhân viên cố định mỗi cửa hàng</h3><p class="hint">Mẫu gốc: sáng 07:00–15:00, tối 15:00–21:30. Chọn cách giao ca 30 phút trước khi tạo lịch. Ca hành chính tham khảo 08:00–17:00, sửa trong Ca làm; kho, lái xe, kế toán và bộ phận khác dùng phân ca hàng loạt.</p><button class="btn secondary" data-action="roster-presets">Bổ sung 3 mẫu ca chuẩn</button>${data.available?`<p><strong>${configured.length}/${active.length} cửa hàng đã có ca cố định</strong> · ${configured.length*2} vị trí nhân viên đã phân.</p><button class="btn" data-action="roster-generate-many" ${configured.length?'':'disabled'}>Tạo lịch nhiều cửa hàng</button><p class="hint">Chọn cửa hàng và ngày làm thực tế. Lịch giống hệt đã tạo được giữ nguyên; ca chồng giờ khác sẽ bị từ chối theo từng cửa hàng.</p>`:''}${!data.available?'<p class="hint">Cần chạy migration 0011 để lưu nhân viên cố định.</p>':state.admin.branches.filter(b=>b.active!==0).map(b=>{const r=data.rosters.find(r=>r.branch_id===b.id);return `<article class="assignment-card"><h3>${esc(b.name)}</h3><p>${r?esc(person(r.morning_user_id)+' · '+shift(r.morning_shift_id)+' / '+person(r.evening_user_id)+' · '+shift(r.evening_shift_id)):'Chưa phân hai nhân viên cố định'}</p><div class="modal-actions"><button class="btn secondary small" data-action="roster-edit" data-id="${esc(b.id)}">Thiết lập</button>${r?`<button class="btn small" data-action="roster-generate" data-id="${esc(b.id)}">Tạo lịch tuần/tháng</button><button class="btn quiet small" data-action="roster-remove" data-id="${esc(b.id)}">Bỏ cấu hình</button>`:''}</div></article>`}).join('')}</div>`;
 }
 function settingsForm(){
  const p=state.admin.settings;
@@ -352,6 +353,10 @@ document.addEventListener('click',async event=>{
     if(action==='photo')return await showPhoto(button.dataset.id);
     if(action==='export')return await exportReports();
     if(action==='roster-presets'){button.disabled=true;const r=await api('/api/admin/rosters',{method:'POST',body:{action:'presets'}});await navigate('admin');notify('Đã bổ sung '+r.created+' mẫu ca còn thiếu.');return;}
+    if(action==='roster-generate-many'){
+      const branches=state.admin.branches.filter(b=>b.active!==0&&state.admin.rosterData.rosters.some(r=>r.branch_id===b.id));
+      showModal('Tạo lịch nhiều cửa hàng',`<form data-form="roster-many" class="form-stack"><p class="hint">Mỗi cửa hàng là một giao dịch riêng. Không ghi đè lịch cũ. Kiểm tra ngày nghỉ và người thay ca trước khi xác nhận.</p><div class="checklist">${branches.map(b=>`<label><input type="checkbox" name="branch_ids" value="${esc(b.id)}" checked> ${esc(b.code+' · '+b.name)}</label>`).join('')}</div><label>Từ ngày<input name="from" type="date" min="${today()}" value="${dayString(Date.now()+86400000)}" required></label><label>Đến ngày<input name="to" type="date" min="${today()}" value="${dayString(Date.now()+86400000)}" required></label><div class="checklist">${['Thứ 2','Thứ 3','Thứ 4','Thứ 5','Thứ 6','Thứ 7','Chủ nhật'].map((d,i)=>`<label><input type="checkbox" name="weekdays" value="${i+1}"> ${d}</label>`).join('')}</div><label><input type="checkbox" name="confirmed" required> Tôi đã kiểm tra ngày nghỉ và giờ giao ca của các cửa hàng đã chọn.</label><p class="error-text" data-form-error hidden></p><div data-roster-results role="status" aria-live="polite"></div><button class="btn" type="submit">Xác nhận tạo lịch</button></form>`);return;
+    }
     if(action==='roster-edit'||action==='roster-generate'||action==='roster-remove'){
       const branch=state.admin.branches.find(b=>b.id===button.dataset.id);if(!branch)return;
       const r=state.admin.rosterData.rosters.find(r=>r.branch_id===branch.id)||{};
@@ -359,7 +364,7 @@ document.addEventListener('click',async event=>{
       const select=(name,label,rows,value,display='name')=>`<label>${label}<select name="${name}" required><option value="">Chọn</option>${rowOptions(rows,value,display)}</select></label>`;
       const mode=[['morning_stays','Ca sáng ở lại 30 phút (đến 15:30)'],['evening_arrives','Ca tối đến sớm 30 phút (từ 14:30)'],['split','Mỗi ca 15 phút (14:45–15:15)']];
       const kind=action==='roster-edit'?'save':action==='roster-remove'?'remove':'generate';
-      const fields=kind==='save'?select('morning_user_id','Nhân viên ca sáng',employees,r.morning_user_id,'full_name')+select('morning_shift_id','Mẫu ca sáng',shifts,r.morning_shift_id)+select('evening_user_id','Nhân viên ca tối',employees,r.evening_user_id,'full_name')+select('evening_shift_id','Mẫu ca tối',shifts,r.evening_shift_id)+`<label>Giao ca 30 phút<select name="handover" required><option value="">Chọn cách giao ca</option>${mode.map(([v,l])=>`<option value="${v}" ${r.handover===v?'selected':''}>${l}</option>`).join('')}</select></label><p class="hint">Mốc ví dụ tính theo giờ giao ca 15:00. Khoảng giao ca được tính vào giờ ca phân công, không phải dung sai đi muộn.</p>`:kind==='generate'?`<label>Từ ngày<input name="from" type="date" min="${today()}" value="${today()}" required></label><label>Đến ngày<input name="to" type="date" min="${today()}" required></label><div class="checklist">${['Thứ 2','Thứ 3','Thứ 4','Thứ 5','Thứ 6','Thứ 7','Chủ nhật'].map((d,i)=>`<label><input type="checkbox" name="weekdays" value="${i+1}" ${i<5?'checked':''}>${d}</label>`).join('')}</div><p class="hint">Tối đa 31 ngày; chọn ngày nghỉ thực tế. Cả hai nhân viên được phân cùng các ngày đã chọn; nếu có ca trùng, toàn bộ đợt không được lưu.</p>`:'<p>Bỏ cấu hình cố định nhưng không xóa lịch phân công và dữ liệu chấm công đã tạo.</p>';
+      const fields=kind==='save'?select('morning_user_id','Nhân viên ca sáng',employees,r.morning_user_id,'full_name')+select('morning_shift_id','Mẫu ca sáng',shifts,r.morning_shift_id||shifts.find(s=>s.start_time==='07:00'&&s.end_time==='15:00')?.id)+select('evening_user_id','Nhân viên ca tối',employees,r.evening_user_id,'full_name')+select('evening_shift_id','Mẫu ca tối',shifts,r.evening_shift_id||shifts.find(s=>s.start_time==='15:00'&&s.end_time==='21:30')?.id)+`<label>Giao ca 30 phút<select name="handover" required><option value="">Chọn cách giao ca</option>${mode.map(([v,l])=>`<option value="${v}" ${r.handover===v?'selected':''}>${l}</option>`).join('')}</select></label><p class="hint">Mốc ví dụ tính theo giờ giao ca 15:00. Khoảng giao ca được tính vào giờ ca phân công, không phải dung sai đi muộn.</p>`:kind==='generate'?`<label>Từ ngày<input name="from" type="date" min="${today()}" value="${today()}" required></label><label>Đến ngày<input name="to" type="date" min="${today()}" required></label><div class="checklist">${['Thứ 2','Thứ 3','Thứ 4','Thứ 5','Thứ 6','Thứ 7','Chủ nhật'].map((d,i)=>`<label><input type="checkbox" name="weekdays" value="${i+1}" ${i<5?'checked':''}>${d}</label>`).join('')}</div><p class="hint">Tối đa 31 ngày; chọn ngày nghỉ thực tế. Cả hai nhân viên được phân cùng các ngày đã chọn; nếu có ca trùng, toàn bộ đợt không được lưu.</p>`:'<p>Bỏ cấu hình cố định nhưng không xóa lịch phân công và dữ liệu chấm công đã tạo.</p>';
       showModal(esc(branch.name),`<form data-form="roster" data-id="${esc(branch.id)}" data-kind="${kind}" class="form-stack">${fields}<p class="error-text" data-form-error hidden></p><button type="submit" class="btn">Xác nhận</button></form>`);return;
     }
     if(action==='admin-add')return adminForm();
@@ -466,6 +471,26 @@ document.addEventListener('submit',async event=>{
       if(resource==='shifts')payload.grace_period=Number(values.grace_period);
       const result=await api(resource==='employees'&&!id?'/api/auth/create':`/api/admin/${resource}`,{method:'POST',body:payload});
       closeModal();await navigate('admin');if(result.secret)credentialModal(result);else notify(result.password_configured?'Đã tạo tài khoản với mật khẩu.':'Đã lưu thông tin.');return;
+    }
+    if(form.dataset.form==='roster-many'){
+      const fd=new FormData(form),ids=fd.getAll('branch_ids'),weekdays=fd.getAll('weekdays').map(Number);
+      if(!ids.length||!weekdays.length||!values.confirmed)throw Error('Chọn cửa hàng, ngày làm việc và xác nhận.');
+      if(values.from>values.to||Date.parse(values.to)-Date.parse(values.from)>30*86400000)throw Error('Chọn khoảng ngày tối đa 31 ngày.');
+      const branches=state.admin.branches.filter(b=>ids.includes(b.id)),epoch=state.sessionEpoch,output=form.querySelector('[data-roster-results]');
+      output.replaceChildren();
+      let created=0,existing=0,failed=0,processed=0;
+      for(const branch of branches){
+        if(!form.isConnected||epoch!==state.sessionEpoch)break;
+        const line=document.createElement('p');line.textContent=branch.code+' · Đang tạo lịch…';output.append(line);
+        try{
+          const r=await api('/api/admin/rosters',{method:'POST',body:{action:'generate-missing',branch_id:branch.id,from:values.from,to:values.to,weekdays}});
+          if(epoch!==state.sessionEpoch||!form.isConnected)return;
+          created+=r.created;existing+=r.existing;line.textContent=branch.code+' · Tạo '+r.created+' ca, giữ '+r.existing+' ca có sẵn.';
+        }catch(e){if(epoch!==state.sessionEpoch||!form.isConnected)return;failed++;line.className='error-text';line.textContent=branch.code+' · '+e.message;}
+        processed++;
+      }
+      if(form.isConnected&&epoch===state.sessionEpoch){const sum=document.createElement('strong');sum.textContent='Đã xử lý '+processed+'/'+branches.length+' cửa hàng: '+created+' ca mới, '+existing+' ca giữ nguyên, '+failed+' cửa hàng lỗi.';output.prepend(sum);}
+      return;
     }
     if(form.dataset.form==='roster'){
       const body={...values,action:form.dataset.kind,branch_id:form.dataset.id};
