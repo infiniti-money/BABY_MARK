@@ -5,9 +5,12 @@ import {readFile,readdir,stat} from 'node:fs/promises';
 import {resolve,extname,sep} from 'node:path';
 import {Miniflare,convertV4MiniflareOptions} from 'miniflare';
 import {seedApp} from '../cloudflare/tests/helpers/app.mjs';
+import {seedDemo} from '../cloudflare/tests/helpers/demo.mjs';
+import {randomHex} from '../cloudflare/lib/auth.mjs';
+const demo=process.argv.includes('--demo'),cronSecret=demo?randomHex(32):undefined;
 const root=resolve(import.meta.dirname,'..'),port=Number(process.env.TEST_PORT||8788);
 const mf=new Miniflare(convertV4MiniflareOptions({modules:true,scriptPath:resolve(root,'work/functions-build/index.js'),compatibilityDate:'2026-11-24',
- d1Databases:['DB'],kvNamespaces:['TIMEMARKS'],bindings:{PHOTO_EVICTION_ENABLED:'false',ATTENDANCE_RETENTION_ENABLED:'false'}}));
+ d1Databases:['DB'],kvNamespaces:['TIMEMARKS'],bindings:{PHOTO_EVICTION_ENABLED:'false',ATTENDANCE_RETENTION_ENABLED:'false',...(demo?{ROSTER_CRON_SECRET:cronSecret}:{})}}));
 await mf.ready;
 const db=await mf.getD1Database('DB');
 // D1 exec accepts one SQL statement per line. Keep trigger bodies intact by
@@ -25,7 +28,7 @@ for(const file of (await readdir(resolve(root,'cloudflare/d1'))).filter(x=>x.end
  const sql=await readFile(resolve(root,'cloudflare/d1',file),'utf8');
  for(const statement of statements(sql))await db.prepare(statement).run();
 }
-await seedApp(db);
+if(demo){const d=await seedDemo(db,cronSecret);console.log('\n=== CHỈ DỮ LIỆU DEMO LOCAL ===\nTên đăng nhập: demo-admin / demo-ql-01 / demo-ql-02 / demo-01-a ... demo-14-b\nMã truy cập tạm thời cho các tài khoản DEMO: '+d.secret+'\nTháng đối soát: '+d.prevMonth+'\nCa tương lai đã tạo: '+d.created+'\nDữ liệu sẽ mất khi dừng máy chủ. Không dùng mã này trên production.\n');}else await seedApp(db);
 const mime={'.html':'text/html; charset=utf-8','.mjs':'text/javascript; charset=utf-8','.js':'text/javascript; charset=utf-8','.css':'text/css; charset=utf-8','.png':'image/png','.json':'application/json','.webmanifest':'application/manifest+json; charset=utf-8'};
 const assetRoot=resolve(root,'dist');
 // Apply the global and exact-path Cloudflare header rules separately. Otherwise
