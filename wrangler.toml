@@ -2,17 +2,17 @@ name = "babymark"
 pages_build_output_dir = "dist"
 compatibility_date = "2026-11-24"
 
-# Local-only placeholders: replace IDs in a reviewed deployment configuration.
-# This repository never provisions or deploys resources automatically.
+# Production resource IDs supplied by the project administrator.
+# This repository does not provision resources or run remote migrations automatically.
 [[d1_databases]]
 binding = "DB"
 database_name = "babymark-db"
-database_id = "00000000-0000-0000-0000-000000000000"
+database_id = "9d0f6776-8f3f-42a5-8fac-757824bfc105"
 migrations_dir = "cloudflare/d1"
 
 [[kv_namespaces]]
 binding = "TIMEMARKS"
-id = "00000000000000000000000000000000"
+id = "964699b881014758bda7154c0407c2a3"
 
 [vars]
 ATTENDANCE_RETENTION_ENABLED = "false"
