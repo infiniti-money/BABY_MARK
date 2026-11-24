@@ -1,0 +1,2 @@
+# Bàn giao ca
+Sau migration 0013, nhân viên có thể gửi lời nhắn (tối đa 1000 ký tự) ngay sau chấm tan ca, hoặc vào Sổ bàn giao ca trong 24 giờ kể từ lúc ghi nhận OUT. Nội dung không bắt buộc và không ảnh hưởng việc lưu công. Mỗi ca một lời nhắn, không ghi đè. Nhân viên có ca sau cùng cửa hàng trong phạm vi thời gian gần (tối đa 48 giờ sau ca trước, bắt đầu trong 24 giờ tới hoặc kết thúc trong 48 giờ qua) có thể đọc. Quản lý được phân quyền cửa hàng và Admin có thể tra cứu lịch sử theo ngày. Không gửi thông báo Push riêng cho lời nhắn. Không nhập dữ liệu nhạy cảm khách hàng.
