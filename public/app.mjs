@@ -1,4 +1,5 @@
 import {cameraFrame,composeTimemark,currentPosition} from './capture.mjs';
+import {parseMapsCoords,mapsSearchUrl} from './maps-import.mjs';
 import {isLegacyCode,derivePasswordKey,newPasswordCredential} from './password.mjs';
 import {pushRegistration,publicKeyBytes,disableDevicePush} from './push.mjs';
 import {permissionState,checkCameraPermission,checkLocationPermission} from './device-permissions.mjs';
@@ -203,7 +204,7 @@ function adminForm(row={}) {
   const tab=state.adminTab, isNew=!row.id;
   let fields='';
   if(tab==='employees')fields=`${field('Mã nhân viên','employee_code',row.employee_code,{max:40})}${field('Họ và tên','full_name',row.full_name)}${isNew?field('Tên đăng nhập','username','',{max:64,placeholder:'Chữ thường, số, dấu . _ -'})+passwordField():''}<label>Vai trò<select name="role"><option value="staff" ${row.role!=='manager'?'selected':''}>Nhân viên</option><option value="manager" ${row.role==='manager'?'selected':''}>Quản lý cửa hàng</option></select></label>${departmentField(row.department)}`;
-  if(tab==='branches')fields=`${field('Mã cửa hàng','code',row.code,{max:40})}${field('Tên cửa hàng','name',row.name)}${field('Vĩ độ','latitude',row.latitude??'',{type:'number',min:-90,step:'any',required:false})}${field('Kinh độ','longitude',row.longitude??'',{type:'number',min:-180,step:'any',required:false})}${field('Bán kính chấm công (20–1000 m)','allowed_radius',row.allowed_radius??200,{type:'number',min:20,step:'1'})}${field('Địa chỉ','address_text',row.address_text,{required:false,max:300,full:true})}<div class="full"><label>Tọa độ từ Google Maps<input data-branch-coords placeholder="Vĩ độ, kinh độ" autocomplete="off"></label><div class="modal-actions"><button class="btn secondary" type="button" data-action="branch-paste-gps">Điền tọa độ</button><button class="btn secondary" type="button" data-action="branch-current-gps">Lấy GPS hiện tại</button><button class="btn secondary" type="button" data-action="branch-check-map">Kiểm tra trên bản đồ</button></div><p class="hint" data-branch-gps-status role="status">Chỉ lấy GPS hiện tại khi đang đứng tại cửa hàng. Tọa độ chưa được lưu cho đến khi bấm Lưu thông tin.</p></div><p class="hint full">Chỉ nhập tọa độ đã xác minh tại cửa hàng. Để trống cả hai tọa độ sẽ tạm ngăn chấm công tại chi nhánh này.</p>`;
+  if(tab==='branches')fields=`${field('Mã cửa hàng','code',row.code,{max:40})}${field('Tên cửa hàng','name',row.name)}${field('Vĩ độ','latitude',row.latitude??'',{type:'number',min:-90,step:'any',required:false})}${field('Kinh độ','longitude',row.longitude??'',{type:'number',min:-180,step:'any',required:false})}${field('Bán kính chấm công (20–1000 m)','allowed_radius',row.allowed_radius??200,{type:'number',min:20,step:'1'})}${field('Địa chỉ','address_text',row.address_text,{required:false,max:300,full:true})}<div class="full"><div class="modal-actions"><button class="btn secondary" type="button" data-action="branch-maps-search">Lấy địa chỉ từ Google Maps</button><button class="btn secondary" type="button" data-action="branch-address-paste">Dán địa chỉ đã sao chép</button></div><p class="hint">Mở Maps, chọn đúng cửa hàng và sao chép địa chỉ hiển thị, sau đó quay lại và dán địa chỉ. Không tự lưu dữ liệu.</p><label>Tọa độ hoặc liên kết Google Maps<input data-branch-coords placeholder="Vĩ độ, kinh độ hoặc URL đầy đủ" autocomplete="off"></label><div class="modal-actions"><button class="btn secondary" type="button" data-action="branch-paste-gps">Điền tọa độ</button><button class="btn secondary" type="button" data-action="branch-current-gps">Lấy GPS hiện tại</button><button class="btn secondary" type="button" data-action="branch-check-map">Kiểm tra trên bản đồ</button></div><p class="hint" data-branch-gps-status role="status">Chỉ lấy GPS hiện tại khi đang đứng tại cửa hàng. Tọa độ chưa được lưu cho đến khi bấm Lưu thông tin.</p></div><p class="hint full">Chỉ nhập tọa độ đã xác minh tại cửa hàng. Để trống cả hai tọa độ sẽ tạm ngăn chấm công tại chi nhánh này.</p>`;
   if(tab==='shifts')fields=`${field('Tên ca làm','name',row.name,{full:true})}${field('Giờ bắt đầu','start_time',row.start_time||'08:00',{type:'time'})}${field('Giờ kết thúc','end_time',row.end_time||'16:00',{type:'time'})}${field('Dung sai đi muộn (0–120 phút)','grace_period',row.grace_period??0,{type:'number',min:0,step:'1',full:true})}<p class="hint full">Giờ kết thúc nhỏ hơn giờ bắt đầu được tính sang ngày kế tiếp. Giờ đầu và cuối ca cần khác nhau.</p>`;
   if(tab==='assignments')fields=`<label class="full">Nhân viên<select name="user_id" required><option value="">Chọn nhân viên</option>${rowOptions(state.admin.employees.filter(e=>e.active),row.user_id,'full_name')}</select></label><label class="full">Cửa hàng<select name="branch_id" required><option value="">Chọn cửa hàng</option>${rowOptions(state.admin.branches.filter(b=>b.active!==0||b.id===row.branch_id),row.branch_id)}</select></label><label>Ca làm<select name="shift_id" required><option value="">Chọn ca</option>${rowOptions(state.admin.shifts,row.shift_id)}</select></label>${field('Ngày bắt đầu ca (Việt Nam)','work_date',row.work_date||today(),{type:'date'})}<p class="hint full">Máy chủ tính giờ ca theo Việt Nam, bao gồm ca qua đêm. Các lịch trùng giờ hoặc lịch đã có công không thể sửa.</p>`;
   showModal(isNew?(tab==='employees'?'Cấp tài khoản nhân viên':'Thêm '+({branches:'cửa hàng',shifts:'ca làm',assignments:'lịch phân công'}[tab])):'Chỉnh sửa thông tin',`<form data-form="admin-save" data-resource="${tab}" data-id="${esc(row.id||'')}"><div class="form-grid">${fields}</div><p class="error-text inline-error" data-form-error hidden role="alert"></p><div class="modal-actions"><button class="btn secondary" type="button" data-action="close-modal">Hủy</button><button class="btn" type="submit">${tab==='employees'&&isNew?'Tạo và cấp mã truy cập':'Lưu thông tin'}</button></div></form>`);
@@ -443,15 +444,29 @@ document.addEventListener('click',async event=>{
     }
     if(action==='admin-add')return adminForm();
     if(action==='admin-edit')return adminForm(state.admin[state.adminTab].find(r=>r.id===button.dataset.id));
-    if(['branch-paste-gps','branch-current-gps','branch-check-map'].includes(action)){
+    if(['branch-paste-gps','branch-current-gps','branch-check-map','branch-maps-search','branch-address-paste'].includes(action)){
       const form=button.closest('form');if(!form||form.dataset.resource!=='branches')return;
       const lat=form.elements.latitude,lng=form.elements.longitude,status=form.querySelector('[data-branch-gps-status]');
       const show=(message,error=false)=>{if(status.isConnected){status.textContent=message;status.classList.toggle('error-text',error);}};
       const valid=(a,b)=>Number.isFinite(a)&&Math.abs(a)<=90&&Number.isFinite(b)&&Math.abs(b)<=180;
+      if(action==='branch-maps-search'){
+        const q=[form.elements.name.value.trim(),form.elements.address_text.value.trim()].filter(Boolean).join(' ')||'BABY MARK';
+        window.open(mapsSearchUrl(q),'_blank','noopener,noreferrer');return;
+      }
+      if(action==='branch-address-paste'){
+        const ticket=modalTicket;
+        try{
+          if(!navigator.clipboard?.readText)throw Error('clipboard');
+          const address=(await navigator.clipboard.readText()).trim();
+          if(ticket!==modalTicket||!form.isConnected)return;
+          if(!address||address.length>300||/https?:\/\//i.test(address)||parseMapsCoords(address))return show('Hãy sao chép riêng phần địa chỉ hiển thị trên Maps, không phải liên kết hay tọa độ.',true);
+          form.elements.address_text.value=address.replace(/\s+/g,' ');return show('Đã điền địa chỉ. Kiểm tra rồi bấm Lưu thông tin.');
+        }catch{if(ticket===modalTicket&&form.isConnected){form.elements.address_text.focus();show('Không đọc được clipboard. Hãy dán trực tiếp vào ô Địa chỉ (Ctrl+V hoặc nhấn giữ).');}return;}
+      }
       if(action==='branch-paste-gps'){
-        const values=form.querySelector('[data-branch-coords]').value.trim().match(/^(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)$/);
-        if(!values||!valid(Number(values[1]),Number(values[2])))return show('Nhập hai số vĩ độ, kinh độ hợp lệ, phân cách bằng dấu phẩy.',true);
-        lat.value=Number(values[1]);lng.value=Number(values[2]);return show('Đã điền tọa độ. Kiểm tra trên bản đồ trước khi lưu.');
+        const coords=parseMapsCoords(form.querySelector('[data-branch-coords]').value);
+        if(!coords)return show('Dán tọa độ của ghim hoặc URL Maps có tọa độ địa điểm. Với liên kết rút gọn, hãy mở Maps và sao chép tọa độ ghim; không dùng tâm bản đồ.',true);
+        lat.value=coords.lat;lng.value=coords.lng;return show('Đã điền tọa độ. Kiểm tra đúng ghim trên bản đồ trước khi lưu.');
       }
       if(action==='branch-check-map'){
         if(!lat.value.trim()||!lng.value.trim()||!valid(Number(lat.value),Number(lng.value)))return show('Cần có đủ vĩ độ và kinh độ hợp lệ.',true);

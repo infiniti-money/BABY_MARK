@@ -1,0 +1,2 @@
+# Lấy địa chỉ Google Maps miễn phí
+Admin → Cửa hàng → chỉnh sửa → Lấy địa chỉ từ Google Maps. Tìm theo tên/địa chỉ đã nhập. Chọn đúng ghim, sao chép địa chỉ rồi quay lại bấm Dán địa chỉ hoặc dán thủ công. Tọa độ có thể nhập trực tiếp hoặc từ URL có điểm rõ ràng; không dùng tâm bản đồ hay tự giải liên kết ngắn. Kiểm tra và lưu. Không dùng Places API, không có khóa/billing, không tự truy xuất địa chỉ từ Google. Không đổi dữ liệu đang lưu cho đến khi Admin xác nhận.
