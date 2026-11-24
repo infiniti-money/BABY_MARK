@@ -8,7 +8,7 @@ export async function onRequestGet({env}){
  await env.DB.prepare('SELECT details_json FROM management_audit LIMIT 1').first();
  await env.TIMEMARKS.get('_health_probe_nonexistent','arrayBuffer');
  const p=await policy(env);
- const schema=(await env.DB.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name IN ('web_push_settings','branch_rosters','extra_attendance','shift_handover')").all()).results.map(r=>r.name);
- return Response.json({ready:true,mode:'pages-d1-kv',image_composition:'CLIENT_RENDERED',retention_enabled:p.attendance_retention,eviction_enabled:p.photo_eviction,admin_controls_ready:p.available,push_schema_ready:schema.includes('web_push_settings'),roster_schema_ready:schema.includes('branch_rosters'),extra_attendance_ready:schema.includes('extra_attendance'),handover_ready:schema.includes('shift_handover')},{headers});}
+ const schema=(await env.DB.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name IN ('web_push_settings','branch_rosters','extra_attendance','shift_handover','roster_automation','payroll_closings')").all()).results.map(r=>r.name);
+ return Response.json({ready:true,mode:'pages-d1-kv',image_composition:'CLIENT_RENDERED',retention_enabled:p.attendance_retention,eviction_enabled:p.photo_eviction,admin_controls_ready:p.available,push_schema_ready:schema.includes('web_push_settings'),roster_schema_ready:schema.includes('branch_rosters'),extra_attendance_ready:schema.includes('extra_attendance'),handover_ready:schema.includes('shift_handover'),hr_ready:schema.includes('roster_automation')&&schema.includes('payroll_closings')},{headers});}
  catch{return Response.json({ready:false,reason:'Storage not initialized'},{status:503,headers})}
 }

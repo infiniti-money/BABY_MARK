@@ -25,5 +25,13 @@ jobs:
           response="$(mktemp)"
           trap 'rm -f "$response"' EXIT
           curl --fail --silent --show-error --max-time 90 --output "$response" --request POST --header "Authorization: Bearer $ROSTER_SECRET" 'https://babymark.pages.dev/api/maintenance/rosters'
-          jq '{configured,created,skipped,failed}' "$response"
-          jq -e '.failed == 0' "$response" >/dev/null
+          mapfile -t branches < <(jq -er '.branches[]' "$response" || true)
+          failed=0
+          for branch in "${branches[@]}"; do
+            if ! [[ "$branch" =~ ^[a-zA-Z0-9._-]{1,64}$ ]]; then exit 1; fi
+            if curl --fail --silent --show-error --max-time 30 --output "$response" --request POST --header "Authorization: Bearer $ROSTER_SECRET" "https://babymark.pages.dev/api/maintenance/rosters?branch_id=$branch"; then
+              jq '{created,skipped,failed}' "$response"
+              if ! jq -e '.failed == 0' "$response" >/dev/null; then failed=1; fi
+            else failed=1; fi
+          done
+          exit "$failed"
