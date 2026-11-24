@@ -1,0 +1,14 @@
+import test from 'node:test';import assert from 'node:assert/strict';import {appFixture} from './helpers/app.mjs';import * as chat from '../../functions/api/messages.js';
+test('direct and group conversations isolate membership; system only admin; unread is per user',async()=>{const f=await appFixture();try{const post=(who,body)=>f.call(chat,who,{body});const get=(who,query='')=>f.call(chat,who,{method:'GET',query});
+ assert.equal((await get(null)).status,401);
+ const {id}=await (await post('staff',{action:'direct',user_id:f.ids.other})).json();assert.ok(id);
+ assert.equal((await (await post('other',{action:'direct',user_id:f.ids.staff})).json()).id,id);
+ assert.equal((await post('staff',{action:'send',thread_id:id,body:'PRIVATE MESSAGE'})).status,201);
+ assert.equal((await get('admin','?thread='+id)).status,404);
+ assert.equal((await post('manager',{action:'send',thread_id:id,body:'blocked'})).status,404);
+ assert.ok(!(await (await get('admin')).text()).includes('PRIVATE MESSAGE'));
+ const thread=await (await get('other','?thread='+id)).json();assert.equal(thread.messages[0].body,'PRIVATE MESSAGE');assert.equal((await (await get('other')).json()).threads.find(t=>t.id===id).unread,1);
+ assert.equal((await post('other',{action:'read',thread_id:id,message_id:thread.messages[0].id})).status,200);assert.equal((await (await get('other')).json()).threads.find(t=>t.id===id).unread,0);
+ const g=await (await post('staff',{action:'group',title:'Nhóm cửa hàng',user_ids:[f.ids.other,f.ids.manager]})).json();assert.ok(g.id);assert.equal((await get('admin','?thread='+g.id)).status,404);assert.equal((await get('manager','?thread='+g.id)).status,200);
+ assert.equal((await post('staff',{action:'send',thread_id:'system',body:'blocked'})).status,403);assert.equal((await post('admin',{action:'send',thread_id:'system',body:'Thông báo thử'})).status,201);assert.equal((await (await get('staff','?thread=system')).json()).messages[0].body,'Thông báo thử');
+ }finally{f.close()}});
