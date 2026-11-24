@@ -122,8 +122,14 @@ test.describe.serial('Cloudflare local frontend and actual D1/KV endpoints',()=>
     for(const [type,title] of [['in','Đã ghi nhận vào ca'],['out','Đã ghi nhận tan ca']]){
       await page.getByRole('button',{name:'Bật camera',exact:true}).click();
       await expect.poll(()=>page.locator('#camera').evaluate(v=>v.videoWidth>0&&v.readyState>=2)).toBeTruthy();
+      let submitted=0;const countSubmit=r=>{if(r.url().includes('/api/attendance/submit')&&r.method()==='POST')submitted++;};page.on('request',countSubmit);
       await page.getByTestId(`attendance-${type}`).click();
+      await expect(page.getByRole('heading',{name:'Xác nhận ảnh chấm công',exact:true})).toBeVisible({timeout:30000});
+      expect(submitted).toBe(0);
+      if(type==='in'){await page.getByRole('button',{name:'Chụp lại',exact:true}).click();expect(submitted).toBe(0);await expect.poll(()=>page.locator('#camera').evaluate(v=>v.videoWidth>0&&v.readyState>=2)).toBeTruthy();await page.getByTestId('attendance-in').click();await expect(page.getByRole('heading',{name:'Xác nhận ảnh chấm công',exact:true})).toBeVisible({timeout:30000});expect(submitted).toBe(0);}
+      await page.getByRole('button',{name:'Xác nhận chấm công',exact:true}).click();
       await expect(page.getByRole('heading',{name:title,exact:true})).toBeVisible({timeout:30000});
+      expect(submitted).toBe(1);page.off('request',countSubmit);
       const preview=page.getByRole('img',{name:'Ảnh Timemark vừa ghi nhận',exact:true});
       await expect.poll(()=>preview.evaluate(img=>img.complete&&img.naturalWidth>0)).toBeTruthy();
       await expect(page.getByRole('dialog')).toContainText('/ 200 KB');

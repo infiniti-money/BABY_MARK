@@ -32,38 +32,36 @@ export function makeTimemark(meta,{preview=false}={}){
  const text=(x,y,s,size=22,fill=white,weight=500)=>rows.push('<text x="'+x+'" y="'+y+'" font-family="DejaVu Sans, Arial, sans-serif" font-size="'+size+'" font-weight="'+weight+'" fill="'+fill+'" stroke="#171019" stroke-opacity=".85" stroke-width="1.5" stroke-linejoin="round" paint-order="stroke fill">'+esc(s)+'</text>');
  const rect=(x,y,w,h,fill,opacity=1)=>rows.push('<rect x="'+x+'" y="'+y+'" width="'+w+'" height="'+h+'" rx="3" fill="'+fill+'" fill-opacity="'+opacity+'"/>');
  const single=(x,y,value,max,size,fill=white,weight=650)=>text(x,y,fitLines(value,max,1)[0]||'',size,fill,weight);
- // Brand signature and timestamp remain in opposite corners; central portrait is clear.
- panel(18,18,116,116,LOGO_OPACITY,'#fff1f4');
- rows.push('<image x="23" y="23" width="106" height="106" xlink:href="'+logo+'"/>');
- panel(18,143,356,45);
- text(32,172,'BABY MARK  /  TIMEMARK',20,white,750);
- panel(398,18,384,190);
- rect(414,35,5,35,'#f58ba9');
- text(430,60,type==='IN'?'VÀO CA':'TAN CA',27,rose,750);
- text(418,118,time.format(serverTimestamp),56,white,750);
- text(420,149,date.format(serverTimestamp)+' · UTC+7',23,white,600);
- single(420,178,status,27,21,timing.minutes?warn:ok,700);
- text(420,196,'Giờ máy chủ cấp dấu',14,muted,500);
- // Employee and workplace: large names, codes and planned shift.
- panel(18,824,764,190);
- rect(36,838,5,21,'#f58ba9');
- single(51,852,'CỬA HÀNG'+(branchCode?' · '+branchCode:''),48,17,rose,750);
- fitLines(branchName,39,2).forEach((v,k)=>text(36,879+k*25,v,24,white,700));
- single(36,929,'NHÂN VIÊN · '+employeeCode,49,17,rose,750);
- fitLines(employeeName,42,2).forEach((v,k)=>text(36,954+k*24,v,23,white,700));
+ // A logo with transparent pixels and no surrounding panel.
+ rows.push('<image x="18" y="18" width="210" height="145" preserveAspectRatio="xMidYMid meet" xlink:href="'+logo+'"/>');
+ // Top-right identity and time. No full-frame or corner background.
+ const right=(y,value,size,fill=white,weight=700)=>rows.push('<text x="778" y="'+y+'" text-anchor="end" font-family="DejaVu Sans, Arial, sans-serif" font-size="'+size+'" font-weight="'+weight+'" fill="'+fill+'" stroke="#171019" stroke-width="2" stroke-linejoin="round" paint-order="stroke fill">'+esc(value)+'</text>');
+ fitLines(employeeName,25,2).forEach((v,k)=>right(42+k*27,v,25));
+ right(97,'Mã NV: '+(fitLines(employeeCode,27,1)[0]||''),20,rose);
+ right(155,time.format(serverTimestamp),55,white,750);
+ right(185,date.format(serverTimestamp)+' · UTC+7',22);
+ right(207,'Giờ máy chủ cấp dấu',15,muted,500);
+ // One continuous translucent information block, no duplicate employee identity or clock.
+ panel(18,824,764,358);
+ rect(36,838,5,25,'#f58ba9');
+ text(51,857,type==='IN'?'VÀO CA':'TAN CA',25,rose,750);
+ single(235,857,status,38,23,timing.minutes?warn:ok,700);
+ const rule=y=>rows.push('<path d="M36 '+y+' H764" stroke="#fff" stroke-opacity=".35" stroke-width="1"/>');
+ rule(870);
+ single(36,891,'CỬA HÀNG'+(branchCode?' · '+branchCode:''),55,16,rose,750);
+ fitLines(branchName,42,2).forEach((v,k)=>text(36,918+k*23,v,23,white,700));
  const shift='CA LÀM: '+hm(shiftStart)+' – '+hm(shiftEnd)+(date.format(shiftStart)!==date.format(shiftEnd)?' (+1 ngày)':'');
- text(36,1002,shift,21,white,650);
- if(clean(shiftName)&&shift.length<32)single(420,1002,shiftName,25,17,muted,600);
- // Location: independent GPS classification and reported accuracy.
- panel(18,1024,764,158);
+ text(36,969,shift,21,white,650);
+ if(clean(shiftName))single(36,994,shiftName,50,19,muted,600);
+ rule(1005);
  const tint=outside?bad:uncertain?warn:ok;
- rect(36,1037,5,22,tint);
- text(51,1055,location+' · '+Math.round(distance)+' / '+Math.round(radius)+' m',24,tint,750);
- text(36,1083,'GPS '+lat.toFixed(6)+', '+lng.toFixed(6)+'  ·  Sai số ±'+Math.round(accuracy)+' m',20,white,600);
- text(36,1107,'ĐỊA CHỈ CỬA HÀNG',15,rose,750);
- fitLines(address||'Chưa xác định địa chỉ',51,2).forEach((v,k)=>text(36,1131+k*22,v,19,white,600));
- if(clean(reference))single(36,1172,'Mã dấu: '+reference+' · Ảnh ghép trên thiết bị',59,14,muted,500);
- else text(36,1172,'Ảnh ghép trên thiết bị',14,muted,500);
- if(preview){panel(150,192,500,44,.7,'#fff1f4');rows.push('<text x="400" y="220" text-anchor="middle" font-family="sans-serif" font-size="18" font-weight="bold" fill="#9c3449">MẪU XEM TRƯỚC · KHÔNG PHẢI BẰNG CHỨNG</text>')}
+ text(36,1034,location+' · '+Math.round(distance)+' / '+Math.round(radius)+' m',24,tint,750);
+ text(36,1062,'GPS '+lat.toFixed(6)+', '+lng.toFixed(6)+'  ·  Sai số ±'+Math.round(accuracy)+' m',20,white,600);
+ rule(1074);
+ text(36,1095,'ĐỊA CHỈ CỬA HÀNG',15,rose,750);
+ fitLines(address||'Chưa xác định địa chỉ',51,2).forEach((v,k)=>text(36,1118+k*22,v,19,white,600));
+ if(clean(reference))single(36,1170,'Mã dấu: '+reference+' · Ảnh ghép trên thiết bị',59,14,muted,500);
+ else text(36,1170,'Ảnh ghép trên thiết bị',14,muted,500);
+ if(preview){panel(150,222,500,44,.7,'#fff1f4');rows.push('<text x="400" y="250" text-anchor="middle" font-family="sans-serif" font-size="18" font-weight="bold" fill="#9c3449">MẪU XEM TRƯỚC · KHÔNG PHẢI BẰNG CHỨNG</text>')}
  return '<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="800" height="1200" viewBox="0 0 800 1200">'+rows.join('')+'</svg>';
 }

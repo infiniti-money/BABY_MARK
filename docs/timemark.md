@@ -13,3 +13,6 @@ The legacy Node Sharp renderer is retained only as historical source and is not 
 
 ## Timemark Pro
 Mẫu mới giữ nguyên ảnh dọc 800 × 1200, vùng chân dung giữa trong suốt và nền 40%/logo 70%. Tăng cỡ đồng hồ, thêm mã cửa hàng, mã nhân viên tách riêng, tên ca khi đủ chỗ và mã dấu ngắn từ challenge phía máy chủ (không phải chữ ký xác thực). Tách trạng thái khoảng cách và trạng thái giờ, hiển thị UTC+7, sai số, tọa độ, địa chỉ cửa hàng và ghi rõ ảnh ghép trên thiết bị. Chuỗi dài có thể rút gọn bằng dấu …; dữ liệu đầy đủ lưu trong hệ thống. Ảnh cũ giữ nguyên, không cần migration.
+
+## Confirmation layout
+Logo alone at top left, employee name/code and server issue time/date top right, a single translucent footer with shift, branch, timing status, GPS and reference. Preview is held in browser memory; only Confirm sends the JPEG. Retake discards the draft and requires a new capture/challenge. The existing 90-second server expiry still applies. An uncertain network failure can be checked in history; the same challenge and bytes are idempotent. No SQL changes.

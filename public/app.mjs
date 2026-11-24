@@ -75,7 +75,8 @@ function stopCamera() {
   if($('#camera-live'))$('#camera-live').hidden=true;
 }
 function clearPhotos() { photoURLs.forEach(URL.revokeObjectURL); photoURLs=[]; }
-function closeModal() { modalTicket++;modal.close(); modal.innerHTML=''; clearPhotos(); }
+let pendingCapture=null,confirmationTimer=null;
+function closeModal() { pendingCapture=null;clearInterval(confirmationTimer);confirmationTimer=null;modalTicket++;modal.close(); modal.innerHTML=''; clearPhotos(); }
 function showModal(title,body) {
   closeModal(); modal.innerHTML=`<div class="modal-head"><h2 id="modal-title">${esc(title)}</h2><button class="close" data-action="close-modal" aria-label="Đóng">×</button></div><div class="modal-body">${body}</div>`;
   modal.showModal();
@@ -308,17 +309,31 @@ async function capture(type,button) {
     status.textContent='Đang ghép Timemark và nén ảnh…';
     const photo=await composeTimemark(frame,prepared.metadata);
     stillCurrent();
-    const form=new FormData();form.set('challenge_id',prepared.challenge_id);form.set('photo',photo,'timemark.jpg');
-    status.textContent='Đang lưu bản ghi công và ảnh. Vui lòng chờ…';
-    const result=await api('/api/attendance/submit',{method:'POST',body:form});
-    if(epoch!==state.sessionEpoch||renderId!==state.renderId)return;
-    const url=URL.createObjectURL(photo);
     stopCamera();
-    showModal('Đã ghi nhận '+(type==='IN'?'vào ca':'tan ca'),`<p class="muted">Bản ghi đã được lưu trên máy chủ. Ảnh bên dưới được ghép trên thiết bị từ thông tin máy chủ. Giờ đóng dấu có thể sớm hơn giờ ghi nhận tối đa 90 giây.</p><div class="review-meta"><div>Thời gian máy chủ<strong>${dt(result.attendance?.server_timestamp||prepared.metadata.serverTimestamp)}</strong></div><div>Dung lượng ảnh<strong>${(photo.size/1000).toFixed(1)} KB / 200 KB</strong></div><div>Khoảng cách<strong>${Math.round(prepared.metadata.distance)} / ${prepared.metadata.radius} m</strong></div><div>Sai số GPS<strong>±${Math.round(prepared.metadata.accuracy)} m</strong></div></div>${prepared.metadata.distance>prepared.metadata.radius?'<p class="error-text">Ngoài vùng: ảnh và giờ vẫn được lưu, chưa cộng công tự động.</p>':'<p class="hint">Trong bán kính cửa hàng theo vị trí báo cáo.</p>'}<img class="result-photo" src="${url}" alt="Ảnh Timemark vừa ghi nhận">${type==='OUT'&&state.handover?.available?handoverForm(assignment_id):''}<div class="modal-actions"><button class="btn" data-action="close-modal">Hoàn tất</button></div>`);
-    // Keep the current preview alive until the dialog closes.
+    const url=URL.createObjectURL(photo);
+    const ticket=showModal('Xác nhận ảnh chấm công',`<p class="muted">Kiểm tra ảnh và thông tin. Chưa lưu chấm công cho đến khi bạn xác nhận.</p><img class="result-photo" src="${url}" alt="Ảnh Timemark xem trước"><p class="hint">Khoảng cách ${Math.round(prepared.metadata.distance)} / ${prepared.metadata.radius} m · Sai số ±${Math.round(prepared.metadata.accuracy)} m</p>${prepared.metadata.distance>prepared.metadata.radius?'<p class="error-text">Ngoài vùng: chưa cộng công tự động.</p>':''}<p data-confirm-expiry role="status" class="hint"></p><p data-confirm-error class="error-text" role="alert" hidden></p><div class="modal-actions"><button class="btn secondary" data-action="capture-retake">Chụp lại</button><button class="btn" data-action="capture-confirm">Xác nhận chấm công</button></div>`);
     photoURLs.push(url);
-    await navigate('today');
+    pendingCapture={photo,prepared,assignment_id,type,epoch,renderId,ticket,sending:false};
+    const expires=Number(prepared.expires_at);
+    const tick=()=>{if(!pendingCapture||pendingCapture.ticket!==ticket)return;const left=Math.max(0,Math.ceil((expires-Date.now())/1000));const el=$('[data-confirm-expiry]');if(el)el.textContent=left?'Còn '+left+' giây để xác nhận.':'Ảnh đã hết hạn. Hãy chụp lại.';const b=$('[data-action="capture-confirm"]');if(b&&!left&&!pendingCapture.sending)b.disabled=true;};
+    tick();confirmationTimer=setInterval(tick,500);
   } finally { if(captureAbort===run)captureAbort=null;if(status.isConnected){status.textContent='';document.querySelectorAll('[data-action="capture"]').forEach(b=>b.disabled=false);} }
+}
+async function confirmCapture(button){
+ const p=pendingCapture;
+ if(!p||p.sending||p.epoch!==state.sessionEpoch||p.renderId!==state.renderId||p.ticket!==modalTicket||!modal.open)return;
+ if(Date.now()>=p.prepared.expires_at)throw Error('Ảnh đã hết hạn. Hãy chụp lại.');
+ p.sending=true;button.disabled=true;const retake=$('[data-action="capture-retake"]'),close=$('.modal-head .close');if(retake)retake.disabled=true;if(close)close.disabled=true;
+ const error=$('[data-confirm-error]');if(error)error.hidden=true;
+ try{
+  const form=new FormData();form.set('challenge_id',p.prepared.challenge_id);form.set('photo',p.photo,'timemark.jpg');
+  const result=await api('/api/attendance/submit',{method:'POST',body:form});
+  if(p.epoch!==state.sessionEpoch||p.renderId!==state.renderId||pendingCapture!==p)return;
+  const url=URL.createObjectURL(p.photo),m=p.prepared.metadata;
+  showModal('Đã ghi nhận '+(p.type==='IN'?'vào ca':'tan ca'),`<p class="muted">Đã lưu bản ghi trên máy chủ. Thời gian ghi nhận thực tế có thể khác giờ cấp dấu trên ảnh tối đa 90 giây.</p><div class="review-meta"><div>Thời gian máy chủ<strong>${dt(result.attendance?.server_timestamp||m.serverTimestamp)}</strong></div><div>Dung lượng ảnh<strong>${(p.photo.size/1000).toFixed(1)} KB / 200 KB</strong></div><div>Khoảng cách<strong>${Math.round(m.distance)} / ${m.radius} m</strong></div><div>Sai số GPS<strong>±${Math.round(m.accuracy)} m</strong></div></div><img class="result-photo" src="${url}" alt="Ảnh Timemark vừa ghi nhận">${p.type==='OUT'&&state.handover?.available?handoverForm(p.assignment_id):''}<div class="modal-actions"><button class="btn" data-action="close-modal">Hoàn tất</button></div>`);
+  photoURLs.push(url);await navigate('today');
+ }catch(e){if(pendingCapture===p&&error?.isConnected){error.textContent=e.message+' Kiểm tra lịch sử nếu không chắc lượt công đã được lưu.';error.hidden=false;}}
+ finally{if(pendingCapture===p){p.sending=false;button.disabled=Date.now()>=p.prepared.expires_at;if(retake)retake.disabled=false;if(close)close.disabled=false;}}
 }
 async function showPhoto(id) {
   const epoch=state.sessionEpoch,ticket=showModal('Ảnh chấm công',loading());
@@ -345,7 +360,9 @@ document.addEventListener('click',async event=>{
   const action=button.dataset.action;if(!action)return;
   try {
     if(action==='mobile-menu'){mobileMenu(button.getAttribute('aria-expanded')!=='true');return;}
-    if(action==='close-modal')return closeModal();
+    if(action==='close-modal'){if(!pendingCapture?.sending)closeModal();return;}
+    if(action==='capture-confirm')return await confirmCapture(button);
+    if(action==='capture-retake'){if(pendingCapture?.sending)return;closeModal();await startCamera();return;}
     if(action==='refresh')return void navigate();
     if(action==='enable-safe-features'){
       button.disabled=true;
@@ -605,8 +622,8 @@ document.addEventListener('submit',async event=>{
   }catch(e){if(error&&error.isConnected){error.textContent=e.message;error.hidden=false;}else notify(e.message,true);}
   finally{if(button.isConnected){button.disabled=false;button.innerHTML=old;}}
 });
-modal.addEventListener('cancel',event=>{event.preventDefault();closeModal();});
-window.addEventListener('pagehide',()=>{stopCamera();clearPhotos();});
+modal.addEventListener('cancel',event=>{event.preventDefault();if(!pendingCapture?.sending)closeModal();});
+window.addEventListener('pagehide',()=>{stopCamera();if(pendingCapture&&!pendingCapture.sending)closeModal();clearPhotos();});
 document.addEventListener('visibilitychange',()=>{if(document.hidden)stopCamera();});
 
 async function boot(){
