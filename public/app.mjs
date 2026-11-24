@@ -6,6 +6,9 @@ import {isLegacyCode,derivePasswordKey,newPasswordCredential} from './password.m
 import {pushRegistration,publicKeyBytes,disableDevicePush} from './push.mjs';
 import {permissionState,checkCameraPermission,checkLocationPermission} from './device-permissions.mjs';
 let pushReg=null,pushConfig=null,pushSub=null;
+let documentPreview=null;
+const documents=()=>import('./report-documents.mjs');
+function clearPrint(){documentPreview=null;document.body.classList.remove('printing-document');const root=document.querySelector('#print-document');if(root)root.innerHTML='';}
 
 const $ = s => document.querySelector(s);
 const app = $('#app'), modal = $('#modal');
@@ -44,7 +47,7 @@ function setSession(session) {
   stopCamera();closeModal();
   state.sessionEpoch++;state.renderId++;
   state.token=session?.token||null;cameraFacing='user';adminList={tab:'',search:'',page:1};viewFilters={};listState=null;state.filters=defaultFilters();state.view='today';state.adminTab='employees';
-  state.assignments=[];state.attendances=[];state.admin={};state.reports=[];state.requests=[];state.handover=null;state.extra=null;state.payrollData=null;state.payrollMonth=null;state.payrollRevision=null;
+  state.assignments=[];state.attendances=[];state.admin={};state.reports=[];state.reportData=null;state.requests=[];state.handover=null;state.extra=null;state.payrollData=null;state.payrollMonth=null;state.payrollRevision=null;
   try{sessionStorage.removeItem(SESSION_KEY);}catch{}
   try{localStorage.removeItem(SESSION_KEY);}catch{}
   if(session){if(session.remember){try{localStorage.setItem(SESSION_KEY,JSON.stringify(session));return;}catch{}}try{sessionStorage.setItem(SESSION_KEY,JSON.stringify(session));}catch{}}
@@ -87,7 +90,7 @@ function stopCamera() {
 }
 function clearPhotos() { photoURLs.forEach(URL.revokeObjectURL); photoURLs=[]; }
 let pendingCapture=null,confirmationTimer=null;
-function closeModal() { pendingCapture=null;clearInterval(confirmationTimer);confirmationTimer=null;modalTicket++;modal.close(); modal.innerHTML=''; clearPhotos(); }
+function closeModal() { clearPrint();pendingCapture=null;clearInterval(confirmationTimer);confirmationTimer=null;modalTicket++;modal.close(); modal.innerHTML=''; clearPhotos(); }
 function showModal(title,body) {
   closeModal(); modal.innerHTML=`<div class="modal-head"><h2 id="modal-title">${esc(title)}</h2><button class="close" data-action="close-modal" aria-label="Đóng">×</button></div><div class="modal-body">${body}</div>`;
   modal.showModal();
@@ -283,9 +286,9 @@ function branchReport(rows){
 }
 async function renderReports(id) {
   const [data,loaded]=await Promise.all([api(`/api/reports?${query(state.filters)}`),state.user.role==='admin'?loadAdmin(['branches','employees'],id):Promise.resolve(true)]); if(!loaded||id!==state.renderId)return;
-  state.reports=data.rows;
+  state.reports=data.rows;state.reportData=data;
   const s=data.summary||{};
-  $('#content').innerHTML=`<div class="stats">${stat('Ca hoàn tất',s.shifts??0,'Các ca đủ dữ liệu công','check')}${stat('Giờ làm ghi nhận',(Number(s.minutes||0)/60).toFixed(1),'Chưa bao gồm quy tắc tính lương','clock')}${stat('Đi muộn',s.late??0,'Tổng phút theo bảng công','calendar')}${stat('Ngày nghỉ được duyệt',s.leaveDays??0,'Theo đơn đã phê duyệt','file')}</div>${branchReport(data.branches||[])}<section class="card"><div class="card-head"><h2>Bảng công theo ca</h2><span class="tag">${data.rows.length} CA</span></div>${filterBar({reports:true})}${listPager(data.rows,rows=>rows.length?`<div class="table-wrap"><table><thead><tr><th>Nhân viên</th><th>Ngày / Cửa hàng</th><th>Ca làm</th><th>Vào / Tan ca</th><th>Phút công</th><th>Trạng thái</th><th>Đối soát ảnh / GPS</th></tr></thead><tbody>${rows.map(r=>`<tr><td><strong>${esc(r.full_name)}</strong><small>${esc(r.employee_code)}</small></td><td>${dateVN(r.work_date)}<small>${esc(r.branch_name)}</small></td><td>${esc(r.shift_name)}<small>${hm(r.starts_at)} – ${hm(r.ends_at)}</small></td><td>${r.summary?.adjusted?`${hm(r.proposed_in)} / ${hm(r.proposed_out)}<small>Đã duyệt · Gốc: ${hm(r.in_at)} / ${hm(r.out_at)}</small>`:`${hm(r.in_at)} / ${hm(r.out_at)}`}</td><td>${r.summary?.minutes??0}<small>Muộn ${r.summary?.late??0} · Sớm ${r.summary?.early??0}</small></td><td>${badge(r.summary?.status)}</td><td>${['in','out'].map(type=>r[type+'_id']?`<div><small>${type==='in'?'Vào':'Ra'} · ${r[type+'_distance_m']==null?'—':Math.round(r[type+'_distance_m'])+' m'} · sai số ${r[type+'_accuracy_m']==null?'—':'±'+Math.round(r[type+'_accuracy_m'])+' m'}</small><button class="btn secondary small" data-action="photo" data-id="${esc(r[type+'_id'])}">Ảnh ${type==='in'?'vào':'ra'}</button></div>`:'').join('')||'—'}</td></tr>`).join('')}</tbody></table></div><p class="table-footer">Dữ liệu tham khảo đối soát. CSV mở được trong Excel; chưa áp dụng quy tắc lương, nghỉ giữa ca và ngày lễ.</p>`:empty())}</section>`;drawList();
+  $('#content').innerHTML=`<div class="stats">${stat('Ca hoàn tất',s.shifts??0,'Các ca đủ dữ liệu công','check')}${stat('Giờ làm ghi nhận',(Number(s.minutes||0)/60).toFixed(1),'Chưa bao gồm quy tắc tính lương','clock')}${stat('Đi muộn',s.late??0,'Tổng phút theo bảng công','calendar')}${stat('Ngày nghỉ được duyệt',s.leaveDays??0,'Theo đơn đã phê duyệt','file')}</div>${branchReport(data.branches||[])}<section class="card"><div class="card-head"><h2>Bảng công theo ca</h2><span class="tag">${data.rows.length} CA</span></div>${filterBar({reports:true})}<div class="card-body modal-actions"><button class="btn secondary" data-action="report-documents" ${data.rows.length?'':'disabled'}>Excel / In bảng công</button></div>${listPager(data.rows,rows=>rows.length?`<div class="table-wrap"><table><thead><tr><th>Nhân viên</th><th>Ngày / Cửa hàng</th><th>Ca làm</th><th>Vào / Tan ca</th><th>Phút công</th><th>Trạng thái</th><th>Đối soát ảnh / GPS</th></tr></thead><tbody>${rows.map(r=>`<tr><td><strong>${esc(r.full_name)}</strong><small>${esc(r.employee_code)}</small></td><td>${dateVN(r.work_date)}<small>${esc(r.branch_name)}</small></td><td>${esc(r.shift_name)}<small>${hm(r.starts_at)} – ${hm(r.ends_at)}</small></td><td>${r.summary?.adjusted?`${hm(r.proposed_in)} / ${hm(r.proposed_out)}<small>Đã duyệt · Gốc: ${hm(r.in_at)} / ${hm(r.out_at)}</small>`:`${hm(r.in_at)} / ${hm(r.out_at)}`}</td><td>${r.summary?.minutes??0}<small>Muộn ${r.summary?.late??0} · Sớm ${r.summary?.early??0}</small></td><td>${badge(r.summary?.status)}</td><td>${['in','out'].map(type=>r[type+'_id']?`<div><small>${type==='in'?'Vào':'Ra'} · ${r[type+'_distance_m']==null?'—':Math.round(r[type+'_distance_m'])+' m'} · sai số ${r[type+'_accuracy_m']==null?'—':'±'+Math.round(r[type+'_accuracy_m'])+' m'}</small><button class="btn secondary small" data-action="photo" data-id="${esc(r[type+'_id'])}">Ảnh ${type==='in'?'vào':'ra'}</button></div>`:'').join('')||'—'}</td></tr>`).join('')}</tbody></table></div><p class="table-footer">Dữ liệu tham khảo đối soát. CSV mở được trong Excel; chưa áp dụng quy tắc lương, nghỉ giữa ca và ngày lễ.</p>`:empty())}</section>`;drawList();
 }
 function handoverCards(rows){
  return rows.map(r=>`<article class="assignment-card"><strong>${esc(r.branch_name)} · ${esc(r.shift_name)}</strong><p class="hint">${esc(r.full_name)} · ${dt(r.created_at)}</p><p class="request-reason">${esc(r.message)}</p></article>`).join('');
@@ -315,7 +318,7 @@ async function renderPayroll(id){
  const data=await api('/api/admin/payroll?'+query({month,revision}));if(id!==state.renderId)return;
  if(!data.available){$('#content').innerHTML=errorHTML('Cần migration 0014 để mở bảng công và lương.');return;}
  state.payrollData=data;const d=data.data,locked=data.selected_revision!==null,money=v=>v==null?'Chưa đặt':Number(v).toLocaleString('vi-VN')+' đ';
- $('#content').innerHTML=`<section class="card"><div class="card-head"><h2>Bảng công & lương dự kiến</h2></div><div class="card-body form-stack"><form data-form="payroll-filter" class="form-stack"><label>Tháng<input type="month" name="month" required value="${esc(month)}"></label><button class="btn secondary" type="submit">Xem tháng</button></form><p class="hint">Tính tiền giờ thực tế trong ca × đơn giá theo giờ + khoản cộng − khoản trừ do Admin nhập. Giờ ngoài ca, nghỉ phép có lương, phụ cấp, thuế, bảo hiểm và các quy tắc pháp lý cần đối soát riêng. Không tự khấu trừ đi muộn.</p><p><strong>${locked?'Bản chốt #'+data.selected_revision:'Bản dự thảo trực tiếp'}</strong> · Tổng dự kiến ${money(d.total)}</p><p class="hint">Chưa có đơn giá: ${d.missing_rates} · Chờ duyệt: ${d.pending} · Ca cần kiểm tra: ${d.issues} · Ca vắng: ${d.absences} · Phút ngoài ca: ${d.extra_minutes} · Ca nghỉ duyệt: ${d.leave_shifts}</p><div class="modal-actions"><button class="btn secondary" data-action="payroll-live">Xem dự thảo</button><button class="btn secondary" data-action="payroll-export">Xuất CSV</button>${!locked?`<button class="btn" data-action="payroll-close" ${!d.month_ended||d.pending||d.missing_rates||!d.rows.length?'disabled':''}>Chốt phiên bản tháng</button>`:''}</div><div class="checklist">${data.revisions.map(r=>`<button class="btn secondary small" data-action="payroll-revision" data-revision="${r.revision}">Bản chốt #${r.revision} · ${esc(dt(r.created_at))} · ${esc(r.reason)}</button>`).join('')}</div></div><div class="table-wrap"><table><thead><tr><th>Nhân viên</th><th>Ngày / giờ công</th><th>Đơn giá / giờ</th><th>Cộng / trừ</th><th>Tổng dự kiến</th><th>Thao tác</th></tr></thead><tbody>${d.rows.map(r=>`<tr><td><strong>${esc(r.full_name)}</strong><small>${esc(r.employee_code)} · ${esc(r.department)}</small></td><td>${r.days} ngày · ${(r.regular_minutes/60).toFixed(2)} giờ<small>Thực tế ${(r.worked_minutes/60).toFixed(2)} giờ · Ngoài ca ${r.extra_minutes} phút · Nghỉ ${r.leave_shifts} · Vắng ${r.absence_shifts} · Cần kiểm tra ${r.issues}</small></td><td>${money(r.hourly_rate)}</td><td>${money(r.additions)} / ${money(r.deductions)}<small>${esc(r.note)}</small></td><td><strong>${money(r.estimated_total)}</strong></td><td>${locked?'Đã chốt':`<button class="btn secondary small" data-action="payroll-edit" data-id="${esc(r.id)}">Đơn giá / điều chỉnh</button>`}</td></tr>`).join('')}</tbody></table></div></section>`;
+ $('#content').innerHTML=`<section class="card"><div class="card-head"><h2>Bảng công & lương dự kiến</h2></div><div class="card-body form-stack"><form data-form="payroll-filter" class="form-stack"><label>Tháng<input type="month" name="month" required value="${esc(month)}"></label><button class="btn secondary" type="submit">Xem tháng</button></form><p class="hint">Tính tiền giờ thực tế trong ca × đơn giá theo giờ + khoản cộng − khoản trừ do Admin nhập. Giờ ngoài ca, nghỉ phép có lương, phụ cấp, thuế, bảo hiểm và các quy tắc pháp lý cần đối soát riêng. Không tự khấu trừ đi muộn.</p><p><strong>${locked?'Bản chốt #'+data.selected_revision:'Bản dự thảo trực tiếp'}</strong> · Tổng dự kiến ${money(d.total)}</p><p class="hint">Chưa có đơn giá: ${d.missing_rates} · Chờ duyệt: ${d.pending} · Ca cần kiểm tra: ${d.issues} · Ca vắng: ${d.absences} · Phút ngoài ca: ${d.extra_minutes} · Ca nghỉ duyệt: ${d.leave_shifts}</p><div class="modal-actions"><button class="btn secondary" data-action="payroll-live">Xem dự thảo</button><button class="btn secondary" data-action="payroll-export">Xuất CSV</button><button class="btn secondary" data-action="payroll-documents" ${d.rows.length?'':'disabled'}>Excel / In bảng lương</button>${!locked?`<button class="btn" data-action="payroll-close" ${!d.month_ended||d.pending||d.missing_rates||!d.rows.length?'disabled':''}>Chốt phiên bản tháng</button>`:''}</div><div class="checklist">${data.revisions.map(r=>`<button class="btn secondary small" data-action="payroll-revision" data-revision="${r.revision}">Bản chốt #${r.revision} · ${esc(dt(r.created_at))} · ${esc(r.reason)}</button>`).join('')}</div></div><div class="table-wrap"><table><thead><tr><th>Nhân viên</th><th>Ngày / giờ công</th><th>Đơn giá / giờ</th><th>Cộng / trừ</th><th>Tổng dự kiến</th><th>Thao tác</th></tr></thead><tbody>${d.rows.map(r=>`<tr><td><strong>${esc(r.full_name)}</strong><small>${esc(r.employee_code)} · ${esc(r.department)}</small></td><td>${r.days} ngày · ${(r.regular_minutes/60).toFixed(2)} giờ<small>Thực tế ${(r.worked_minutes/60).toFixed(2)} giờ · Ngoài ca ${r.extra_minutes} phút · Nghỉ ${r.leave_shifts} · Vắng ${r.absence_shifts} · Cần kiểm tra ${r.issues}</small></td><td>${money(r.hourly_rate)}</td><td>${money(r.additions)} / ${money(r.deductions)}<small>${esc(r.note)}</small></td><td><strong>${money(r.estimated_total)}</strong></td><td>${locked?'Đã chốt':`<button class="btn secondary small" data-action="payroll-edit" data-id="${esc(r.id)}">Đơn giá / điều chỉnh</button>`} <button class="btn secondary small" data-action="payroll-pos" data-id="${esc(r.id)}">In phiếu POS</button></td></tr>`).join('')}</tbody></table></div></section>`;
 }
 function requestForm() {
   const own=state.assignments.filter(a=>a.user_id===state.user.id);
@@ -342,7 +345,7 @@ function prepareResponsiveTables(){
 async function navigate(view=state.view) {
   if(!state.user)return;
   const allowed=new Set(navItems().map(x=>x[0]));allowed.add('extra');if(!allowed.has(view))view=landing();
-  const changed=state.view!==view;stopCamera();if(pendingCapture&&!pendingCapture.sending)closeModal();
+  const changed=state.view!==view;if(documentPreview)closeModal();stopCamera();if(pendingCapture&&!pendingCapture.sending)closeModal();
   if(changed){viewFilters[state.view]={...state.filters};state.filters={...(viewFilters[view]||defaultFilters())};}
   state.view=view;listState=null;const id=++state.renderId;shell();
   if(changed)window.scrollTo(0,0);
@@ -447,6 +450,29 @@ async function showPhoto(id) {
     $('.modal-body').innerHTML=`<img class="photo-view" src="${url}" alt="Ảnh Timemark chấm công"><p class="hint">Ảnh ghép trên thiết bị; dùng bản ghi công máy chủ và quy trình đối soát để kiểm tra.</p>`;
   } catch(e) { if(modal.open&&ticket===modalTicket&&epoch===state.sessionEpoch)$('.modal-body').innerHTML=`<p class="error-text">${esc(e.message)}</p>`; }
 }
+async function openDocumentPreview(kind,person='',pos=false){
+ const data=kind==='report'?state.reportData:state.payrollData,epoch=state.sessionEpoch,render=state.renderId;
+ if(!data||!state.user||kind==='payroll'&&state.user.role!=='admin')throw Error('Không có quyền hoặc dữ liệu chưa sẵn sàng.');
+ const mod=await documents();if(epoch!==state.sessionEpoch||render!==state.renderId)return;
+ const list=mod.people(kind,data);if(!list.length)throw Error('Không có dữ liệu để in.');
+ if(person&&!list.some(p=>p.id===person))throw Error('Không tìm thấy nhân viên.');
+ showModal(kind==='report'?'Xuất / in bảng công':'Xuất / in bảng lương',`<div class="form-stack document-controls"><label>Nhân viên<select id="document-person"><option value="">Tất cả trong dữ liệu đang xem</option>${list.map(p=>`<option value="${esc(p.id)}" ${p.id===person?'selected':''}>${esc(p.code+' · '+p.name)}</option>`).join('')}</select></label><label>Khổ giấy<select id="document-paper"><option value="a4">A4 ngang</option>${kind==='payroll'?'<option value="80">POS 80 mm</option><option value="58">POS 58 mm</option>':''}</select></label><p class="hint">Dữ liệu đúng bộ lọc / phiên bản đang xem. POS chỉ in riêng từng người; chọn khổ cuộn tương ứng trên máy in. Không tự gửi lệnh đến máy in.</p><div class="modal-actions"><button class="btn secondary" data-action="document-xlsx">Xuất Excel (.xlsx)</button><button class="btn" data-action="document-print">In bảng</button></div><div id="document-preview"></div></div>`);
+ documentPreview={kind,data,mod,epoch,render};if(pos)$('#document-paper').value='80';updateDocumentPreview();
+}
+function documentSelection(){
+ const d=documentPreview;if(!d||d.epoch!==state.sessionEpoch||d.render!==state.renderId||!state.user||d.kind==='payroll'&&state.user.role!=='admin')throw Error('Dữ liệu không còn trong phiên hiện tại.');
+ const id=$('#document-person').value,paper=$('#document-paper').value;
+ if(paper!=='a4'&&!id)throw Error('Chọn một nhân viên để in POS.');
+ return {...d,id,paper};
+}
+function updateDocumentPreview(){
+ try{const d=documentSelection();$('#document-preview').innerHTML=d.mod.printDocument(d.kind,d.data,d.id,d.paper);}
+ catch(e){$('#document-preview').innerHTML=errorHTML(e.message);}
+}
+document.addEventListener('change',e=>{if(documentPreview&&['document-person','document-paper'].includes(e.target.id))updateDocumentPreview();});
+window.addEventListener('afterprint',()=>{document.body.classList.remove('printing-document');$('#print-document').innerHTML='';});
+function printSelectedDocument(){const d=documentSelection(),root=$('#print-document');root.innerHTML=d.mod.printDocument(d.kind,d.data,d.id,d.paper);document.body.classList.add('printing-document');try{window.print();}catch(e){document.body.classList.remove('printing-document');root.innerHTML='';throw e;}}
+function exportSelectedDocument(){const d=documentSelection(),bytes=d.mod.workbook(d.kind,d.data,d.id),suffix=d.id?'_'+(d.mod.people(d.kind,d.data).find(x=>x.id===d.id)?.code||'NV').replace(/[^a-zA-Z0-9._-]/g,'_'):'',period=d.kind==='report'?d.data.from+'_'+d.data.to:d.data.data.month+(d.data.selected_revision==null?'_draft':'_v'+d.data.selected_revision);const url=URL.createObjectURL(new Blob([bytes],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'})),a=document.createElement('a');a.href=url;a.download='BABY_MARK_'+d.kind+'_'+period+suffix+'.xlsx';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);notify('Đã xuất Excel.');}
 async function exportReports() {
   const epoch=state.sessionEpoch;
   const response=await api(`/api/reports?${query({...state.filters,format:'csv'})}`,{raw:true});
@@ -538,6 +564,11 @@ document.addEventListener('click',async event=>{
     if(action==='camera-stop'){stopCamera();cameraControls();return;}
     if(action==='capture')return await capture(button.dataset.type,button);
     if(action==='photo')return await showPhoto(button.dataset.id);
+    if(action==='report-documents')return await openDocumentPreview('report');
+    if(action==='payroll-documents')return await openDocumentPreview('payroll');
+    if(action==='payroll-pos')return await openDocumentPreview('payroll',button.dataset.id,true);
+    if(action==='document-xlsx')return exportSelectedDocument();
+    if(action==='document-print')return printSelectedDocument();
     if(action==='export')return await exportReports();
     if(action==='radius-all'){
       const active=state.admin.branches.filter(b=>b.active!==0),radii=[...new Set(active.map(b=>Number(b.allowed_radius)))],initial=radii.length===1?radii[0]:200;
@@ -777,5 +808,5 @@ async function boot(){
   try{state.user=(await api('/api/auth/me')).user;await navigate(landing());}
   catch(e){if(e.status===401||e.status===403){setSession(null);renderLogin(e.message);}else{app.innerHTML='<main class="login-panel"><section class="login-box"><h2>Chưa thể kết nối BABY MARK</h2><p class="muted">Phiên đã lưu chưa bị xóa. Kiểm tra mạng và thử lại.</p><button class="btn" data-action="session-retry">Thử lại</button><button class="btn secondary" data-action="logout">Đăng xuất</button></section></main>';}}
 }
-window.addEventListener('storage',event=>{if(event.key!==SESSION_KEY&&event.key!==null)return;if(!state.token)return;let old=null;try{old=JSON.parse(event.oldValue||'null');}catch{}if(event.key!==null&&old?.token!==state.token)return;state.user=null;stopCamera();closeModal();state.sessionEpoch++;state.renderId++;state.token=null;state.assignments=[];state.attendances=[];state.admin={};state.reports=[];state.requests=[];state.handover=null;state.extra=null;state.payrollData=null;state.payrollMonth=null;state.payrollRevision=null;viewFilters={};state.filters=defaultFilters();state.adminTab='employees';try{sessionStorage.removeItem(SESSION_KEY)}catch{}renderLogin('Phiên trên thiết bị đã thay đổi. Vui lòng mở lại ứng dụng hoặc đăng nhập.');});
+window.addEventListener('storage',event=>{if(event.key!==SESSION_KEY&&event.key!==null)return;if(!state.token)return;let old=null;try{old=JSON.parse(event.oldValue||'null');}catch{}if(event.key!==null&&old?.token!==state.token)return;state.user=null;stopCamera();closeModal();state.sessionEpoch++;state.renderId++;state.token=null;state.assignments=[];state.attendances=[];state.admin={};state.reports=[];state.reportData=null;state.requests=[];state.handover=null;state.extra=null;state.payrollData=null;state.payrollMonth=null;state.payrollRevision=null;viewFilters={};state.filters=defaultFilters();state.adminTab='employees';try{sessionStorage.removeItem(SESSION_KEY)}catch{}renderLogin('Phiên trên thiết bị đã thay đổi. Vui lòng mở lại ứng dụng hoặc đăng nhập.');});
 await boot();
