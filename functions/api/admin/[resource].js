@@ -38,6 +38,12 @@ export async function onRequestPost({request,env,params}){
    return reply({settings:await policy(env)});
   }
   if(resource==='branches'){
+   if(b.action==='set-radius-all'){
+    if(!(await policy(env)).available)throw new ApiError(409,'Cần migration 0009');
+    if(b.allowed_radius!==200)invalid('Bán kính áp dụng toàn hệ thống là 200 m');
+    const result=await db.batch([db.prepare("UPDATE branches SET allowed_radius=200 WHERE active=1 AND allowed_radius<>200"),managementAudit(db,actor,'branches','ALL_ACTIVE','SET_RADIUS_ALL',{allowed_radius:200})]);
+    return reply({updated:result[0].meta.changes});
+   }
    if(b.action==='set-active'){
     if(!b.id||typeof b.active!=='boolean')invalid('Trạng thái cửa hàng không hợp lệ');
     if(!(await policy(env)).available)throw new ApiError(409,'Cần migration 0009');
@@ -58,7 +64,7 @@ export async function onRequestPost({request,env,params}){
     if(result[1].meta?.changes!==1)throw new ApiError(409,'Không thể xóa: cửa hàng không tồn tại, đã có lịch phân công hoặc đang được giao cho quản lý.');
     return reply({id,deleted:true});
    }
-   const code=textField(b.code,40),name=textField(b.name,150),address=textField(b.address_text??'',300,true),lat=b.latitude??null,lng=b.longitude??null,radius=b.allowed_radius;
+   const code=textField(b.code,40),name=textField(b.name,150),address=textField(b.address_text??'',300,true),lat=b.latitude??null,lng=b.longitude??null,radius=b.allowed_radius??(b.id?null:200);
    if(!Number.isInteger(radius)||radius<20||radius>1000||!((lat===null&&lng===null)||(Number.isFinite(lat)&&Math.abs(lat)<=90&&Number.isFinite(lng)&&Math.abs(lng)<=180)))invalid('GPS hoặc bán kính không hợp lệ');
    if(b.id&&!await db.prepare('SELECT id FROM branches WHERE id=?').bind(id).first())throw new ApiError(404,'Không tìm thấy cửa hàng');
    const statement=b.id?db.prepare('UPDATE branches SET code=?,name=?,latitude=?,longitude=?,allowed_radius=?,address_text=? WHERE id=?').bind(code,name,lat,lng,radius,address,id):db.prepare('INSERT INTO branches(id,code,name,latitude,longitude,allowed_radius,address_text) VALUES(?,?,?,?,?,?,?)').bind(id,code,name,lat,lng,radius,address);
