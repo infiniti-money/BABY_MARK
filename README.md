@@ -1,23 +1,38 @@
-# BABY_MARK — Attendance
-Nền tảng chấm công cho nhân viên và quản lý. Múi giờ nghiệp vụ Asia/Ho_Chi_Minh.
-## Tình trạng v0.2 (chưa kiểm thử triển khai)
-Mã nguồn nền tảng, chưa triển khai production. Không lưu bí mật hoặc ảnh thật vào GitHub.
-- Supabase Auth, PostgreSQL, RLS, ca/lịch phân công, ảnh private, API xác thực thời gian server và geofence.
-- Khoảng cách ngoài vùng được ghi cờ OUTSIDE để quản lý xem xét. GPS do thiết bị cung cấp, không phải bằng chứng tuyệt đối chống giả mạo.
-- Timestamps là thời gian API nhận yêu cầu, không phải thời điểm màn trập đã được xác thực. Không lấy giờ máy khách làm giờ công.
-## Cài đặt
-1. Tạo project Supabase riêng, chạy supabase/schema.sql một lần trên project mới bằng SQL Editor.
-2. Tạo người dùng Auth (tắt đăng ký công khai), tạo profiles với UUID tương ứng và mã nhân viên. Chỉ người vận hành có quyền DB mới tạo admin.
-3. Tạo branches, shifts và assignments (starts_at/ends_at là timestamptz, work_date là ngày tại Việt Nam, grace_minutes sao chép từ ca). Ca qua đêm cần ends_at vào ngày kế tiếp.
-4. cd apps/web; copy .env.example thành .env.local; điền URL, publishable key và service role key (chỉ phía server); tùy chọn Goong key. npm install; npm test; npm run build; npm run dev.
-5. Trước production, cập nhật bản vá dependency, khóa lockfile, chạy kiểm thử quyền RLS và tải ảnh. Camera/GPS web cần HTTPS hoặc localhost.
-## Bảo mật và riêng tư
-Chỉ xin vị trí lúc chấm công; không theo dõi nền. Hạn chế quyền đọc ảnh; không dùng nhận diện khuôn mặt. Xác định chính sách thông báo, lưu trữ/xóa ảnh, quyền truy cập và quy trình sửa công trước triển khai. Không coi root/mock check là bảo đảm chống gian lận. Không dùng kết quả GPS đơn lẻ để tự động kỷ luật.
-## Tiếp theo
-Hoàn thiện Expo native, quản lý lịch ca, thông báo FCM/APNs và kiểm thử trên thiết bị. Báo cáo ngày/tháng cần đối soát ngày nghỉ, ca qua đêm, nghỉ giữa ca, duyệt ngoại lệ và phép trước khi tính lương.
+# BABY_MARK — Cloudflare attendance
+Active target: static `public/` + root `functions/` on **Cloudflare Pages/Functions + D1 + KV only**. No Supabase, R2, Node server, Sharp, or Images binding is used by this target.
 
-## Cập nhật thông báo và đồng bộ
-Sau schema.sql, chạy supabase/notifications.sql trên project BABY_MARK; cấu hình CRON_SECRET và bộ lập lịch mỗi phút theo docs/notifications.md. Dashboard nhận thông báo realtime và có polling dự phòng. Push native cần EAS credentials; chưa kiểm thử thực tế.
+Audited from main `de439b9e48e86ec179b769ebd9ec88c78a8a37c7` on 24 November 2026. The old Next.js/Expo/Supabase folders remain historical source and are excluded from the active build. No production deployment, resource creation, remote migration, or live deletion was performed.
 
-## v0.4 — Quản trị nhân sự và yêu cầu công
-Sau schema.sql và notifications.sql, chạy workforce.sql rồi workforce-notifications.sql trên đúng project BABY_MARK. Admin tạo tài khoản Auth bằng Dashboard Supabase, sau đó thêm hồ sơ bằng UUID trong giao diện Nhân sự. Vai trò manager chỉ đọc dữ liệu được RLS cho phép và duyệt yêu cầu tại các chi nhánh được cấp quyền; chỉ admin phân ca và cấu hình cửa hàng. Nhân viên gửi yêu cầu nghỉ hoặc điều chỉnh giờ qua mobile web; không sửa log ảnh/GPS gốc. Báo cáo tách ngày có công, số ca hoàn tất, ngày có nghỉ; chưa tính lương hoặc nghỉ giữa ca. Kiểm tra docs/workforce.md trước khi sử dụng.
+## Working target
+- Administrator-issued accounts, one-time random access codes, reset/lock and immediate session revocation; no public signup.
+- Fourteen catalog stores with administrator-managed verified GPS/address/radius; fifty active staff and managers, excluding administrators.
+- Employee camera/GPS capture, server-issued 90-second challenge, browser Timemark with 40% translucent cards, JPEG at most **200,000 bytes**, private KV photo history.
+- D1 validates active identity, assignment, allowed time window, GPS range/accuracy, server distance, IN-before-OUT, duplicate/replay, and current session at finalization.
+- Branch/employee/shift/overnight assignment and manager-scope management; overlap/history guards and audit records.
+- Scoped reports and formula-safe UTF-8 CSV for Excel; leave/correction submission and approval preserve original evidence.
+
+**Image trust:** the photograph is composed on the device. A stored hash/challenge does not establish liveness, real GPS, visible stamp correctness or shutter time. D1 `server_timestamp` is accepted-upload time; `stamp_issued_at` is preparation time, at most 90 seconds earlier. [Trust/runtime details](docs/cloudflare-runtime-audit.md).
+
+## Local validation
+Node >=22.13 (Node 22 in CI; local checks used Node 26.13). Install and lock development tools, then:
+```text
+npm ci
+npm test
+npm run check:runtime
+npx playwright install chromium
+npm run test:browser
+```
+Windows browser tests use installed Microsoft Edge; Linux CI uses Chromium. The acceptance server uses ephemeral workerd/D1/KV and generated test accounts only. It never connects to an existing Cloudflare account or database. Test mutations/deletions affect disposable local fixtures.
+
+`npm run dev` starts Pages locally with local bindings; it requires local schema and administrator initialization. See [operations](docs/cloudflare-operations.md). No publish command is included in CI.
+
+## Storage and deployment gates
+Photo payload budget **900,000,000 bytes**, oldest first; maximum TTL sixty days. At 100 photos/day of 200 KB, budget holds about **45 days**, not sixty guaranteed days. D1 attendance retention is two calendar years, with dispute holds. Capacity eviction and attendance cleanup are **disabled by default** until the operator reviews the policy and inventory.
+
+Production still needs actual binding IDs, only unapplied migrations, a securely bootstrapped administrator, real GPS verification for all stores, approved retention, recovery procedure, physical-device acceptance and free-tier CPU/quota measurement. Pages alone has no scheduled handler: guaranteed no-traffic D1 cleanup remains a scheduling decision. Native Expo migration, push/realtime, shift swaps, XLSX workbooks and payroll are pending.
+
+- [Audit and remaining blockers](docs/audit-2026-11-24.md)
+- [Local/production operations and recovery](docs/cloudflare-operations.md)
+- [Hosting target](docs/hosting.md)
+- [Release checklist](docs/release-checklist.md)
+- [Storage](docs/cloudflare-storage.md) · [Internal accounts](docs/internal-auth.md) · [Timemark](docs/timemark.md)

@@ -1,36 +1,33 @@
-name: Verify BABY MARK
+name: Verify Cloudflare BABY MARK
 on:
   push:
-    branches: [main]
+    branches: [main, 'codex/**']
   pull_request:
   workflow_dispatch:
 permissions:
   contents: read
 jobs:
-  web:
+  cloudflare:
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: apps/web
+    env:
+      WRANGLER_SEND_METRICS: 'false'
+      WRANGLER_LOG_PATH: work/wrangler.log
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7.0.1
+      - uses: actions/setup-node@v7.1.0
         with:
           node-version: '22'
+          cache: npm
+      - run: npm ci
       - run: npm test
-      - run: npm install --no-audit --no-fund
-      - run: npm run build
-  mobile:
-    runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: apps/mobile
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - run: npm run check:runtime
+      - run: npx playwright install --with-deps chromium
+      - run: npm run test:browser
+      - uses: actions/upload-artifact@v7.0.2
+        if: failure()
         with:
-          node-version: '22'
-      - run: npm install --no-audit --no-fund
-      - run: npx expo install --check
-      - run: npx expo export --platform android --output-dir dist/android
-      - run: npx expo export --platform ios --output-dir dist/ios
+          name: browser-failure-evidence
+          path: work/playwright-results
+          retention-days: 7
+# Verification only. No deployment, remote migrations, resource provisioning,
+# scheduled cleanup, or production credentials are used by this workflow.

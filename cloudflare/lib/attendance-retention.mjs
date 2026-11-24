@@ -15,6 +15,7 @@ export async function pruneAttendance(db,now=Date.now()){
  db.prepare("INSERT INTO retention_runs(id,started_at,cutoff_at) VALUES(?,?,?)").bind(id,now,cutoff),
  db.prepare(`INSERT INTO retention_candidates(run_id,assignment_id)
  SELECT ?,a.id FROM assignments a WHERE a.ends_at<?
+ AND NOT EXISTS(SELECT 1 FROM attendance_challenges c WHERE c.assignment_id=a.id AND c.state='PROCESSING')
  AND NOT EXISTS(SELECT 1 FROM attendances t WHERE t.assignment_id=a.id AND t.server_timestamp>=?)
  AND NOT EXISTS(SELECT 1 FROM workforce_requests w WHERE w.assignment_id=a.id AND (w.state='PENDING' OR w.created_at>=? OR w.decided_at>=?))
  AND NOT EXISTS(SELECT 1 FROM attendance_notifications n WHERE n.assignment_id=a.id AND n.created_at>=?)
@@ -26,9 +27,10 @@ export async function pruneAttendance(db,now=Date.now()){
  // KV expires separately; remove only already-retired inventory metadata for old records.
  db.prepare("DELETE FROM photo_inventory WHERE state IN ('evicted','expired') AND photo_path IN (SELECT photo_path FROM attendances WHERE assignment_id IN ("+selected+"))").bind(id),
  db.prepare("DELETE FROM attendances WHERE assignment_id IN ("+selected+")").bind(id),
+ db.prepare("DELETE FROM attendance_challenges WHERE assignment_id IN ("+selected+")").bind(id),
  db.prepare("DELETE FROM assignments WHERE id IN ("+selected+")").bind(id),
  db.prepare("DELETE FROM retention_candidates WHERE run_id=?").bind(id)
  ];
  const results=await db.batch(sql);
- return {run_id:id,cutoff_at:cutoff,assignments_removed:results[8].meta.changes};
+ return {run_id:id,cutoff_at:cutoff,assignments_removed:results[9].meta.changes};
 }
