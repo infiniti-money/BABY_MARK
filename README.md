@@ -18,3 +18,6 @@ Hoàn thiện Expo native, quản lý lịch ca, thông báo FCM/APNs và kiểm
 
 ## Cập nhật thông báo và đồng bộ
 Sau schema.sql, chạy supabase/notifications.sql trên project BABY_MARK; cấu hình CRON_SECRET và bộ lập lịch mỗi phút theo docs/notifications.md. Dashboard nhận thông báo realtime và có polling dự phòng. Push native cần EAS credentials; chưa kiểm thử thực tế.
+
+## v0.4 — Quản trị nhân sự và yêu cầu công
+Sau schema.sql và notifications.sql, chạy workforce.sql rồi workforce-notifications.sql trên đúng project BABY_MARK. Admin tạo tài khoản Auth bằng Dashboard Supabase, sau đó thêm hồ sơ bằng UUID trong giao diện Nhân sự. Vai trò manager chỉ đọc dữ liệu được RLS cho phép và duyệt yêu cầu tại các chi nhánh được cấp quyền; chỉ admin phân ca và cấu hình cửa hàng. Nhân viên gửi yêu cầu nghỉ hoặc điều chỉnh giờ qua mobile web; không sửa log ảnh/GPS gốc. Báo cáo tách ngày có công, số ca hoàn tất, ngày có nghỉ; chưa tính lương hoặc nghỉ giữa ca. Kiểm tra docs/workforce.md trước khi sử dụng.
