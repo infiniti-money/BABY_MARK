@@ -26,10 +26,16 @@ for(const file of (await readdir(resolve(root,'cloudflare/d1'))).filter(x=>x.end
  for(const statement of statements(sql))await db.prepare(statement).run();
 }
 await seedApp(db);
-const mime={'.html':'text/html; charset=utf-8','.mjs':'text/javascript; charset=utf-8','.css':'text/css; charset=utf-8','.png':'image/png','.json':'application/json'};
+const mime={'.html':'text/html; charset=utf-8','.mjs':'text/javascript; charset=utf-8','.js':'text/javascript; charset=utf-8','.css':'text/css; charset=utf-8','.png':'image/png','.json':'application/json','.webmanifest':'application/manifest+json; charset=utf-8'};
 const assetRoot=resolve(root,'dist');
-let security={};
-try{const content=await readFile(resolve(root,'public/_headers'),'utf8');for(const line of content.split(/\r?\n/)){const m=line.match(/^\s+([^:]+):\s*(.*)$/);if(m)security[m[1].trim()]=m[2];}}catch{}
+// Apply the global and exact-path Cloudflare header rules separately. Otherwise
+// /apple-touch-icon.png's Content-Type overwrites every HTML and JS response.
+const headerRules=new Map();let currentRule=null;
+try{const content=await readFile(resolve(root,'public/_headers'),'utf8');for(const line of content.split(/\r?\n/)){
+ if(line.trim().startsWith('#')||!line.trim())continue;
+ if(!/^\s/.test(line)){currentRule=line.trim();headerRules.set(currentRule,{});continue;}
+ const m=line.match(/^\s+([^:]+):\s*(.*)$/);if(m&&currentRule)headerRules.get(currentRule)[m[1].trim()]=m[2];
+}}catch{}
 const server=createServer(async(req,res)=>{
  try{
   if(req.url==='/__test__/ready'){res.writeHead(200,{'Content-Type':'application/json'});res.end('{"local":true,"ephemeral":true}');return;}
@@ -41,7 +47,7 @@ const server=createServer(async(req,res)=>{
   const pathname=decodeURIComponent(new URL(req.url,'http://localhost').pathname);
   const file=resolve(assetRoot,'.'+(pathname==='/'?'/index.html':pathname));
   if(!file.startsWith(assetRoot+sep)||!await stat(file).then(s=>s.isFile()).catch(()=>false)){res.writeHead(404);res.end('Not found');return;}
-  res.writeHead(200,{'Content-Type':mime[extname(file)]||'application/octet-stream',...security});res.end(await readFile(file));
+  res.writeHead(200,{'Content-Type':mime[extname(file)]||'application/octet-stream',...(headerRules.get('/*')||{}),...(headerRules.get(pathname)||{})});res.end(await readFile(file));
  }catch(e){console.error('Local acceptance request failed:',e.message);res.writeHead(500);res.end('Local test server error');}
 });
 server.listen(port,'127.0.0.1',()=>console.log(`Ephemeral Cloudflare acceptance environment: http://127.0.0.1:${port}`));

@@ -407,3 +407,11 @@ test('mobile employee can reach own password settings without sideways scrolling
  await expect(page.getByRole('dialog',{name:'Đổi mật khẩu của bạn'})).toBeVisible();
  expect(await page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth)).toBeTruthy();
 });
+
+test('PWA header rules preserve HTML, JavaScript, manifest and image MIME types',async({request})=>{
+ for(const [path,mime] of [['/','text/html'],['/app.mjs','text/javascript'],['/sw.js','text/javascript'],['/manifest.webmanifest?v=2','application/manifest+json'],['/apple-touch-icon.png?v=2','image/png']]){
+  const response=await request.get(path);
+  expect(response.ok()).toBeTruthy();
+  expect(response.headers()['content-type']).toContain(mime);
+ }
+});
