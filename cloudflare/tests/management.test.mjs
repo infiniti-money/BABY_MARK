@@ -150,3 +150,27 @@ test('admin can remove unused stores only; history, manager scope and audit are 
   assert.equal(f.sqlite.prepare('SELECT COUNT(*) n FROM branches').get().n,14);
  }finally{f.close();}
 });
+
+test('expanded admin controls preserve historic stores, enforce configurable active capacity and bulk atomicity',async()=>{
+ const f=await fixture();try{
+  const act=(resource,body)=>f.call(admin,'admin',{method:'POST',resource,body});
+  f.addAssignment('past','staff','BM-002','2020-01-01');
+  assert.equal((await act('branches',{id:'BM-002',action:'set-active',active:false})).status,200);
+  assert.equal(f.sqlite.prepare("SELECT COUNT(*) n FROM assignments WHERE branch_id='BM-002'").get().n,1);
+  assert.equal((await act('branches',{code:'BM-015',name:'New branch',latitude:null,longitude:null,allowed_radius:100})).status,201);
+  assert.equal((await act('branches',{id:'BM-002',action:'set-active',active:true})).status,409);
+  assert.equal((await act('settings',{branch_limit:15,photo_eviction:false,attendance_retention:false,late_alerts:true})).status,200);
+  assert.equal((await act('branches',{id:'BM-002',action:'set-active',active:true})).status,200);
+  const day=new Date(Date.now()+3*86400000).toISOString().slice(0,10),next=new Date(Date.now()+4*86400000).toISOString().slice(0,10);
+  const bulk={action:'bulk',user_ids:['staff','other'],branch_id:'BM-002',shift_id:'day',from:day,to:next,weekdays:[1,2,3,4,5,6,7]};
+  const result=await act('assignments',bulk);assert.equal(result.status,201);assert.equal((await result.json()).created,4);
+  assert.equal((await act('assignments',bulk)).status,409);
+  assert.equal(f.sqlite.prepare('SELECT COUNT(*) n FROM assignments').get().n,5);
+  assert.equal((await act('branches',{id:'BM-002',action:'set-active',active:false})).status,409);
+  const id=f.sqlite.prepare("SELECT id FROM assignments WHERE user_id='staff' AND work_date=?").get(day).id;
+  assert.equal((await act('assignments',{id,action:'cancel',reason:'Test cancel'})).status,200);
+  assert.equal((await act('assignments',{id:'past',action:'cancel',reason:'Test past'})).status,409);
+  assert.equal((await act('shifts',{id:'day',action:'delete-unused'})).status,409);
+  assert.equal((await act('shifts',{id:'night',action:'delete-unused'})).status,200);
+ }finally{f.close()}
+});

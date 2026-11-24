@@ -3,6 +3,7 @@ import {distanceMeters,attendanceTiming} from '../../../cloudflare/lib/timemark-
 import {storeStampedPhoto} from '../../../cloudflare/lib/timemark-kv.mjs';
 import {jpegDimensions} from '../../../cloudflare/lib/jpeg.mjs';
 import {HttpError,readLimited,jsonLimited,idPattern,errorResponse} from '../../../cloudflare/lib/http.mjs';
+import {policy} from '../../../cloudflare/lib/policy.mjs';
 const MAX_AGE=90000;
 const fail=(status,message,code)=>{throw new HttpError(status,message,code);};
 const assignmentSQL=`SELECT a.*,b.name AS branch_name,b.latitude,b.longitude,b.allowed_radius,b.address_text,
@@ -67,7 +68,7 @@ async function submit(request,env,user){
   // and branch. This closes a plan edit between the preflight read and claim.
   const frozen=await env.DB.prepare(assignmentSQL).bind(c.assignment_id,user.id).first();
   if(!frozen||await planHash(frozen)!==c.plan_hash)fail(409,'Ca hoặc cửa hàng đã thay đổi; chụp lại','PLAN_CHANGED');
-  await storeStampedPhoto(env.DB,env.TIMEMARKS,key,bytes,c.created_at,{allowEviction:env.PHOTO_EVICTION_ENABLED==='true'});
+  await storeStampedPhoto(env.DB,env.TIMEMARKS,key,bytes,c.created_at,{allowEviction:(await policy(env)).photo_eviction});
   const m=JSON.parse(c.metadata_json),timing=attendanceTiming({...m,serverTimestamp:receivedAt});
   const outside=m.distance>m.radius,status=outside?'OUTSIDE':c.type==='IN'?(timing.minutes?'LATE':'ON_TIME'):(timing.minutes?'EARLY':'ON_TIME');
   const sessionHash=await digest('babymark-session-v1:'+request.headers.get('authorization').slice(7));
