@@ -1,0 +1,29 @@
+{
+  "expo": {
+    "name": "BABY_MARK Staff",
+    "slug": "baby-mark-staff",
+    "version": "0.1.0",
+    "ios": {
+      "bundleIdentifier": "com.infinitimoney.babymark",
+      "supportsTablet": false
+    },
+    "android": {
+      "package": "com.infinitimoney.babymark"
+    },
+    "plugins": [
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "BABY_MARK cần camera để chụp ảnh chấm công.",
+          "recordAudioAndroid": false
+        }
+      ],
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "BABY_MARK cần vị trí khi chấm công."
+        }
+      ]
+    ]
+  }
+}

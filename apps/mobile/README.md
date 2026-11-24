@@ -1,0 +1,6 @@
+# Expo native starter
+App.js là mã nguồn màn hình đăng nhập, chọn ca, kiểm tra quyền, camera trước và GPS. Chưa chạy thử trên thiết bị.
+Tạo project Expo tương thích trong thư mục tạm bằng npx create-expo-app@latest babymark-native --template blank.
+Sao chép App.js và app.json vào project mới. Cài dependencies bằng npx expo install expo-camera expo-location expo-image-manipulator @react-native-async-storage/async-storage react-native-url-polyfill; npm install --save-exact @supabase/supabase-js@2.95.3.
+Sao chép .env.example thành .env, điền publishable key và HTTPS API URL. Chạy npx expo install --fix, npx expo-doctor và npx expo start; commit package.json và lockfile sau khi kiểm thử. Không dùng service role key.
+Mock detection phụ thuộc hệ điều hành và phiên bản SDK. Chưa có device attestation/root/jailbreak checks hay push. Cần EAS dev build và thiết bị thật để kiểm thử.
