@@ -1,0 +1,2 @@
+# Tổng quan điều hành
+Admin lọc ngày, cửa hàng, trạng thái; chỉ số theo ngày/cửa hàng; danh sách ca theo cả ba. Cửa hàng không có lịch vẫn hiển thị. Duyệt 20 yêu cầu cũ nhất từng loại toàn hệ thống, mở thêm danh sách khi cần. Cấp tài khoản, phân ca, chương trình, cài GPS, ảnh và in bảng công ngày mở trực tiếp. Bảng lương và tin nhắn mở đúng phân hệ riêng, không tạo menu trùng. Không thay đổi quyền, không giả lập chấm công. Báo cáo in dùng ngày/cửa hàng/người đã chọn, không lọc trạng thái. Làm mới theo thao tác, không polling nền. Không migration cho dashboard.
