@@ -14,6 +14,11 @@ export async function onRequestGet({request,env,params}){
  try{
  const actor=await sessionUser(request,env.DB);if(!actor)return reply({error:'Chưa đăng nhập'},401);
  if(params.action==='me')return reply({user:actor});
+ if(params.action==='sessions'){
+  const hash=await digest('babymark-session-v1:'+request.headers.get('authorization').slice(7));
+  const row=await env.DB.prepare('SELECT COUNT(*) AS total,MAX(CASE WHEN s.token_hash=? THEN s.expires_at END) AS current_expires_at FROM sessions s JOIN credentials c ON c.user_id=s.user_id AND c.version=s.credential_version WHERE s.user_id=? AND s.expires_at>?').bind(hash,actor.id,Date.now()).first();
+  return reply({total:row.total,other:Math.max(0,row.total-1),current_expires_at:row.current_expires_at});
+ }
  if(params.action==='self-salt'&&actor.role!=='admin'){
   const c=await env.DB.prepare('SELECT salt FROM credentials WHERE user_id=?').bind(actor.id).first();
   return reply({salt:c.salt});
@@ -53,6 +58,11 @@ export async function onRequestPost({request,env,params}){
  return reply({token,expires_at:expires,remember});
  }
  const actor=await sessionUser(request,db);if(!actor)return reply({error:'Chưa đăng nhập'},401);
+ if(action==='revoke-other-sessions'){
+ const hash=await digest('babymark-session-v1:'+request.headers.get('authorization').slice(7));
+ const result=await db.prepare('DELETE FROM sessions WHERE user_id=? AND token_hash<>? AND EXISTS(SELECT 1 FROM sessions current JOIN credentials c ON c.user_id=current.user_id AND c.version=current.credential_version JOIN profiles p ON p.id=current.user_id AND p.active=1 WHERE current.token_hash=? AND current.user_id=? AND current.expires_at>?)').bind(actor.id,hash,hash,actor.id,Date.now()).run();
+ return reply({ok:true,revoked:result.meta.changes});
+ }
  if(action==='logout'){
  const token=request.headers.get('authorization').slice(7);await db.prepare('DELETE FROM sessions WHERE token_hash=?').bind(await digest('babymark-session-v1:'+token)).run();
  if(typeof b.push_endpoint==='string'&&b.push_endpoint.length<=2048){try{await db.prepare('DELETE FROM web_push_subscriptions WHERE endpoint=? AND user_id=?').bind(b.push_endpoint,actor.id).run()}catch(e){if(!/no such table/i.test(String(e?.message)))throw e;}}

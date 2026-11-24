@@ -2,6 +2,7 @@ import {actorFor,apiFailure,ApiError,managementAudit} from '../../../cloudflare/
 import {reply,bodyJSON} from '../../../cloudflare/lib/auth.mjs';
 import {policy} from '../../../cloudflare/lib/policy.mjs';
 import {pushSettings,vapidDiagnosis} from '../../../cloudflare/lib/web-push.mjs';
+import {coverage} from '../../../cloudflare/lib/coverage.mjs';
 
 async function readiness(env){
  const db=env.DB,p=await policy(env),push=await pushSettings(env),now=Date.now();
@@ -21,7 +22,7 @@ async function readiness(env){
    lastPush=await db.prepare('SELECT claimed_at,state FROM web_push_receipts ORDER BY claimed_at DESC LIMIT 1').first();
   }catch(e){if(!/no such table/i.test(String(e?.message)))throw e;pushSchema=false;}
  }
- return {admin_ready:p.available,branches:counts.branches,gps_ready:counts.gps_ready||0,missing_gps:missing,branch_limit:p.branch_limit,employees:people.employees,accounts:people.accounts||0,shifts:shifts.total,scheduled:scheduled.total,late_alerts:p.late_alerts,photo_eviction:p.photo_eviction,attendance_retention:p.attendance_retention,retention_secret_ready:p.retention_secret_configured,photo_bytes:photos.bytes,photo_records:photos.records,last_retention:lastRetention,push_schema_ready:pushSchema,push_enabled:push.enabled,vapid_ready:vapid.ready,vapid_code:vapid.code,push_cron_secret_ready:typeof env.PUSH_CRON_SECRET==='string'&&env.PUSH_CRON_SECRET.length>=32,push_devices:devices,last_push:lastPush,kv_bound:!!env.TIMEMARKS};
+ return {coverage:p.available?await coverage(db,now):null,admin_ready:p.available,branches:counts.branches,gps_ready:counts.gps_ready||0,missing_gps:missing,branch_limit:p.branch_limit,employees:people.employees,accounts:people.accounts||0,shifts:shifts.total,scheduled:scheduled.total,late_alerts:p.late_alerts,photo_eviction:p.photo_eviction,attendance_retention:p.attendance_retention,retention_secret_ready:p.retention_secret_configured,photo_bytes:photos.bytes,photo_records:photos.records,last_retention:lastRetention,push_schema_ready:pushSchema,push_enabled:push.enabled,vapid_ready:vapid.ready,vapid_code:vapid.code,push_cron_secret_ready:typeof env.PUSH_CRON_SECRET==='string'&&env.PUSH_CRON_SECRET.length>=32,push_devices:devices,last_push:lastPush,kv_bound:!!env.TIMEMARKS};
 }
 
 export async function onRequestGet({request,env}){
