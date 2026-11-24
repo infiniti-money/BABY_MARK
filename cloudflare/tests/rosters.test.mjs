@@ -10,10 +10,15 @@ test('fixed roster creates two shifts with explicit 30-minute overlap and never 
  assert.equal((await (await call({action:'presets'})).json()).created,3);
  assert.equal((await (await call({action:'presets'})).json()).created,0);
  const data={action:'save',branch_id:'BM-001',morning_user_id:f.ids.staff,evening_user_id:f.ids.other,morning_shift_id:'BM-MORNING',evening_shift_id:'BM-EVENING',handover:'split'};
+ assert.equal((await call(data)).status,400);
+ await f.db.prepare("UPDATE profiles SET department='Bán hàng' WHERE id IN (?,?)").bind(f.ids.staff,f.ids.other).run();
  assert.equal((await call(data)).status,200);
  assert.equal((await call({...data,branch_id:'BM-002'})).status,409);
  const from=dayVN(Date.now()+2*86400000);
  const batch={action:'generate',branch_id:'BM-001',from,to:from,weekdays:[1,2,3,4,5,6,7]};
+ await f.db.prepare("UPDATE profiles SET department='Kho' WHERE id=?").bind(f.ids.other).run();
+ assert.equal((await call(batch)).status,400);
+ await f.db.prepare("UPDATE profiles SET department='Bán hàng' WHERE id=?").bind(f.ids.other).run();
  const res=await call(batch);assert.equal(res.status,201);assert.equal((await res.json()).created,2);
  const rows=(await f.db.prepare('SELECT * FROM assignments WHERE branch_id=? AND work_date=? ORDER BY starts_at').bind('BM-001',from).all()).results;
  assert.equal(rows.length,2);assert.equal(rows[0].ends_at-rows[1].starts_at,1800000);

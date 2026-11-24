@@ -1,5 +1,6 @@
 import {actorFor,apiFailure,ApiError,identifier,invalid,validDay,dayVN,shiftInterval,managementAudit} from '../../../cloudflare/lib/access.mjs';
 import {reply,bodyJSON} from '../../../cloudflare/lib/auth.mjs';
+import {isRetailStaff} from '../../../public/retail-staff.mjs';
 const presets=[['BM-MORNING','Ca sáng cửa hàng','07:00','15:00',5],['BM-EVENING','Ca tối cửa hàng','15:00','21:30',5],['BM-OFFICE','Ca hành chính','08:00','17:00',5]];
 const missing=e=>/no such table: (?:main\.)?branch_rosters/i.test(String(e?.message));
 async function read(db){try{return {available:true,rosters:(await db.prepare('SELECT * FROM branch_rosters ORDER BY branch_id').all()).results}}catch(e){if(missing(e))return {available:false,rosters:[]};throw e}}
@@ -25,9 +26,9 @@ export async function onRequestPost({request,env}){
   if(b.action==='save'){
    const m=identifier(b.morning_user_id),e=identifier(b.evening_user_id),ms=identifier(b.morning_shift_id),es=identifier(b.evening_shift_id);
    if(m===e||ms===es||!['morning_stays','evening_arrives','split'].includes(b.handover))invalid('Chọn hai nhân viên khác nhau, hai mẫu ca và cách giao ca');
-   const p=await db.prepare("SELECT COUNT(*) AS n FROM profiles WHERE id IN (?,?) AND active=1 AND role<>'admin'").bind(m,e).first();
+   const people=(await db.prepare('SELECT id,role,active,department FROM profiles WHERE id IN (?,?)').bind(m,e).all()).results;
    const q=await db.prepare('SELECT COUNT(*) AS n FROM shifts WHERE id IN (?,?)').bind(ms,es).first();
-   if(p.n!==2||q.n!==2)invalid('Nhân viên hoặc mẫu ca không hợp lệ');
+   if(people.length!==2||!people.every(isRetailStaff)||q.n!==2)invalid('Chọn hai nhân viên đang hoạt động thuộc bộ phận Bán hàng và hai mẫu ca hợp lệ');
    await db.batch([db.prepare('INSERT INTO branch_rosters(branch_id,morning_user_id,evening_user_id,morning_shift_id,evening_shift_id,handover,updated_at) VALUES(?,?,?,?,?,?,?) ON CONFLICT(branch_id) DO UPDATE SET morning_user_id=excluded.morning_user_id,evening_user_id=excluded.evening_user_id,morning_shift_id=excluded.morning_shift_id,evening_shift_id=excluded.evening_shift_id,handover=excluded.handover,updated_at=excluded.updated_at').bind(branch,m,e,ms,es,b.handover,Date.now()),managementAudit(db,actor,'rosters',branch,'SAVE',{morning_user_id:m,evening_user_id:e,morning_shift_id:ms,evening_shift_id:es,handover:b.handover})]);
    return reply({ok:true});
   }
@@ -37,8 +38,8 @@ export async function onRequestPost({request,env}){
   const roster=await db.prepare('SELECT * FROM branch_rosters WHERE branch_id=?').bind(branch).first();
   if(!roster)invalid('Chưa cấu hình hai nhân viên cố định');
   const m=await db.prepare('SELECT * FROM shifts WHERE id=?').bind(roster.morning_shift_id).first(),e=await db.prepare('SELECT * FROM shifts WHERE id=?').bind(roster.evening_shift_id).first();
-  const p=await db.prepare("SELECT COUNT(*) AS n FROM profiles WHERE id IN (?,?) AND active=1 AND role<>'admin'").bind(roster.morning_user_id,roster.evening_user_id).first();
-  if(!m||!e||p.n!==2)invalid('Cần hai nhân viên đang hoạt động và hai mẫu ca');
+  const people=(await db.prepare('SELECT id,role,active,department FROM profiles WHERE id IN (?,?)').bind(roster.morning_user_id,roster.evening_user_id).all()).results;
+  if(!m||!e||people.length!==2||!people.every(isRetailStaff))invalid('Cần hai nhân viên Bán hàng đang hoạt động và hai mẫu ca. Kiểm tra lại bộ phận hoặc cấu hình ca cố định.');
   const rows=[];
   for(let t=Date.parse(b.from);t<=Date.parse(b.to);t+=86400000){
    const d=new Date(t);if(!b.weekdays.includes(d.getUTCDay()||7))continue;
