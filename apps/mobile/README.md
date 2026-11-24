@@ -7,3 +7,6 @@ Mock detection phụ thuộc hệ điều hành và phiên bản SDK. Chưa có 
 
 ## Push notifications
 Cài thêm npx expo install expo-notifications expo-constants expo-dev-client. Sao chép notifications.js cùng App.js. Chạy eas init, cấu hình FCM v1 và APNs qua EAS credentials, tạo development build, thử trên thiết bị thật. Bật thông báo trong màn hình sau đăng nhập. Xem docs/notifications.md.
+
+## Nhận diện BABY MARK
+Sao chép thư mục assets khi tạo project Expo. Logo 288px dùng cho giao diện và cấu hình icon/splash thử nghiệm. Trước phát hành App Store/Play Store, chuẩn bị icon PNG vuông 1024px từ logo gốc có độ phân giải cao; kiểm tra vùng an toàn Android adaptive icon. Không sử dụng ảnh banner quảng cáo làm nền bảng công.

@@ -1,8 +1,8 @@
 {
   "expo": {
-    "name": "BABY_MARK Staff",
+    "name": "BABY MARK Staff",
     "slug": "baby-mark-staff",
-    "version": "0.2.0",
+    "version": "0.3.0",
     "ios": {
       "bundleIdentifier": "com.infinitimoney.babymark",
       "supportsTablet": false
@@ -25,6 +25,13 @@
         }
       ],
       "expo-notifications"
-    ]
+    ],
+    "icon": "./assets/logo.png",
+    "userInterfaceStyle": "light",
+    "splash": {
+      "image": "./assets/logo.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#fff1f4"
+    }
   }
 }
