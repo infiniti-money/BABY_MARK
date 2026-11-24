@@ -15,7 +15,7 @@ export async function onRequestPost({request,env}){
  for(const cfg of configs.filter(c=>c.branch_id===branch)){
   const weekdays=[1,2,3,4,5,6,7].filter(d=>cfg.weekday_mask&(1<<(d-1)));
   let status;
-  try{const r=await generateRoster(db,{id:cfg.updated_by,role:'admin'},cfg.branch_id,{action:'auto-generate',from,to,weekdays});created+=r.created;skipped+=r.existing;status='OK '+r.created+' mới / '+r.existing+' đã có hoặc bỏ qua';}
+  try{const r=await generateRoster(db,{id:cfg.updated_by,role:'admin'},cfg.branch_id,{action:'auto-generate',from,to,weekdays,config_updated_at:cfg.updated_at});created+=r.created;skipped+=r.existing;status='OK '+r.created+' mới / '+r.existing+' đã có hoặc bỏ qua';}
   catch{failed++;status='Cần kiểm tra: ca xung đột hoặc cấu hình không hợp lệ';}
   await db.prepare('UPDATE roster_automation SET last_run_at=?,last_status=? WHERE branch_id=? AND updated_at=?').bind(Date.now(),status,cfg.branch_id,cfg.updated_at).run();
   results.push({branch_id:cfg.branch_id,status});
