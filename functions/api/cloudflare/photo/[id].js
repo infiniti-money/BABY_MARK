@@ -1,15 +1,12 @@
-// Read-only pilot. Auth remains Supabase Auth during migration; business scope comes from D1.
+import {sessionUser} from '../../../../cloudflare/lib/auth.mjs';
+// Private KV photo read, authorized via D1 internal account.
 export async function onRequestGet({request,env,params}){
  const headers={'Cache-Control':'private, no-store','X-Content-Type-Options':'nosniff'};
  const fail=(status,error)=>Response.json({error},{status,headers});
- if(!env.DB||!env.TIMEMARKS||!env.SUPABASE_AUTH_URL||!env.SUPABASE_PUBLISHABLE_KEY)return fail(503,'Not configured');
- const token=request.headers.get('authorization')?.match(/^Bearer (.+)$/)?.[1];
- if(!token)return fail(401,'Unauthorized');
+ if(!env.DB||!env.TIMEMARKS)return fail(503,'Not configured');
  try{
- const auth=await fetch(env.SUPABASE_AUTH_URL.replace(/\/$/,'')+'/auth/v1/user',{headers:{Authorization:'Bearer '+token,apikey:env.SUPABASE_PUBLISHABLE_KEY}});
- if(!auth.ok)return fail(401,'Unauthorized');
- const user=await auth.json();
- if(typeof user.id!=='string')return fail(401,'Unauthorized');
+ const user=await sessionUser(request,env.DB);
+ if(!user)return fail(401,'Unauthorized');
  const record=await env.DB.prepare(
  "SELECT t.photo_path,t.server_timestamp FROM attendances t JOIN assignments a ON a.id=t.assignment_id JOIN profiles p ON p.id=? AND p.active=1 WHERE t.id=? AND (t.user_id=p.id OR p.role='admin' OR (p.role='manager' AND EXISTS(SELECT 1 FROM branch_managers bm WHERE bm.user_id=p.id AND bm.branch_id=a.branch_id)))"
  ).bind(user.id,String(params.id)).first();

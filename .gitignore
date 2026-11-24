@@ -7,3 +7,5 @@ dist/
 .env.*.local
 *.jks
 *.p8
+
+bootstrap-admin.local.sql
