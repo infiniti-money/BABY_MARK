@@ -135,11 +135,12 @@ async function loadAdmin() {
 }
 async function renderAdmin(id) {
   await loadAdmin(); if(id!==state.renderId)return;
-  const tabs=[['employees','people','Nhân viên'],['branches','store','Cửa hàng'],['shifts','clock','Ca làm'],['assignments','calendar','Phân ca'],['settings','shield','Cài đặt'],['operations','shield','Vận hành']];
+  const tabs=[['employees','people','Nhân viên'],['branches','store','Cửa hàng'],['shifts','clock','Ca làm'],['assignments','calendar','Phân ca'],['rosters','calendar','Ca cố định'],['settings','shield','Cài đặt'],['operations','shield','Vận hành']];
   if(state.adminTab==='operations'){state.admin.operations=await api('/api/admin/operations');if(id!==state.renderId)return;}
+  if(state.adminTab==='rosters'){state.admin.rosterData=await api('/api/admin/rosters');if(id!==state.renderId)return;}
   const rows=state.admin[state.adminTab]||[];
   const tabName=tabs.find(t=>t[0]===state.adminTab)[2];
-  $('#content').innerHTML=`<div class="stats">${stat('Nhân viên',state.admin.employees.filter(p=>p.active&&p.role!=='admin').length,'Tài khoản đang hoạt động','people')}${stat('Cửa hàng',state.admin.branches.filter(b=>b.active!==0).length,'Đang hoạt động','store')}${stat('Ca làm',state.admin.shifts.length,'Mẫu giờ làm việc','clock')}${stat('Lịch phân công',state.admin.assignments.length,'Trong khoảng ngày đang chọn','calendar')}</div><div class="tabs" role="tablist" aria-label="Danh mục quản trị">${tabs.map(([key,ic,name])=>`<button role="tab" aria-selected="${state.adminTab===key}" data-admin-tab="${key}" class="${state.adminTab===key?'active':''}">${name}</button>`).join('')}</div><section class="card"><div class="card-head"><div><h2>${tabName}</h2><p class="muted">Quản lý tập trung · Chỉ quản trị viên được chỉnh sửa</p></div>${['settings','operations'].includes(state.adminTab)?'':`<button class="btn" data-action="admin-add" ${state.adminTab==='branches'&&state.admin.branches.filter(b=>b.active!==0).length>=state.admin.settings.branch_limit?'disabled title="Đã đạt giới hạn cửa hàng"':''}>${icon('plus')} ${state.adminTab==='employees'?'Cấp tài khoản':'Thêm mới'}</button>`}</div>${state.adminTab==='assignments'?filterBar()+'<div class="card-body"><button class="btn secondary" data-action="bulk-assign">Phân ca hàng loạt</button></div>':''}${state.adminTab==='settings'?settingsForm():state.adminTab==='operations'?operationsPanel():adminTable(rows)}</section>`;
+  $('#content').innerHTML=`<div class="stats">${stat('Nhân viên',state.admin.employees.filter(p=>p.active&&p.role!=='admin').length,'Tài khoản đang hoạt động','people')}${stat('Cửa hàng',state.admin.branches.filter(b=>b.active!==0).length,'Đang hoạt động','store')}${stat('Ca làm',state.admin.shifts.length,'Mẫu giờ làm việc','clock')}${stat('Lịch phân công',state.admin.assignments.length,'Trong khoảng ngày đang chọn','calendar')}</div><div class="tabs" role="tablist" aria-label="Danh mục quản trị">${tabs.map(([key,ic,name])=>`<button role="tab" aria-selected="${state.adminTab===key}" data-admin-tab="${key}" class="${state.adminTab===key?'active':''}">${name}</button>`).join('')}</div><section class="card"><div class="card-head"><div><h2>${tabName}</h2><p class="muted">Quản lý tập trung · Chỉ quản trị viên được chỉnh sửa</p></div>${['settings','operations','rosters'].includes(state.adminTab)?'':`<button class="btn" data-action="admin-add" ${state.adminTab==='branches'&&state.admin.branches.filter(b=>b.active!==0).length>=state.admin.settings.branch_limit?'disabled title="Đã đạt giới hạn cửa hàng"':''}>${icon('plus')} ${state.adminTab==='employees'?'Cấp tài khoản':'Thêm mới'}</button>`}</div>${state.adminTab==='assignments'?filterBar()+'<div class="card-body"><button class="btn secondary" data-action="bulk-assign">Phân ca hàng loạt</button></div>':''}${state.adminTab==='settings'?settingsForm():state.adminTab==='operations'?operationsPanel():state.adminTab==='rosters'?rosterPanel():adminTable(rows)}</section>`;
 }
 const vapidHints={JWK_MISSING:'Pages chưa nhận PUSH_VAPID_JWK. Kiểm tra môi trường Production và triển khai lại.',JWK_JSON:'PUSH_VAPID_JWK không phải JSON hợp lệ. Dán nguyên JSON khóa riêng, không kèm dấu nháy ngoài hoặc tên biến.',JWK_CURVE:'Khóa cần EC / P-256.',JWK_PRIVATE_MISSING:'Đã nhập khóa công khai thay vì JWK khóa riêng (thiếu d).',JWK_FIELDS:'Các trường x, y, d không đúng định dạng khóa P-256.',SUBJECT_MISSING:'Pages chưa nhận PUSH_VAPID_SUBJECT.',SUBJECT_INVALID:'PUSH_VAPID_SUBJECT cần email liên hệ hợp lệ hoặc URL HTTPS.',KEY_PAIR_MISMATCH:'Khóa công khai và khóa riêng không khớp.',KEY_CRYPTO_INVALID:'Không thể xác thực cặp khóa P-256 trong Web Crypto. Kiểm tra JWK gốc.',OK:'Cặp khóa VAPID ký và xác minh thành công.'};
 const vapidHint=code=>vapidHints[code]||'Kiểm tra Secret VAPID của môi trường Production.';
@@ -152,6 +153,12 @@ function operationsPanel(){
  <p class="hint">Push gần nhất: ${o.last_push?esc(dt(o.last_push.claimed_at)+' · '+o.last_push.state):'Chưa có bản ghi gửi theo lịch'}. Dọn bảng công gần nhất: ${o.last_retention?esc(dt(o.last_retention.started_at)+' · '+o.last_retention.assignments_removed+' ca'):'Chưa có bản ghi'}.</p>
  <p class="hint">Kích hoạt an toàn bật cảnh báo đi muộn và bật Push, nhắc ca nếu đã đủ cấu hình. Không tự bật xóa ảnh hoặc bảng công.</p>
  <button class="btn" data-action="enable-safe-features" ${o.admin_ready?'':'disabled'}>Kích hoạt tính năng an toàn</button><button class="btn secondary" data-view="push">Cài đặt Push điện thoại</button><button class="btn secondary" data-admin-tab="settings">Chính sách lưu trữ</button><button class="btn quiet" data-action="refresh">Kiểm tra lại trạng thái</button></div>`;
+}
+function rosterPanel(){
+ const data=state.admin.rosterData;
+ const person=id=>state.admin.employees.find(e=>e.id===id)?.full_name||'Chưa chọn';
+ const shift=id=>state.admin.shifts.find(s=>s.id===id)?.name||'Chưa chọn';
+ return `<div class="card-body form-stack"><h3>Hai nhân viên cố định mỗi cửa hàng</h3><p class="hint">Mẫu gốc: sáng 07:00–15:00, tối 15:00–21:30. Chọn cách giao ca 30 phút trước khi tạo lịch. Ca hành chính tham khảo 08:00–17:00, sửa trong Ca làm; kho, lái xe, kế toán và bộ phận khác dùng phân ca hàng loạt.</p><button class="btn secondary" data-action="roster-presets">Bổ sung 3 mẫu ca chuẩn</button>${!data.available?'<p class="hint">Cần chạy migration 0011 để lưu nhân viên cố định.</p>':state.admin.branches.filter(b=>b.active!==0).map(b=>{const r=data.rosters.find(r=>r.branch_id===b.id);return `<article class="assignment-card"><h3>${esc(b.name)}</h3><p>${r?esc(person(r.morning_user_id)+' · '+shift(r.morning_shift_id)+' / '+person(r.evening_user_id)+' · '+shift(r.evening_shift_id)):'Chưa phân hai nhân viên cố định'}</p><div class="modal-actions"><button class="btn secondary small" data-action="roster-edit" data-id="${esc(b.id)}">Thiết lập</button>${r?`<button class="btn small" data-action="roster-generate" data-id="${esc(b.id)}">Tạo lịch tuần/tháng</button><button class="btn quiet small" data-action="roster-remove" data-id="${esc(b.id)}">Bỏ cấu hình</button>`:''}</div></article>`}).join('')}</div>`;
 }
 function settingsForm(){
  const p=state.admin.settings;
@@ -344,6 +351,17 @@ document.addEventListener('click',async event=>{
     if(action==='capture')return await capture(button.dataset.type,button);
     if(action==='photo')return await showPhoto(button.dataset.id);
     if(action==='export')return await exportReports();
+    if(action==='roster-presets'){button.disabled=true;const r=await api('/api/admin/rosters',{method:'POST',body:{action:'presets'}});await navigate('admin');notify('Đã bổ sung '+r.created+' mẫu ca còn thiếu.');return;}
+    if(action==='roster-edit'||action==='roster-generate'||action==='roster-remove'){
+      const branch=state.admin.branches.find(b=>b.id===button.dataset.id);if(!branch)return;
+      const r=state.admin.rosterData.rosters.find(r=>r.branch_id===branch.id)||{};
+      const employees=state.admin.employees.filter(e=>e.active&&e.role!=='admin'),shifts=state.admin.shifts;
+      const select=(name,label,rows,value,display='name')=>`<label>${label}<select name="${name}" required><option value="">Chọn</option>${rowOptions(rows,value,display)}</select></label>`;
+      const mode=[['morning_stays','Ca sáng ở lại 30 phút (đến 15:30)'],['evening_arrives','Ca tối đến sớm 30 phút (từ 14:30)'],['split','Mỗi ca 15 phút (14:45–15:15)']];
+      const kind=action==='roster-edit'?'save':action==='roster-remove'?'remove':'generate';
+      const fields=kind==='save'?select('morning_user_id','Nhân viên ca sáng',employees,r.morning_user_id,'full_name')+select('morning_shift_id','Mẫu ca sáng',shifts,r.morning_shift_id)+select('evening_user_id','Nhân viên ca tối',employees,r.evening_user_id,'full_name')+select('evening_shift_id','Mẫu ca tối',shifts,r.evening_shift_id)+`<label>Giao ca 30 phút<select name="handover" required><option value="">Chọn cách giao ca</option>${mode.map(([v,l])=>`<option value="${v}" ${r.handover===v?'selected':''}>${l}</option>`).join('')}</select></label><p class="hint">Mốc ví dụ tính theo giờ giao ca 15:00. Khoảng giao ca được tính vào giờ ca phân công, không phải dung sai đi muộn.</p>`:kind==='generate'?`<label>Từ ngày<input name="from" type="date" min="${today()}" value="${today()}" required></label><label>Đến ngày<input name="to" type="date" min="${today()}" required></label><div class="checklist">${['Thứ 2','Thứ 3','Thứ 4','Thứ 5','Thứ 6','Thứ 7','Chủ nhật'].map((d,i)=>`<label><input type="checkbox" name="weekdays" value="${i+1}" ${i<5?'checked':''}>${d}</label>`).join('')}</div><p class="hint">Tối đa 31 ngày; chọn ngày nghỉ thực tế. Cả hai nhân viên được phân cùng các ngày đã chọn; nếu có ca trùng, toàn bộ đợt không được lưu.</p>`:'<p>Bỏ cấu hình cố định nhưng không xóa lịch phân công và dữ liệu chấm công đã tạo.</p>';
+      showModal(esc(branch.name),`<form data-form="roster" data-id="${esc(branch.id)}" data-kind="${kind}" class="form-stack">${fields}<p class="error-text" data-form-error hidden></p><button type="submit" class="btn">Xác nhận</button></form>`);return;
+    }
     if(action==='admin-add')return adminForm();
     if(action==='admin-edit')return adminForm(state.admin[state.adminTab].find(r=>r.id===button.dataset.id));
     if(['branch-paste-gps','branch-current-gps','branch-check-map'].includes(action)){
@@ -448,6 +466,11 @@ document.addEventListener('submit',async event=>{
       if(resource==='shifts')payload.grace_period=Number(values.grace_period);
       const result=await api(resource==='employees'&&!id?'/api/auth/create':`/api/admin/${resource}`,{method:'POST',body:payload});
       closeModal();await navigate('admin');if(result.secret)credentialModal(result);else notify(result.password_configured?'Đã tạo tài khoản với mật khẩu.':'Đã lưu thông tin.');return;
+    }
+    if(form.dataset.form==='roster'){
+      const body={...values,action:form.dataset.kind,branch_id:form.dataset.id};
+      if(body.action==='generate')body.weekdays=new FormData(form).getAll('weekdays').map(Number);
+      const result=await api('/api/admin/rosters',{method:'POST',body});closeModal();await navigate('admin');notify(body.action==='generate'?'Đã tạo '+result.created+' ca.':'Đã lưu cấu hình.');return;
     }
     if(form.dataset.form==='system-settings'){
       const old=state.admin.settings;
