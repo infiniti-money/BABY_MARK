@@ -1,0 +1,6 @@
+name = "babymark-push-scheduler"
+main = "worker.mjs"
+compatibility_date = "2026-11-24"
+workers_dev = false
+[triggers]
+crons = ["*/2 * * * *"]

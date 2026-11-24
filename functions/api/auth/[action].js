@@ -53,7 +53,9 @@ export async function onRequestPost({request,env,params}){
  }
  const actor=await sessionUser(request,db);if(!actor)return reply({error:'Chưa đăng nhập'},401);
  if(action==='logout'){
- const token=request.headers.get('authorization').slice(7);await db.prepare('DELETE FROM sessions WHERE token_hash=?').bind(await digest('babymark-session-v1:'+token)).run();return reply({ok:true});
+ const token=request.headers.get('authorization').slice(7);await db.prepare('DELETE FROM sessions WHERE token_hash=?').bind(await digest('babymark-session-v1:'+token)).run();
+ if(typeof b.push_endpoint==='string'&&b.push_endpoint.length<=2048){try{await db.prepare('DELETE FROM web_push_subscriptions WHERE endpoint=? AND user_id=?').bind(b.push_endpoint,actor.id).run()}catch(e){if(!/no such table/i.test(String(e?.message)))throw e;}}
+ return reply({ok:true});
  }
  if(action==='change-password'){
   if(actor.role==='admin')return reply({error:'Chức năng này dành cho nhân viên và quản lý'},403);

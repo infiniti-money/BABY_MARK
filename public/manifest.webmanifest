@@ -1,0 +1,18 @@
+{
+  "id": "/",
+  "name": "BABY MARK – Chấm công",
+  "short_name": "BABY MARK",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#fff7f9",
+  "theme_color": "#a6193c",
+  "icons": [
+    {
+      "src": "/brand/logo.png",
+      "sizes": "288x288",
+      "type": "image/png",
+      "purpose": "any"
+    }
+  ]
+}

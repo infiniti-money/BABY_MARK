@@ -1,5 +1,7 @@
 import {cameraFrame,composeTimemark,currentPosition} from './capture.mjs';
 import {isLegacyCode,derivePasswordKey,newPasswordCredential} from './password.mjs';
+import {pushRegistration,publicKeyBytes,disableDevicePush} from './push.mjs';
+let pushReg=null,pushConfig=null;
 
 const $ = s => document.querySelector(s);
 const app = $('#app'), modal = $('#modal');
@@ -79,8 +81,8 @@ function showModal(title,body) {
 function renderLogin(error='') {
   app.innerHTML=`<div class="login"><aside class="login-story"><div><div class="login-brand"><img src="/brand/logo.png" alt="BABY MARK"><div><strong>BABY MARK</strong><p class="muted">MOM & BABY</p></div></div><h1>Mỗi ngày làm việc.<br>Một dấu ấn tận tâm.</h1><p class="intro">Không gian chấm công và quản lý ca làm dành riêng cho đội ngũ BABY MARK.</p><div class="login-values"><div><strong>14</strong><span>Cửa hàng kết nối</span></div><div><strong>01</strong><span>Đội ngũ đồng hành</span></div></div></div><div class="login-foot">BABY MARK · Cổng nội bộ dành cho nhân viên được cấp tài khoản</div></aside><main id="main" class="login-panel"><section class="login-box"><p class="eyebrow">CHÀO MỪNG TRỞ LẠI</p><h2>Đăng nhập hệ thống</h2><p class="muted">Sử dụng tài khoản và mật khẩu hoặc mã truy cập do quản trị viên cấp.</p><form data-form="login" class="form-stack"><label>Tên đăng nhập<input name="username" autocomplete="username" required minlength="3" maxlength="64" placeholder="Ví dụ: bm001" autocapitalize="none" spellcheck="false"></label><label>Mật khẩu hoặc mã truy cập<input name="secret" type="password" autocomplete="current-password" required maxlength="128" placeholder="Mật khẩu hoặc mã 48 ký tự"></label><p id="login-error" class="error-text" role="alert" ${error?'':'hidden'}>${esc(error)}</p><button class="btn wide" type="submit" data-testid="login-submit">Đăng nhập ${icon('arrow')}</button></form><div class="login-note">${icon('shield')}<span>Tài khoản được cấp nội bộ. Nếu quên mật khẩu hoặc chưa có tài khoản, hãy liên hệ quản trị viên cửa hàng.</span></div><p class="hint">Camera và GPS cần HTTPS hoặc localhost. Trang chỉ xin quyền khi bạn bắt đầu chấm công.</p></section></main></div>`;
 }
-const navItems = () => [['today','camera','Chấm công'],['history','clock','Lịch sử'],['schedule','calendar','Lịch làm việc'],['requests','file','Yêu cầu công'],...(state.user.role==='admin'?[['admin','people','Quản trị']]:[]),...(['admin','manager'].includes(state.user.role)?[['reports','chart','Báo cáo'],['alerts','clock','Thông báo']]:[])];
-const titles = {today:'Chấm công hôm nay',history:'Lịch sử chấm công',schedule:'Lịch làm việc',requests:'Yêu cầu công',admin:'Quản trị hệ thống',reports:'Báo cáo chấm công',alerts:'Thông báo đi muộn'};
+const navItems = () => [['today','camera','Chấm công'],['history','clock','Lịch sử'],['schedule','calendar','Lịch làm việc'],['requests','file','Yêu cầu công'],['push','clock','Push điện thoại'],...(state.user.role==='admin'?[['admin','people','Quản trị']]:[]),...(['admin','manager'].includes(state.user.role)?[['reports','chart','Báo cáo'],['alerts','clock','Thông báo']]:[])];
+const titles = {today:'Chấm công hôm nay',history:'Lịch sử chấm công',schedule:'Lịch làm việc',requests:'Yêu cầu công',admin:'Quản trị hệ thống',reports:'Báo cáo chấm công',alerts:'Thông báo đi muộn',push:'Push điện thoại'};
 function shell() {
   const name=state.user.full_name;
   app.innerHTML=`<div class="shell"><aside class="sidebar"><div class="brand"><img src="/brand/logo.png" alt="BABY MARK"><div><strong>BABY MARK</strong><span>KHÔNG GIAN LÀM VIỆC</span></div></div><div class="nav-label">ĐỘI NGŨ BABY MARK</div><nav class="nav" aria-label="Điều hướng chính">${navItems().map(([id,ic,label])=>`<button data-view="${id}" class="${state.view===id?'active':''}" ${state.view===id?'aria-current="page"':''}>${icon(ic)}<span>${label}</span></button>`).join('')}</nav><div class="sidebar-bottom"><div class="privacy-note">${icon('shield')}<strong>Riêng tư theo phân quyền</strong>Ảnh chỉ dành cho bạn và người quản lý được cấp quyền.</div>${state.user.role!=='admin'?'<button class="logout" data-action="self-password">Đổi mật khẩu</button>':''}<button class="logout" data-action="logout">Đăng xuất tài khoản</button></div></aside><div class="workspace"><header class="topbar"><div class="topbar-path">Không gian làm việc / <span>${titles[state.view]}</span></div><div class="profile"><div class="avatar">${esc(name.split(/\s+/).map(s=>s[0]).slice(-2).join('').toUpperCase())}</div><div><strong>${esc(name)}</strong><small>${esc(state.user.employee_code)} · ${roles[state.user.role]}</small></div><button class="btn quiet small mobile-logout" data-action="logout" aria-label="Đăng xuất">${icon('logout')}</button></div></header><main id="main" class="main"><div class="page-head"><div><p class="eyebrow">${state.view==='today'?'MỘT NGÀY LÀM VIỆC TỐT LÀNH':'BABY MARK · ĐỘI NGŨ'}</p><h1>${titles[state.view]}</h1><p class="muted">${state.view==='today'?'Ghi nhận ca làm của bạn bằng ảnh trực tiếp và vị trí hiện tại.':'Dữ liệu được hiển thị theo phạm vi tài khoản của bạn.'}</p></div><div class="date-chip">${icon('calendar')} ${new Intl.DateTimeFormat('vi-VN',{timeZone:tz,weekday:'long',day:'2-digit',month:'2-digit',year:'numeric'}).format(Date.now())}</div></div><div id="content">${loading()}</div><p class="footer-note">BABY MARK · Múi giờ Việt Nam (UTC+7) · Ảnh tối đa 200 KB, lưu tối đa 60 ngày theo ngân sách ảnh 900 MB · Bảng công lưu 2 năm.</p></main></div></div>`;
@@ -115,6 +117,15 @@ async function renderHistory(id) {
 }
 function attendanceTable(rows) {
   return rows.length?`<div class="table-wrap"><table><thead><tr><th>Nhân viên / Cửa hàng</th><th>Thời gian máy chủ</th><th>Loại</th><th>Trạng thái</th><th>Vị trí</th><th>Ảnh</th></tr></thead><tbody>${rows.map(r=>`<tr><td><strong>${esc(r.full_name||state.user.full_name)}</strong><small>${esc(r.branch_name||r.assignment_id)}</small></td><td>${dt(r.server_timestamp)}</td><td>${r.type==='IN'?'Vào ca':'Tan ca'}</td><td>${badge(r.status)}${r.late_minutes?`<small>Muộn ${r.late_minutes} phút</small>`:''}${r.early_minutes?`<small>Sớm ${r.early_minutes} phút</small>`:''}</td><td>${Math.round(r.distance_m)} m<small>Sai số ±${Math.round(r.accuracy_m)} m</small></td><td><button class="btn secondary small" data-action="photo" data-id="${esc(r.id)}">Xem ảnh</button></td></tr>`).join('')}</tbody></table></div><p class="table-footer">Thời gian hiển thị theo Việt Nam · Ảnh có thể hết hạn trước bản ghi công.</p>`:empty();
+}
+async function renderPush(id){
+ const data=await api('/api/push/config');if(id!==state.renderId)return;pushConfig=data;pushReg=null;
+ const settings=data.settings,ready=settings.available&&settings.configured&&settings.enabled;
+ if(ready){try{pushReg=await pushRegistration()}catch{}}
+ if(id!==state.renderId)return;
+ let subscribed=false;if(pushReg){const sub=await pushReg.pushManager.getSubscription();if(sub){try{subscribed=(await api('/api/push/status',{method:'POST',body:{endpoint:sub.endpoint}})).subscribed}catch{}}}
+ if(id!==state.renderId)return;
+ $('#content').innerHTML=`<section class="card"><div class="card-head"><h2>Thông báo khi đóng ứng dụng</h2></div><div class="card-body form-stack"><p>iPhone/iPad: thêm BABY MARK vào màn hình chính, mở từ biểu tượng rồi bật Push. Android: dùng trình duyệt hỗ trợ hoặc cài ứng dụng web.</p><p class="hint">${!settings.available?'Cần migration 0010.':!settings.configured?'Chưa cấu hình VAPID.':!settings.enabled?'Admin chưa bật Push.':!pushReg?'Thiết bị chưa hỗ trợ Push hoặc chưa cài PWA.':subscribed?'Thiết bị này đã đăng ký nhận Push.':'Thiết bị sẵn sàng đăng ký.'}</p>${pushReg?`<button class="btn" data-action="push-enable">${subscribed?'Đăng ký lại':'Bật Push trên thiết bị'}</button><button class="btn secondary" data-action="push-test" ${subscribed?'':'disabled'}>Gửi thông báo thử</button><button class="btn secondary" data-action="push-disable">Tắt Push trên thiết bị</button>`:''}<p class="hint">Thông báo trên màn hình khóa không chứa tên, GPS hay dữ liệu nhân viên.</p></div></section>${data.admin&&settings.available?`<section class="card section-gap"><div class="card-head"><h2>Cài đặt Push toàn hệ thống</h2></div><form class="card-body form-stack" data-form="push-settings"><label><input type="checkbox" name="enabled" ${settings.enabled?'checked':''} ${settings.configured?'':'disabled'}> Bật Push</label><label><input type="checkbox" name="reminders" ${settings.reminders?'checked':''}> Nhắc trước ca 10 phút</label><label><input type="checkbox" name="late_alerts" ${settings.late_alerts?'checked':''}> Cảnh báo quản lý đi muộn (cần bật thông báo đi muộn trong Cài đặt)</label><p class="hint">Cần Worker Cron riêng đã cấu hình để gửi tự động; giờ gửi không được bảo đảm tuyệt đối.</p><p class="error-text" data-form-error hidden></p><button class="btn" type="submit">Lưu cài đặt Push</button></form></section>`:''}`;
 }
 async function renderAlerts(id){const data=await api('/api/alerts');if(id!==state.renderId)return;$('#content').innerHTML=`<section class="card"><div class="card-head"><div><h2>Thông báo đi muộn</h2><p class="muted">Cập nhật khi mở hoặc làm mới trang; không phải push nền.</p></div><button class="btn secondary" data-action="refresh">Làm mới</button></div><div class="card-body">${!data.enabled?empty('Quản trị viên chưa bật thông báo đi muộn.'):data.alerts.length?data.alerts.map(a=>`<article class="assignment-card"><strong>${esc(a.full_name)} · ${esc(a.employee_code)}</strong><p>${esc(a.branch_name)} · ${dateVN(a.work_date)} · ${hm(a.starts_at)}</p><p>${badge(a.in_at==null?'Chưa vào ca':'Đi muộn')} ${a.minutes} phút</p></article>`).join(''):empty('Không có cảnh báo trong phạm vi quản lý.')}</div></section>`;}
 async function loadAdmin() {
@@ -183,7 +194,7 @@ async function navigate(view=state.view) {
   if(!state.user)return;
   stopCamera(); state.view=view; const id=++state.renderId; shell();
   try {
-    await ({today:renderToday,history:renderHistory,schedule:renderSchedule,admin:renderAdmin,reports:renderReports,requests:renderRequests,alerts:renderAlerts}[view])(id);
+    await ({today:renderToday,history:renderHistory,schedule:renderSchedule,admin:renderAdmin,reports:renderReports,requests:renderRequests,alerts:renderAlerts,push:renderPush}[view])(id);
   } catch(e) { if(id===state.renderId&&$('#content'))$('#content').innerHTML=errorHTML(e.message); }
 }
 
@@ -256,12 +267,32 @@ document.addEventListener('click',async event=>{
   try {
     if(action==='close-modal')return closeModal();
     if(action==='refresh')return void navigate();
+    if(action==='push-enable'){
+      if(!pushReg||!pushConfig?.public_key)throw Error('Push chưa sẵn sàng.');
+      const epoch=state.sessionEpoch;
+      const permission=await Notification.requestPermission();
+      if(permission!=='granted')throw Error('Chưa được cấp quyền thông báo.');
+      let sub=await pushReg.pushManager.getSubscription();
+      if(!sub)sub=await pushReg.pushManager.subscribe({userVisibleOnly:true,applicationServerKey:publicKeyBytes(pushConfig.public_key)});
+      if(epoch!==state.sessionEpoch){await sub.unsubscribe();return;}
+      await api('/api/push/subscribe',{method:'POST',body:{endpoint:sub.endpoint}});
+      try{localStorage.setItem('babymark-push-endpoint',sub.endpoint)}catch{}
+      await navigate('push');notify('Đã đăng ký thiết bị nhận Push.');return;
+    }
+    if(action==='push-test'||action==='push-disable'){
+      const sub=await pushReg?.pushManager.getSubscription();
+      if(!sub)throw Error('Thiết bị chưa đăng ký Push.');
+      if(action==='push-test'){await api('/api/push/test',{method:'POST',body:{endpoint:sub.endpoint}});notify('Dịch vụ Push đã chấp nhận yêu cầu; kiểm tra điện thoại.');}
+      else{try{await api('/api/push/unsubscribe',{method:'POST',body:{endpoint:sub.endpoint}});}finally{await sub.unsubscribe();try{localStorage.removeItem('babymark-push-endpoint')}catch{}}await navigate('push');notify('Đã tắt Push trên thiết bị.');}return;
+    }
     if(action==='self-password'){
       showModal('Đổi mật khẩu của bạn',`<form data-form="self-password" class="form-stack"><label>Mật khẩu hoặc mã hiện tại<input type="password" name="current" autocomplete="current-password" required maxlength="128"></label><label>Mật khẩu mới<input type="password" name="next" autocomplete="new-password" required minlength="15" maxlength="128"></label><label>Nhập lại mật khẩu mới<input type="password" name="confirm" autocomplete="new-password" required minlength="15" maxlength="128"></label><p class="hint">Tối thiểu 15 ký tự. Sau khi đổi, tất cả phiên cũ sẽ bị thu hồi.</p><p class="error-text inline-error" data-form-error hidden></p><div class="modal-actions"><button class="btn secondary" type="button" data-action="close-modal">Hủy</button><button class="btn" type="submit">Đổi mật khẩu</button></div></form>`);return;
     }
     if(action==='logout'){
-      const token=state.token;
-      const revoke=fetch('/api/auth/logout',{method:'POST',headers:{Authorization:'Bearer '+token,'Content-Type':'application/json'},body:'{}',signal:AbortSignal.timeout(5000)});
+      const token=state.token;let endpoint;
+      try{endpoint=localStorage.getItem('babymark-push-endpoint');localStorage.removeItem('babymark-push-endpoint')}catch{}
+      void disableDevicePush();
+      const revoke=fetch('/api/auth/logout',{method:'POST',headers:{Authorization:'Bearer '+token,'Content-Type':'application/json'},body:JSON.stringify({push_endpoint:endpoint}),signal:AbortSignal.timeout(5000)});
       state.user=null;setSession(null);renderLogin();const epoch=state.sessionEpoch;
       try{const response=await revoke;if(!response.ok)throw Error('REVOKE_FAILED');}
       catch{if(epoch===state.sessionEpoch)renderLogin('Đã đăng xuất trên thiết bị. Chưa xác nhận thu hồi phiên máy chủ do mất kết nối.');}
@@ -354,6 +385,9 @@ document.addEventListener('submit',async event=>{
       if(isLegacyCode(values.current))body.current_secret=values.current;
       else{const {salt}=await api('/api/auth/self-salt');body.current_key=await derivePasswordKey(values.current,salt);}
       await api('/api/auth/change-password',{method:'POST',body});state.user=null;setSession(null);renderLogin('Đã đổi mật khẩu. Đăng nhập lại bằng mật khẩu mới.');return;
+    }
+    if(form.dataset.form==='push-settings'){
+      await api('/api/push/settings',{method:'POST',body:{enabled:!!values.enabled,reminders:!!values.reminders,late_alerts:!!values.late_alerts}});await navigate('push');notify('Đã lưu cài đặt Push.');return;
     }
     if(form.dataset.form==='filter'){
       if(values.from>values.to)throw new Error('Ngày bắt đầu phải trước hoặc trùng ngày kết thúc.');
