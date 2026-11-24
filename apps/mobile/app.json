@@ -2,7 +2,7 @@
   "expo": {
     "name": "BABY MARK Staff",
     "slug": "baby-mark-staff",
-    "version": "0.3.0",
+    "version": "0.4.0",
     "ios": {
       "bundleIdentifier": "com.infinitimoney.babymark",
       "supportsTablet": false
