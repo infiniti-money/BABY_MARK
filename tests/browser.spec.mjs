@@ -293,15 +293,21 @@ test.describe.serial('Cloudflare local frontend and actual D1/KV endpoints',()=>
       await expect(employeeRow).toBeVisible();
       await employeeRow.getByRole('button',{name:'Đổi tên đăng nhập / mật khẩu',exact:true}).click();
       const resetDialog=page.getByRole('dialog',{name:'Đổi tên đăng nhập và mật khẩu',exact:true});
+      const renamed=employee.username+'-new';
+      const username=resetDialog.locator('input[name="username"]');
+      await username.fill('invalid name');expect(await username.evaluate(e=>e.checkValidity())).toBe(false);
+      await username.fill(renamed);expect(await username.evaluate(e=>e.checkValidity())).toBe(true);
       await resetDialog.getByRole('button',{name:'Lưu thông tin đăng nhập',exact:true}).click();
       const issued=page.getByTestId('issued-secret');await issued.waitFor({state:'visible'});
       const newSecret=await issued.textContent();
       await page.getByRole('button',{name:'Đã lưu mã an toàn',exact:true}).click();
       expect(/^[0-9a-f]{48}$/.test(newSecret)).toBeTruthy();
       expect(newSecret!==employee.secret).toBeTruthy();
+      await expect(employeeRow).toContainText(renamed);
+      const oldName=await request.post('/api/auth/login',{data:{username:employee.username,secret:newSecret}});expect(oldName.status()).toBe(401);
       const oldSession=await request.get('/api/auth/me',{headers:auth(oldToken)});expect(oldSession.status()).toBe(401);
       const oldCredential=await request.post('/api/auth/login',{data:{username:employee.username,secret:employee.secret}});expect(oldCredential.status()).toBe(401);
-      const newLogin=await request.post('/api/auth/login',{data:{username:employee.username,secret:newSecret}});expect(newLogin.status()).toBe(200);
+      const newLogin=await request.post('/api/auth/login',{data:{username:renamed,secret:newSecret}});expect(newLogin.status()).toBe(200);
       const newToken=(await newLogin.json()).token;
 
       await employeeRow.getByRole('button',{name:'Khóa',exact:true}).click();
@@ -309,13 +315,13 @@ test.describe.serial('Cloudflare local frontend and actual D1/KV endpoints',()=>
       await lockDialog.getByRole('button',{name:'Khóa tài khoản',exact:true}).click();
       await expect(lockDialog).not.toBeVisible();await expect(employeeRow).toContainText('Đã khóa');
       const revoked=await request.get('/api/auth/me',{headers:auth(newToken)});expect(revoked.status()).toBe(401);
-      const disabledLogin=await request.post('/api/auth/login',{data:{username:employee.username,secret:newSecret}});expect(disabledLogin.status()).toBe(401);
+      const disabledLogin=await request.post('/api/auth/login',{data:{username:renamed,secret:newSecret}});expect(disabledLogin.status()).toBe(401);
 
       await employeeRow.getByRole('button',{name:'Mở khóa',exact:true}).click();
       const unlockDialog=page.getByRole('dialog',{name:'Mở khóa tài khoản',exact:true});
       await unlockDialog.getByRole('button',{name:'Mở khóa',exact:true}).click();
       await expect(unlockDialog).not.toBeVisible();await expect(employeeRow).toContainText('Đang hoạt động');
-      const restored=await request.post('/api/auth/login',{data:{username:employee.username,secret:newSecret}});expect(restored.status()).toBe(200);
+      const restored=await request.post('/api/auth/login',{data:{username:renamed,secret:newSecret}});expect(restored.status()).toBe(200);
       const stillRevoked=await request.get('/api/auth/me',{headers:auth(newToken)});expect(stillRevoked.status()).toBe(401);
       expect(errors).toEqual([]);
     });
