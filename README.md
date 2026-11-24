@@ -1,38 +1,38 @@
-# BABY_MARK — Cloudflare attendance
-Active target: static `public/` + root `functions/` on **Cloudflare Pages/Functions + D1 + KV only**. No Supabase, R2, Node server, Sharp, or Images binding is used by this target.
+# BABY MARK v1.1.0 — HR Management
+Hệ thống quản lý nhân sự nội bộ cho chuỗi cửa hàng. Nền tảng đang hoạt động: `public/` + `functions/` trên **Cloudflare Pages + D1 + KV**. Không sử dụng API trả phí mới, không tự nâng cấp gói. Các thư mục Next.js/Expo/Supabase cũ chỉ là nguồn lịch sử, không nằm trong build Pages.
 
-Audited from main `de439b9e48e86ec179b769ebd9ec88c78a8a37c7` on 24 November 2026. The old Next.js/Expo/Supabase folders remain historical source and are excluded from the active build. No production deployment, resource creation, remote migration, or live deletion was performed.
+**Production:** https://babymark.pages.dev/  
+**Bản phát hành:** [v1.1.0 — chức năng, kiểm thử và giới hạn](docs/releases/v1.1.0.md).
 
-## Working target
-- Administrator-issued accounts, one-time random access codes, reset/lock and immediate session revocation; no public signup.
-- Fourteen catalog stores with administrator-managed verified GPS/address/radius; fifty active staff and managers, excluding administrators.
-- Employee camera/GPS capture, server-issued 90-second challenge, browser Timemark with 40% translucent cards, JPEG at most **200,000 bytes**, private KV photo history.
-- D1 validates active identity, assignment, allowed time window, GPS range/accuracy, server distance, IN-before-OUT, duplicate/replay, and current session at finalization.
-- Branch/employee/shift/overnight assignment and manager-scope management; overlap/history guards and audit records.
-- Scoped reports and formula-safe UTF-8 CSV for Excel; leave/correction submission and approval preserve original evidence.
+## Chức năng chính
+- Quản trị theo vai trò, 14 cửa hàng, 50 nhân viên/quản lý hoạt động, tài khoản và phiên đăng nhập.
+- Lịch ca cố định, đổi ca thứ Hai, tạo lịch tự động trước 14 ngày sau khi cấu hình.
+- Chấm công Timemark trực tiếp, GPS, camera trước/sau, xác nhận ảnh, lưu riêng tư.
+- Nghỉ phép, điều chỉnh công, thay ca, bàn giao, duyệt theo quyền.
+- Báo cáo CSV, lương dự kiến theo giờ, bản chốt tháng bất biến.
+- Thông báo đi muộn và Web Push (cần thiết lập).
 
-**Image trust:** the photograph is composed on the device. A stored hash/challenge does not establish liveness, real GPS, visible stamp correctness or shutter time. D1 `server_timestamp` is accepted-upload time; `stamp_issued_at` is preparation time, at most 90 seconds earlier. [Trust/runtime details](docs/cloudflare-runtime-audit.md).
-
-## Local validation
-Node >=22.13 (Node 22 in CI; local checks used Node 26.13). Install and lock development tools, then:
-```text
+## Kiểm thử và DEMO
+Node >=22.13:
+```sh
 npm ci
+npm run demo
+```
+Mở http://127.0.0.1:8788, dùng mã ngẫu nhiên xuất hiện ở Terminal. D1/KV local tạm thời, không kết nối production. [Hướng dẫn DEMO](docs/demo-testing.md).
+
+```sh
 npm test
 npm run check:runtime
 npx playwright install chromium
 npm run test:browser
 ```
-Windows browser tests use installed Microsoft Edge; Linux CI uses Chromium. The acceptance server uses ephemeral workerd/D1/KV and generated test accounts only. It never connects to an existing Cloudflare account or database. Test mutations/deletions affect disposable local fixtures.
 
-`npm run dev` starts Pages locally with local bindings; it requires local schema and administrator initialization. See [operations](docs/cloudflare-operations.md). No publish command is included in CI.
+## Vận hành
+- [Quản trị và camera](docs/admin-camera-upgrade.md) · [Giao diện](docs/workspace-redesign.md)
+- [Lịch tự động / nghỉ / công và lương](docs/hr-phase-one.md) · [Ca cố định](docs/fixed-rosters.md)
+- [Tài khoản](docs/internal-auth.md) · [Ghi nhớ phiên](docs/remember-device.md) · [Timemark](docs/timemark.md)
+- [Cloudflare](docs/cloudflare-operations.md) · [Lưu trữ](docs/cloudflare-storage.md)
+- [Migration D1](cloudflare/d1/) — chỉ áp dụng migration còn thiếu, không tự chạy trên production.
+- [Lỗi còn tồn tại / phạm vi xác minh](docs/releases/v1.1.0.md).
 
-## Storage and deployment gates
-Photo payload budget **900,000,000 bytes**, oldest first; maximum TTL sixty days. At 100 photos/day of 200 KB, budget holds about **45 days**, not sixty guaranteed days. D1 attendance retention is two calendar years, with dispute holds. Capacity eviction and attendance cleanup are **disabled by default** until the operator reviews the policy and inventory.
-
-Production still needs actual binding IDs, only unapplied migrations, a securely bootstrapped administrator, real GPS verification for all stores, approved retention, recovery procedure, physical-device acceptance and free-tier CPU/quota measurement. Pages alone has no scheduled handler: guaranteed no-traffic D1 cleanup remains a scheduling decision. Native Expo migration, push/realtime, shift swaps, XLSX workbooks and payroll are pending.
-
-- [Audit and remaining blockers](docs/audit-2026-11-24.md)
-- [Local/production operations and recovery](docs/cloudflare-operations.md)
-- [Hosting target](docs/hosting.md)
-- [Release checklist](docs/release-checklist.md)
-- [Storage](docs/cloudflare-storage.md) · [Internal accounts](docs/internal-auth.md) · [Timemark](docs/timemark.md)
+Ảnh tối đa 200 KB, KV TTL tối đa 60 ngày theo ngân sách ảnh 900 MB, có thể hết hạn sớm. Chính sách dọn bảng công và dọn dung lượng do Admin kiểm soát; không tự kích hoạt trong release. Ảnh và GPS client không chứng minh tuyệt đối sự hiện diện. Giờ máy chủ ghi nhận khi lưu; dấu giờ được cấp trước tối đa 90 giây.

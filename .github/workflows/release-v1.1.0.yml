@@ -1,0 +1,51 @@
+name: Publish BABY MARK v1.1.0
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'docs/releases/v1.1.0.md'
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: babymark-release-v1-1-0
+  cancel-in-progress: false
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - uses: actions/setup-node@v7.1.0
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+      - run: npm test
+      - run: npm run check:runtime
+      - run: npx playwright install --with-deps chromium
+      - run: npm run test:browser
+  release:
+    needs: verify
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - name: Publish exact verified commit, never overwrite a release or tag
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(node -p "require('./package.json').version")" = "1.1.0"
+          if gh release view v1.1.0 >/dev/null 2>&1; then
+            echo "Release already exists; not modifying."
+            exit 0
+          fi
+          if gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/v1.1.0" >/dev/null 2>&1; then
+            echo "Tag already exists without release; manual review required."
+            exit 1
+          fi
+          gh release create v1.1.0 --target "$GITHUB_SHA" --title "BABY MARK v1.1.0 — HR Management" --notes-file docs/releases/v1.1.0.md
