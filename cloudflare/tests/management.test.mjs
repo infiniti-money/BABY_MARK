@@ -133,3 +133,20 @@ test('manager scope revoked during approval cannot change request or append a de
   assert.equal(f.sqlite.prepare("SELECT COUNT(*) AS n FROM management_audit WHERE action='DECIDE'").get().n,0);
  }finally{f.close();}
 });
+
+test('admin can remove unused stores only; history, manager scope and audit are preserved',async()=>{
+ const f=await fixture();try{
+  const remove=(who,id)=>f.call(admin,who,{method:'POST',resource:'branches',body:{id,action:'delete-unused'}});
+  assert.equal((await remove('staff','BM-003')).status,403);
+  assert.equal((await remove('admin','BM-001')).status,409);
+  f.addAssignment('history','staff','BM-002');
+  assert.equal((await remove('admin','BM-002')).status,409);
+  assert.equal((await remove('admin','BM-003')).status,200);
+  assert.equal(f.sqlite.prepare('SELECT COUNT(*) n FROM branches').get().n,13);
+  assert.equal(f.sqlite.prepare("SELECT COUNT(*) n FROM management_audit WHERE action='DELETE_UNUSED'").get().n,1);
+  assert.equal((await remove('admin','BM-003')).status,409);
+  assert.equal(f.sqlite.prepare("SELECT COUNT(*) n FROM management_audit WHERE action='DELETE_UNUSED'").get().n,1);
+  assert.equal((await f.call(admin,'admin',{method:'POST',resource:'branches',body:{code:'BM-015',name:'Cửa hàng mới',latitude:null,longitude:null,allowed_radius:100}})).status,201);
+  assert.equal(f.sqlite.prepare('SELECT COUNT(*) n FROM branches').get().n,14);
+ }finally{f.close();}
+});

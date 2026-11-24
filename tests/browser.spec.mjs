@@ -70,8 +70,10 @@ test.describe.serial('Cloudflare local frontend and actual D1/KV endpoints',()=>
     await page.getByRole('tab',{name:'Cửa hàng',exact:true}).click();
     const store=page.getByRole('row').filter({hasText:'BABYMARK LUXURY LIÊN NGHĨA'});
     await store.getByRole('button',{name:'Sửa',exact:true}).click();
-    await page.getByLabel('Vĩ độ',{exact:true}).fill('20');
-    await page.getByLabel('Kinh độ',{exact:true}).fill('106');
+    await page.getByLabel('Tọa độ từ Google Maps',{exact:true}).fill('20, 106');
+    await page.getByRole('button',{name:'Điền tọa độ',exact:true}).click();
+    await expect(page.getByLabel('Vĩ độ',{exact:true})).toHaveValue('20');
+    await expect(page.getByLabel('Kinh độ',{exact:true})).toHaveValue('106');
     await page.getByLabel('Bán kính chấm công (20–1000 m)',{exact:true}).fill('100');
     await page.getByLabel('Địa chỉ',{exact:true}).fill('Địa chỉ tổng hợp cho kiểm thử cục bộ');
     await page.getByRole('button',{name:'Lưu thông tin',exact:true}).click();

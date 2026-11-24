@@ -134,7 +134,7 @@ function adminTable(rows) {
   return `<div class="table-wrap"><table><thead><tr>${headers.map(h=>`<th>${h}</th>`).join('')}</tr></thead><tbody>${rows.map(r=>{
     const edit=`<button class="btn secondary small" data-action="admin-edit" data-id="${esc(r.id)}">Sửa</button>`;
     if(tab==='employees')return `<tr><td><strong>${esc(r.full_name)}</strong><small>${esc(r.employee_code)}</small></td><td>${roles[r.role]}<small>${esc(r.department)}</small></td><td>${esc(r.username||'Chưa được cấp')}<small>${r.active?'Đang hoạt động':'Đã khóa'}</small></td><td>${r.role==='admin'?'<span class="muted">Quản trị hệ thống</span>':`${edit}<button class="btn secondary small" data-action="reset-account" data-id="${esc(r.id)}">Cấp lại mã</button><button class="btn ${r.active?'danger':'quiet'} small" data-action="toggle-account" data-id="${esc(r.id)}">${r.active?'Khóa':'Mở khóa'}</button>${r.role==='manager'?`<button class="btn quiet small" data-action="manager-scope" data-id="${esc(r.id)}">Phạm vi cửa hàng</button>`:''}`}</td></tr>`;
-    if(tab==='branches')return `<tr><td><strong>${esc(r.name)}</strong><small>${esc(r.code)}</small></td><td>${r.latitude==null?badge('Chưa cấu hình'):esc(Number(r.latitude).toFixed(6)+', '+Number(r.longitude).toFixed(6))}</td><td>${r.allowed_radius} m<small>${esc(r.address_text||'Chưa có địa chỉ')}</small></td><td>${edit}</td></tr>`;
+    if(tab==='branches')return `<tr><td><strong>${esc(r.name)}</strong><small>${esc(r.code)}</small></td><td>${r.latitude==null?badge('Chưa cấu hình'):esc(Number(r.latitude).toFixed(6)+', '+Number(r.longitude).toFixed(6))}</td><td>${r.allowed_radius} m<small>${esc(r.address_text||'Chưa có địa chỉ')}</small></td><td>${edit}<button class="btn danger small" data-action="branch-remove" data-id="${esc(r.id)}">Xóa cửa hàng chưa sử dụng</button></td></tr>`;
     if(tab==='shifts')return `<tr><td><strong>${esc(r.name)}</strong></td><td>${esc(r.start_time)} – ${esc(r.end_time)} ${r.end_time<r.start_time?'<small>Kết thúc ngày kế tiếp</small>':''}</td><td>${r.grace_period} phút</td><td>${edit}</td></tr>`;
     return `<tr><td><strong>${esc(r.full_name)}</strong><small>${esc(r.employee_code)}</small></td><td>${esc(r.branch_name)}<small>${esc(r.shift_name)}</small></td><td>${dateVN(r.work_date)}<small>${dt(r.starts_at)} – ${dt(r.ends_at)}</small></td><td>${edit}</td></tr>`;
   }).join('')}</tbody></table></div><p class="table-footer">${rows.length} bản ghi · Lịch có dữ liệu công được giữ nguyên để bảo toàn đối soát.</p>`;
@@ -146,7 +146,7 @@ function adminForm(row={}) {
   const tab=state.adminTab, isNew=!row.id;
   let fields='';
   if(tab==='employees')fields=`${field('Mã nhân viên','employee_code',row.employee_code,{max:40})}${field('Họ và tên','full_name',row.full_name)}${isNew?field('Tên đăng nhập','username','',{max:64,placeholder:'Chữ thường, số, dấu . _ -'}):''}<label>Vai trò<select name="role"><option value="staff" ${row.role!=='manager'?'selected':''}>Nhân viên</option><option value="manager" ${row.role==='manager'?'selected':''}>Quản lý cửa hàng</option></select></label>${field('Bộ phận','department',row.department,{required:false,max:100,full:true})}`;
-  if(tab==='branches')fields=`${field('Mã cửa hàng','code',row.code,{max:40})}${field('Tên cửa hàng','name',row.name)}${field('Vĩ độ','latitude',row.latitude??'',{type:'number',min:-90,step:'any',required:false})}${field('Kinh độ','longitude',row.longitude??'',{type:'number',min:-180,step:'any',required:false})}${field('Bán kính chấm công (20–1000 m)','allowed_radius',row.allowed_radius??100,{type:'number',min:20,step:'1'})}${field('Địa chỉ','address_text',row.address_text,{required:false,max:300,full:true})}<p class="hint full">Chỉ nhập tọa độ đã xác minh tại cửa hàng. Để trống cả hai tọa độ sẽ tạm ngăn chấm công tại chi nhánh này.</p>`;
+  if(tab==='branches')fields=`${field('Mã cửa hàng','code',row.code,{max:40})}${field('Tên cửa hàng','name',row.name)}${field('Vĩ độ','latitude',row.latitude??'',{type:'number',min:-90,step:'any',required:false})}${field('Kinh độ','longitude',row.longitude??'',{type:'number',min:-180,step:'any',required:false})}${field('Bán kính chấm công (20–1000 m)','allowed_radius',row.allowed_radius??100,{type:'number',min:20,step:'1'})}${field('Địa chỉ','address_text',row.address_text,{required:false,max:300,full:true})}<div class="full"><label>Tọa độ từ Google Maps<input data-branch-coords placeholder="Vĩ độ, kinh độ" autocomplete="off"></label><div class="modal-actions"><button class="btn secondary" type="button" data-action="branch-paste-gps">Điền tọa độ</button><button class="btn secondary" type="button" data-action="branch-current-gps">Lấy GPS hiện tại</button><button class="btn secondary" type="button" data-action="branch-check-map">Kiểm tra trên bản đồ</button></div><p class="hint" data-branch-gps-status role="status">Chỉ lấy GPS hiện tại khi đang đứng tại cửa hàng. Tọa độ chưa được lưu cho đến khi bấm Lưu thông tin.</p></div><p class="hint full">Chỉ nhập tọa độ đã xác minh tại cửa hàng. Để trống cả hai tọa độ sẽ tạm ngăn chấm công tại chi nhánh này.</p>`;
   if(tab==='shifts')fields=`${field('Tên ca làm','name',row.name,{full:true})}${field('Giờ bắt đầu','start_time',row.start_time||'08:00',{type:'time'})}${field('Giờ kết thúc','end_time',row.end_time||'16:00',{type:'time'})}${field('Dung sai đi muộn (0–120 phút)','grace_period',row.grace_period??0,{type:'number',min:0,step:'1',full:true})}<p class="hint full">Giờ kết thúc nhỏ hơn giờ bắt đầu được tính sang ngày kế tiếp. Giờ đầu và cuối ca cần khác nhau.</p>`;
   if(tab==='assignments')fields=`<label class="full">Nhân viên<select name="user_id" required><option value="">Chọn nhân viên</option>${rowOptions(state.admin.employees.filter(e=>e.active),row.user_id,'full_name')}</select></label><label class="full">Cửa hàng<select name="branch_id" required><option value="">Chọn cửa hàng</option>${rowOptions(state.admin.branches,row.branch_id)}</select></label><label>Ca làm<select name="shift_id" required><option value="">Chọn ca</option>${rowOptions(state.admin.shifts,row.shift_id)}</select></label>${field('Ngày bắt đầu ca (Việt Nam)','work_date',row.work_date||today(),{type:'date'})}<p class="hint full">Máy chủ tính giờ ca theo Việt Nam, bao gồm ca qua đêm. Các lịch trùng giờ hoặc lịch đã có công không thể sửa.</p>`;
   showModal(isNew?(tab==='employees'?'Cấp tài khoản nhân viên':'Thêm '+({branches:'cửa hàng',shifts:'ca làm',assignments:'lịch phân công'}[tab])):'Chỉnh sửa thông tin',`<form data-form="admin-save" data-resource="${tab}" data-id="${esc(row.id||'')}"><div class="form-grid">${fields}</div><p class="error-text inline-error" data-form-error hidden role="alert"></p><div class="modal-actions"><button class="btn secondary" type="button" data-action="close-modal">Hủy</button><button class="btn" type="submit">${tab==='employees'&&isNew?'Tạo và cấp mã truy cập':'Lưu thông tin'}</button></div></form>`);
@@ -262,6 +262,30 @@ document.addEventListener('click',async event=>{
     if(action==='export')return await exportReports();
     if(action==='admin-add')return adminForm();
     if(action==='admin-edit')return adminForm(state.admin[state.adminTab].find(r=>r.id===button.dataset.id));
+    if(['branch-paste-gps','branch-current-gps','branch-check-map'].includes(action)){
+      const form=button.closest('form');if(!form||form.dataset.resource!=='branches')return;
+      const lat=form.elements.latitude,lng=form.elements.longitude,status=form.querySelector('[data-branch-gps-status]');
+      const show=(message,error=false)=>{if(status.isConnected){status.textContent=message;status.classList.toggle('error-text',error);}};
+      const valid=(a,b)=>Number.isFinite(a)&&Math.abs(a)<=90&&Number.isFinite(b)&&Math.abs(b)<=180;
+      if(action==='branch-paste-gps'){
+        const values=form.querySelector('[data-branch-coords]').value.trim().match(/^(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)$/);
+        if(!values||!valid(Number(values[1]),Number(values[2])))return show('Nhập hai số vĩ độ, kinh độ hợp lệ, phân cách bằng dấu phẩy.',true);
+        lat.value=Number(values[1]);lng.value=Number(values[2]);return show('Đã điền tọa độ. Kiểm tra trên bản đồ trước khi lưu.');
+      }
+      if(action==='branch-check-map'){
+        if(!lat.value.trim()||!lng.value.trim()||!valid(Number(lat.value),Number(lng.value)))return show('Cần có đủ vĩ độ và kinh độ hợp lệ.',true);
+        window.open('https://www.google.com/maps/search/?api=1&query='+encodeURIComponent(lat.value+','+lng.value),'_blank','noopener,noreferrer');return;
+      }
+      const ticket=modalTicket;button.disabled=true;show('Đang yêu cầu quyền vị trí…');
+      try{const p=await currentPosition();if(ticket!==modalTicket||!form.isConnected)return;lat.value=p.lat;lng.value=p.lng;show('Đã điền GPS; sai số ±'+Math.round(p.accuracy)+' m. Kiểm tra trước khi lưu.');}
+      catch(e){if(ticket===modalTicket)show(e.message,true);}
+      finally{if(button.isConnected)button.disabled=false;}
+      return;
+    }
+    if(action==='branch-remove'){
+      const branch=state.admin.branches?.find(r=>r.id===button.dataset.id);if(!branch)return;
+      showModal('Xóa cửa hàng chưa sử dụng',`<p>Chỉ xóa được cửa hàng <strong>${esc(branch.name)}</strong> chưa có lịch phân công và chưa được giao cho quản lý. Cửa hàng có lịch sử sẽ bị từ chối; không xóa bảng công hoặc ảnh.</p><form data-form="branch-remove" data-id="${esc(branch.id)}"><p class="error-text inline-error" data-form-error hidden></p><div class="modal-actions"><button class="btn secondary" type="button" data-action="close-modal">Hủy</button><button class="btn danger" type="submit">Xác nhận xóa</button></div></form>`);return;
+    }
     const employee=state.admin.employees?.find(r=>r.id===button.dataset.id);
     if(action==='reset-account'){
       showModal('Cấp lại mã truy cập',`<p class="muted">Cấp mã mới cho <strong>${esc(employee.full_name)}</strong> sẽ vô hiệu hóa mã cũ và toàn bộ phiên đăng nhập của nhân viên này.</p><form data-form="reset-account" data-id="${esc(employee.id)}"><p class="error-text inline-error" data-form-error hidden></p><div class="modal-actions"><button class="btn secondary" type="button" data-action="close-modal">Hủy</button><button class="btn" type="submit">Cấp lại mã</button></div></form>`);return;
@@ -307,6 +331,9 @@ document.addEventListener('submit',async event=>{
       if(resource==='shifts')payload.grace_period=Number(values.grace_period);
       const result=await api(resource==='employees'&&!id?'/api/auth/create':`/api/admin/${resource}`,{method:'POST',body:payload});
       closeModal();await navigate('admin');if(result.secret)credentialModal(result);else notify('Đã lưu thông tin.');return;
+    }
+    if(form.dataset.form==='branch-remove'){
+      await api('/api/admin/branches',{method:'POST',body:{id:form.dataset.id,action:'delete-unused'}});closeModal();await navigate('admin');notify('Đã xóa cửa hàng chưa sử dụng.');return;
     }
     if(form.dataset.form==='reset-account'){
       const result=await api('/api/auth/reset',{method:'POST',body:{user_id:form.dataset.id}});credentialModal(result);return;

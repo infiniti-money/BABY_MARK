@@ -28,6 +28,18 @@ export async function onRequestPost({request,env,params}){
   const id=b.id?identifier(b.id):crypto.randomUUID();
   const audit=(details)=>managementAudit(db,actor,resource,id,b.id?'UPDATE':'CREATE',details);
   if(resource==='branches'){
+   if(b.action==='delete-unused'){
+    if(!b.id)invalid('Cần mã cửa hàng');
+    // Both statements use the same predicate inside a D1 atomic batch.
+    // Historical references and manager scopes are never cascaded.
+    const guard='id=? AND NOT EXISTS(SELECT 1 FROM assignments WHERE branch_id=branches.id) AND NOT EXISTS(SELECT 1 FROM branch_managers WHERE branch_id=branches.id)';
+    const result=await db.batch([
+     db.prepare("INSERT INTO management_audit(id,actor_id,resource,resource_id,action,details_json,created_at) SELECT ?,?,'branches',id,'DELETE_UNUSED',json_object('code',code,'name',name),? FROM branches WHERE "+guard).bind(crypto.randomUUID(),actor.id,Date.now(),id),
+     db.prepare('DELETE FROM branches WHERE '+guard).bind(id)
+    ]);
+    if(result[1].meta?.changes!==1)throw new ApiError(409,'Không thể xóa: cửa hàng không tồn tại, đã có lịch phân công hoặc đang được giao cho quản lý.');
+    return reply({id,deleted:true});
+   }
    const code=textField(b.code,40),name=textField(b.name,150),address=textField(b.address_text??'',300,true),lat=b.latitude??null,lng=b.longitude??null,radius=b.allowed_radius;
    if(!Number.isInteger(radius)||radius<20||radius>1000||!((lat===null&&lng===null)||(Number.isFinite(lat)&&Math.abs(lat)<=90&&Number.isFinite(lng)&&Math.abs(lng)<=180)))invalid('GPS hoặc bán kính không hợp lệ');
    if(b.id&&!await db.prepare('SELECT id FROM branches WHERE id=?').bind(id).first())throw new ApiError(404,'Không tìm thấy cửa hàng');
