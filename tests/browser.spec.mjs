@@ -504,3 +504,13 @@ test('v1.2 calendar and audit log are accessible from admin navigation',async({p
  await expect(page.getByRole('heading',{name:'Lịch tuần',exact:true})).toBeVisible();
  await expect(page.locator('.calendar-day')).toHaveCount(7);
 });
+
+test('RC.4 overview distribution and quick actions fit narrow and desktop screens',async({page})=>{
+ await page.setViewportSize({width:390,height:844});await login(page);
+ await expect(page.getByRole('heading',{name:'Phân bố trạng thái ca',exact:true})).toBeVisible();
+ await expect(page.locator('.distribution-item')).toHaveCount(9);
+ await expect(page.locator('.quick-actions').getByRole('button',{name:'Sức khỏe và phục hồi',exact:true})).toBeVisible();
+ for(const size of [{width:320,height:640},{width:390,height:844},{width:768,height:1024},{width:1440,height:900}]){
+  await page.setViewportSize(size);expect(await page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth)).toBeTruthy();
+ }
+});
