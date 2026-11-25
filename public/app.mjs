@@ -1,9 +1,8 @@
-import {cvFields,hrFields,hrDeadlines} from './employee-cv.mjs';
-import {cvPrint} from './cv-print.mjs';
 import {observeMotion,stopMotion} from './motion.mjs';
 import {todayAssignments,captureEligible} from './attendance-window.mjs';
 import {calendarRange,calendarDays} from './schedule-calendar.mjs';
-import {cameraFrame,composeTimemark,currentPosition} from './capture.mjs';
+import {currentPosition} from './gps.mjs';
+import {pollDelay,retryAfterMs} from './polling.mjs';
 import {incomeFields,deductionFields,componentFields,componentDefaults,salaryModes} from './payroll-components.mjs';
 import {parseMapsCoords,mapsSearchUrl} from './maps-import.mjs';
 import {isRetailStaff} from './retail-staff.mjs';
@@ -13,23 +12,24 @@ import {pushRegistration,publicKeyBytes,disableDevicePush} from './push.mjs';
 import {permissionState,checkCameraPermission,checkLocationPermission} from './device-permissions.mjs';
 let pushReg=null,pushConfig=null,pushSub=null;
 let documentPreview=null;
-let chatSelection='',chatTimer=null,chatBusy=null,chatPage=null,chatIdle=0;
-function stopChat(){clearTimeout(chatTimer);chatTimer=null;chatBusy=null;chatPage=null;chatIdle=0;}
-const chatDelay=()=>Math.min(120000,30000*2**Math.min(chatIdle,2));
+let chatSelection='',chatTimer=null,chatBusy=null,chatPage=null,chatIdle=0,chatFailures=0,chatRetryAt=0,chatAbort=null;
+function stopChat(){clearTimeout(chatTimer);chatAbort?.abort();chatAbort=null;chatTimer=null;chatBusy=null;chatPage=null;chatIdle=0;chatFailures=0;chatRetryAt=0;}
+const chatDelay=()=>pollDelay({idle:chatIdle,failures:chatFailures,retryAfter:Math.max(0,chatRetryAt-Date.now())});
 function scheduleChat(id,delay=chatDelay()){
  clearTimeout(chatTimer);chatTimer=null;
- if(id!==state.renderId||state.view!=='messages'||document.hidden)return;
+ if(id!==state.renderId||state.view!=='messages'||document.hidden||navigator.onLine===false)return;
  chatTimer=setTimeout(async()=>{
   chatTimer=null;
-  if(id!==state.renderId||state.view!=='messages'||document.hidden)return;
+  if(id!==state.renderId||state.view!=='messages'||document.hidden||navigator.onLine===false)return;
   if(!chatBusy&&!modal.open&&!$('#chat-before')?.dataset.expanded){
-   try{const changed=await refreshChat(id,true);if(id===state.renderId)chatIdle=changed?0:Math.min(2,chatIdle+1);}catch{if(id===state.renderId)chatIdle=Math.min(2,chatIdle+1);}
+   try{const changed=await refreshChat(id,true);if(id===state.renderId){chatIdle=changed?0:Math.min(2,chatIdle+1);chatFailures=0;chatRetryAt=0;}}catch(e){if(id===state.renderId){chatFailures=Math.min(5,chatFailures+1);chatRetryAt=Math.max(chatRetryAt,Date.now()+(e.retryAfter||0));}}
   }
   if(id===state.renderId)scheduleChat(id);
- },delay);
+ },Math.max(delay,chatRetryAt-Date.now()));
 }
 function resetChat(){stopChat();chatSelection='';}
 const documents=()=>import('./report-documents.mjs');
+const captureTools=()=>import('./capture.mjs');
 function clearPrint(){documentPreview=null;document.body.classList.remove('printing-document');const root=document.querySelector('#print-document');if(root)root.innerHTML='';}
 
 const $ = s => document.querySelector(s);
@@ -60,8 +60,10 @@ let saved=readSaved(localStorage)||readSaved(sessionStorage);
 const state = {token:saved?.expires_at>Date.now()?saved.token:null,user:null,view:'today',adminTab:'employees',assignments:[],attendances:[],admin:{},reports:[],requests:[],stream:null,renderId:0,sessionEpoch:0,filters:{from:monthStart(),to:today(),branch_id:'',user_id:''}};
 const defaultFilters=()=>({from:monthStart(),to:today(),branch_id:'',user_id:''});
 let viewFilters={},listState=null;
-let noticeTimer, photoURLs = [],modalTicket=0,cameraTicket=0;
+let noticeTimer, photoURLs = [],modalTicket=0,cameraTicket=0,modalAbort=new AbortController();
 let recentApiErrors=[];
+const apiRequests=new Set();
+function abortRequests(readsOnly=false){for(const r of apiRequests)if(!readsOnly||r.method==='GET')r.controller.abort();}
 function recordApiError(status,requestId,code){
  recentApiErrors.push({status,requestId:/^[0-9a-f-]{36}$/i.test(requestId||'')?requestId:null,code:typeof code==='string'&&/^[A-Z0-9_]{1,64}$/.test(code)?code:null,at:Date.now()});
  if(recentApiErrors.length>20)recentApiErrors.shift();
@@ -72,7 +74,7 @@ function notify(message,error=false) {
   clearTimeout(noticeTimer); noticeTimer=setTimeout(()=>el.hidden=true,error?10000:5500);
 }
 function setSession(session) {
-  stopCamera();closeModal();resetChat();recoveryBusy=null;recentApiErrors=[];
+  abortRequests();stopCamera();closeModal();resetChat();reportPaging=null;recoveryBusy=null;recentApiErrors=[];
   state.sessionEpoch++;state.renderId++;
   state.token=session?.token||null;cameraFacing='user';adminList={tab:'',search:'',page:1};viewFilters={};listState=null;state.filters=defaultFilters();state.view='today';state.adminTab='employees';
   overviewDay='';overviewBranch='';overviewStatus='';state.overview=null;state.assignments=[];state.attendances=[];state.admin={};state.reports=[];state.reportData=null;state.requests=[];state.handover=null;state.extra=null;state.payrollData=null;state.payrollMonth=null;state.payrollRevision=null;
@@ -80,16 +82,20 @@ function setSession(session) {
   try{localStorage.removeItem(SESSION_KEY);}catch{}
   if(session){if(session.remember){try{localStorage.setItem(SESSION_KEY,JSON.stringify(session));return;}catch{}}try{sessionStorage.setItem(SESSION_KEY,JSON.stringify(session));}catch{}}
 }
-async function api(path,{body,method='GET',raw=false,timeout=0}={}) {
+async function api(path,{body,method='GET',raw=false,timeout=method==='GET'?20000:60000,signal}={}) {
   const epoch=state.sessionEpoch;
   const headers = new Headers();
   if (state.token) headers.set('Authorization',`Bearer ${state.token}`);
   if (body && !(body instanceof FormData)) { headers.set('Content-Type','application/json'); body=JSON.stringify(body); }
-  const controller=timeout?new AbortController():null;
-  const timer=controller?setTimeout(()=>controller.abort(),timeout):null;
+  const controller=new AbortController(),entry={controller,method};
+  const cancel=()=>controller.abort();
+  if(signal?.aborted)cancel();else signal?.addEventListener('abort',cancel,{once:true});
+  apiRequests.add(entry);
+  const timer=setTimeout(cancel,timeout);
   const networkError=()=>Object.assign(new Error('Mất kết nối hoặc máy chủ chưa phản hồi. Kiểm tra trạng thái trước khi gửi lại.'),{network:true});
   try{
    let response;try{response=await fetch(path,{method,headers,body,cache:'no-store',credentials:'same-origin',signal:controller?.signal});}catch{throw networkError();}
+   if(controller.signal.aborted)throw networkError();
    if(epoch!==state.sessionEpoch)throw new Error('Tài khoản đã thay đổi. Vui lòng thử lại trong phiên hiện tại.');
    if(!response.ok){
     const result=await response.json().catch(()=>({}));
@@ -98,13 +104,17 @@ async function api(path,{body,method='GET',raw=false,timeout=0}={}) {
     const requestId=response.headers.get('X-Request-ID');
     if(response.status>=500||response.status===429)recordApiError(response.status,requestId,result?.code);
     const message=typeof result?.error==='string'?result.error:`Không thể xử lý yêu cầu (${response.status}).`;
-    throw Object.assign(new Error(message+(response.status>=500&&requestId?' · Mã tra cứu: '+requestId:'')),{status:response.status,code:result?.code,requestId});
+    throw Object.assign(new Error(message+(response.status>=500&&requestId?' · Mã tra cứu: '+requestId:'')),{status:response.status,code:result?.code,requestId,retryAfter:retryAfterMs(response.headers.get('Retry-After'))});
    }
-   if(raw)return response;
+   if(raw){
+    let blob;try{blob=await response.blob();}catch{throw networkError();}
+    if(epoch!==state.sessionEpoch||controller.signal.aborted)throw networkError();
+    return new Response(blob,{status:response.status,statusText:response.statusText,headers:response.headers});
+   }
    let data;try{data=await response.json();}catch{throw networkError();}
    if(epoch!==state.sessionEpoch)throw new Error('Tài khoản đã thay đổi. Vui lòng thử lại trong phiên hiện tại.');
    return data;
-  }finally{clearTimeout(timer);}
+  }finally{clearTimeout(timer);apiRequests.delete(entry);signal?.removeEventListener('abort',cancel);}
 }
 const query = values => new URLSearchParams(Object.entries(values).filter(([,v])=>v!==''&&v!=null)).toString();
 const dateFilters = () => ({from:state.filters.from,to:state.filters.to});
@@ -192,9 +202,9 @@ async function checkCapture(cancel=false){
   if(epoch===state.sessionEpoch){if(p===pendingCapture&&p)p.uncertain=true;const el=p?$('[data-confirm-error]'):$('[data-recovery-message]');if(el){el.hidden=false;el.textContent=e.message+' Chưa thể xác minh; không chụp lại.';}else notify(e.message,true);}
  }finally{if(recoveryBusy===run)recoveryBusy=null;if(p===pendingCapture&&p)p.checking=false;if(epoch===state.sessionEpoch){syncCaptureControls();cameraControls();document.querySelectorAll('[data-action="capture-recover"],[data-action="capture-recover-cancel"]').forEach(b=>b.disabled=!!recoveryBusy);}}
 }
-function closeModal() { clearPrint();pendingCapture=null;clearInterval(confirmationTimer);confirmationTimer=null;modalTicket++;modal.close(); modal.innerHTML=''; clearPhotos(); }
+function closeModal() { modalAbort.abort();clearPrint();pendingCapture=null;clearInterval(confirmationTimer);confirmationTimer=null;modalTicket++;modal.close(); modal.innerHTML=''; clearPhotos(); }
 function showModal(title,body) {
-  closeModal(); modal.innerHTML=`<div class="modal-head"><h2 id="modal-title">${esc(title)}</h2><button class="close" data-action="close-modal" aria-label="Đóng">×</button></div><div class="modal-body">${body}</div>`;
+  closeModal();modalAbort=new AbortController(); modal.innerHTML=`<div class="modal-head"><h2 id="modal-title">${esc(title)}</h2><button class="close" data-action="close-modal" aria-label="Đóng">×</button></div><div class="modal-body">${body}</div>`;
   modal.showModal();
   return modalTicket;
 }
@@ -233,21 +243,21 @@ async function renderMessages(id){
 }
 async function refreshChat(id=state.renderId,poll=false){
  if(chatBusy||state.view!=='messages'||id!==state.renderId||!chatPage)return false;
- const run={};chatBusy=run;
+ const run={};chatBusy=run;const controller=new AbortController();chatAbort=controller;
  try{
-  const changed=await loadChatRoom(id,false,poll);if(id!==state.renderId||!chatPage)return false;
-  const data=await api('/api/messages'+(poll?'?compact=1':''),{timeout:15000});if(id!==state.renderId||!chatPage)return false;
+  const changed=await loadChatRoom(id,false,poll,controller.signal);if(id!==state.renderId||!chatPage)return false;
+  const data=await api('/api/messages'+(poll?'?compact=1':''),{timeout:15000,signal:controller.signal});if(id!==state.renderId||!chatPage)return false;
   const listChanged=JSON.stringify(chatPage.data.threads)!==JSON.stringify(data.threads);
   chatPage.data={...chatPage.data,...data};
   if(listChanged)$('#chat-threads').innerHTML=chatThreadList(data);
-  if(!poll){chatIdle=0;scheduleChat(id,30000);}
+  if(!poll){chatIdle=0;chatFailures=0;chatRetryAt=0;scheduleChat(id,30000);}
   return !!changed||listChanged;
- }finally{if(chatBusy===run)chatBusy=null;}
+ }finally{if(chatBusy===run)chatBusy=null;if(chatAbort===controller)chatAbort=null;}
 }
-async function loadChatRoom(id,rebuild,poll=false){
+async function loadChatRoom(id,rebuild,poll=false,signal){
  const selected=chatSelection;if(!selected){$('#chat-room').innerHTML=empty('Chọn cuộc trò chuyện.');return false;}
  const known=poll&&chatPage?.latest!==undefined&&(chatPage.latest===0||chatPage.read===chatPage.latest)?chatPage.latest:null;
- const data=await api('/api/messages?'+query({thread:selected,known}),{timeout:15000});if(id!==state.renderId||selected!==chatSelection||!chatPage)return false;
+ const data=await api('/api/messages?'+query({thread:selected,known}),{timeout:15000,signal});if(id!==state.renderId||selected!==chatSelection||!chatPage)return false;
  if(data.unchanged)return false;
  const latest=data.messages.at(-1)?.id||0,changed=rebuild||chatPage.latest!==latest;
  chatPage.latest=latest;
@@ -257,7 +267,7 @@ async function loadChatRoom(id,rebuild,poll=false){
  }else{const host=$('#chat-stream');if(changed&&!$('#chat-before').dataset.expanded){const nearBottom=host.scrollHeight-host.scrollTop-host.clientHeight<48;const scroll=host.scrollTop;host.innerHTML=chatMessagesHTML(data);host.scrollTop=nearBottom?host.scrollHeight:scroll;}$('#chat-before').hidden=!data.more;}
  if(!$('#chat-before').dataset.expanded){const host=$('#chat-stream');if(rebuild)host.scrollTop=host.scrollHeight;$('#chat-before').dataset.first=String(data.messages[0]?.id||'');}
  if(latest&&!document.hidden&&chatPage.read!==latest){
-  await api('/api/messages',{method:'POST',body:{action:'read',thread_id:selected,message_id:latest},timeout:15000});
+  await api('/api/messages',{method:'POST',body:{action:'read',thread_id:selected,message_id:latest},timeout:15000,signal});
   if(id===state.renderId&&selected===chatSelection&&chatPage)chatPage.read=latest;
  }
  return changed;
@@ -492,11 +502,30 @@ function branchReport(rows){
  if(!rows.length)return '';
  return `<section class="card section-gap"><div class="card-head"><div><h2>Tổng hợp theo cửa hàng</h2><p class="muted">Cùng khoảng ngày và bộ lọc với bảng công chi tiết.</p></div></div><div class="table-wrap"><table><thead><tr><th>Cửa hàng</th><th>Ca đủ / có lịch</th><th>Giờ công</th><th>Muộn / sớm (phút)</th><th>Nghỉ / vắng / thiếu ra</th><th>Ngoài vùng / chờ duyệt</th></tr></thead><tbody>${rows.map(b=>`<tr><td><strong>${esc(b.branch_code)}</strong><small>${esc(b.branch_name)}</small></td><td>${b.completed} / ${b.scheduled}</td><td>${(b.minutes/60).toFixed(1)}</td><td>${b.late} / ${b.early}</td><td>${b.leave} / ${b.absent} / ${b.missing_out}</td><td>${b.outside} / ${b.pending}</td></tr>`).join('')}</tbody></table></div><p class="table-footer">Chỉ gồm ca trong phạm vi bộ lọc. Ca bổ sung chưa duyệt không tính giờ. Số ca thiếu công cần xác minh.</p></section>`;
 }
+let reportPaging=null;
+function reportRows(rows){return rows.length?`<div class="table-wrap"><table><thead><tr><th>Nhân viên</th><th>Ngày / Cửa hàng</th><th>Ca làm</th><th>Vào / Tan ca</th><th>Phút / công quy đổi</th><th>Trạng thái</th><th>Đối soát ảnh / GPS</th></tr></thead><tbody>${rows.map(r=>`<tr><td><strong>${esc(r.full_name)}</strong><small>${esc(r.employee_code)}</small></td><td>${dateVN(r.work_date)}<small>${esc(r.branch_name)}</small></td><td>${esc(r.shift_name)}<small>${hm(r.starts_at)} – ${hm(r.ends_at)}</small></td><td>${r.summary?.adjusted?`${hm(r.proposed_in)} / ${hm(r.proposed_out)}<small>Đã duyệt · Gốc: ${hm(r.in_at)} / ${hm(r.out_at)}</small>`:`${hm(r.in_at)} / ${hm(r.out_at)}`}</td><td>${r.summary?.minutes??0} phút · ${r.summary?.work_units??0} công<small>Làm thêm ${r.summary?.overtime_minutes??0} phút</small><small>Muộn ${r.summary?.late??0} · Sớm ${r.summary?.early??0}</small></td><td>${badge(r.summary?.status)}</td><td>${['in','out'].map(type=>r[type+'_id']?`<div><small>${type==='in'?'Vào':'Ra'} · ${r[type+'_distance_m']==null?'—':Math.round(r[type+'_distance_m'])+' m'} · sai số ${r[type+'_accuracy_m']==null?'—':'±'+Math.round(r[type+'_accuracy_m'])+' m'}</small><button class="btn secondary small" data-action="photo" data-id="${esc(r[type+'_id'])}">Ảnh ${type==='in'?'vào':'ra'}</button></div>`:'').join('')||'—'}</td></tr>`).join('')}</tbody></table></div><p class="table-footer">Dữ liệu tham khảo đối soát. Excel tổng có 6 trang tính theo bộ lọc đang xem; không tính tiền lương, nghỉ giữa ca hoặc ngày lễ.</p>`:empty();}
+function drawReportPage(){
+ const p=reportPaging,host=$('#report-page');if(!p||!host)return;
+ const count=state.reportData.summary.assignments,offset=p.index*30;
+ host.innerHTML=reportRows(p.data.rows)+'<div class="admin-pager"><span>'+(count?(offset+1)+'–'+(offset+p.data.rows.length):'0')+' / '+count+' ca</span><div><button class="btn secondary small" data-action="report-prev" '+(p.index?'':'disabled')+'>Trước</button><span>Trang '+(p.index+1)+'</span><button class="btn secondary small" data-action="report-next" '+(p.data.next?'':'disabled')+'>Sau</button></div></div>';
+ prepareResponsiveTables();observeMotion(host);
+}
+async function changeReportPage(step){
+ const p=reportPaging,id=state.renderId;if(!p||p.busy)return;
+ const index=p.index+step,cursor=step>0?p.data.next:p.cursors[index];if(index<0||step>0&&!cursor)return;
+ p.busy=true;document.querySelectorAll('[data-action="report-prev"],[data-action="report-next"]').forEach(b=>b.disabled=true);
+ try{
+  const data=await api('/api/reports?'+query({...p.filters,page_size:30,...cursor}),{timeout:15000});
+  if(id!==state.renderId||p!==reportPaging)return;
+  p.index=index;p.cursors[index]=cursor;p.data=data;state.reports=data.rows;
+ }finally{p.busy=false;if(id===state.renderId&&p===reportPaging)drawReportPage();}
+}
+async function fullReport(){return api('/api/reports?'+query(reportPaging?.filters||state.filters));}
 async function renderReports(id) {
-  const [data,loaded]=await Promise.all([api(`/api/reports?${query(state.filters)}`),state.user.role==='admin'?loadAdmin(['branches','employees'],id):Promise.resolve(true)]); if(!loaded||id!==state.renderId)return;
-  state.reports=data.rows;state.reportData=data;
+  const [data,page,loaded]=await Promise.all([api('/api/reports?'+query({...state.filters,view:'summary'})),api('/api/reports?'+query({...state.filters,page_size:30})),state.user.role==='admin'?loadAdmin(['branches','employees'],id):Promise.resolve(true)]); if(!loaded||id!==state.renderId)return;
+  state.reports=page.rows;state.reportData=data;reportPaging={filters:{...state.filters},cursors:[null],index:0,data:page};
   const s=data.summary||{};
-  $('#content').innerHTML=`<div class="stats">${stat('Ca hoàn tất',s.shifts??0,'Các ca đủ dữ liệu công','check')}${stat('Công quy đổi',s.work_units??0,'Ca thường 1 · cả ngày 2','units')}${stat('Làm thêm sau ca',s.overtime_minutes??0,'Phút cần đối soát','overtime')}${stat('Giờ làm ghi nhận',(Number(s.minutes||0)/60).toFixed(1),'Chưa bao gồm quy tắc tính lương','clock')}${stat('Đi muộn',s.late??0,'Tổng phút theo bảng công','calendar')}${stat('Ngày nghỉ được duyệt',s.leaveDays??0,'Theo đơn đã phê duyệt','file')}</div>${branchReport(data.branches||[])}<section class="card"><div class="card-head"><h2>Bảng công theo ca</h2><span class="tag">${data.rows.length} CA</span></div>${filterBar({reports:true})}<div class="card-body modal-actions"><button class="btn" data-action="report-xlsx-all" ${data.rows.length?'':'disabled'}>Xuất Excel tổng chấm công</button><button class="btn secondary" data-action="report-documents" ${data.rows.length?'':'disabled'}>Excel / In bảng công</button></div>${listPager(data.rows,rows=>rows.length?`<div class="table-wrap"><table><thead><tr><th>Nhân viên</th><th>Ngày / Cửa hàng</th><th>Ca làm</th><th>Vào / Tan ca</th><th>Phút / công quy đổi</th><th>Trạng thái</th><th>Đối soát ảnh / GPS</th></tr></thead><tbody>${rows.map(r=>`<tr><td><strong>${esc(r.full_name)}</strong><small>${esc(r.employee_code)}</small></td><td>${dateVN(r.work_date)}<small>${esc(r.branch_name)}</small></td><td>${esc(r.shift_name)}<small>${hm(r.starts_at)} – ${hm(r.ends_at)}</small></td><td>${r.summary?.adjusted?`${hm(r.proposed_in)} / ${hm(r.proposed_out)}<small>Đã duyệt · Gốc: ${hm(r.in_at)} / ${hm(r.out_at)}</small>`:`${hm(r.in_at)} / ${hm(r.out_at)}`}</td><td>${r.summary?.minutes??0} phút · ${r.summary?.work_units??0} công<small>Làm thêm ${r.summary?.overtime_minutes??0} phút</small><small>Muộn ${r.summary?.late??0} · Sớm ${r.summary?.early??0}</small></td><td>${badge(r.summary?.status)}</td><td>${['in','out'].map(type=>r[type+'_id']?`<div><small>${type==='in'?'Vào':'Ra'} · ${r[type+'_distance_m']==null?'—':Math.round(r[type+'_distance_m'])+' m'} · sai số ${r[type+'_accuracy_m']==null?'—':'±'+Math.round(r[type+'_accuracy_m'])+' m'}</small><button class="btn secondary small" data-action="photo" data-id="${esc(r[type+'_id'])}">Ảnh ${type==='in'?'vào':'ra'}</button></div>`:'').join('')||'—'}</td></tr>`).join('')}</tbody></table></div><p class="table-footer">Dữ liệu tham khảo đối soát. Excel tổng có 6 trang tính theo bộ lọc đang xem; không tính tiền lương, nghỉ giữa ca hoặc ngày lễ.</p>`:empty())}</section>`;drawList();
+  $('#content').innerHTML=`<div class="stats">${stat('Ca hoàn tất',s.shifts??0,'Các ca đủ dữ liệu công','check')}${stat('Công quy đổi',s.work_units??0,'Ca thường 1 · cả ngày 2','units')}${stat('Làm thêm sau ca',s.overtime_minutes??0,'Phút cần đối soát','overtime')}${stat('Giờ làm ghi nhận',(Number(s.minutes||0)/60).toFixed(1),'Chưa bao gồm quy tắc tính lương','clock')}${stat('Đi muộn',s.late??0,'Tổng phút theo bảng công','calendar')}${stat('Ngày nghỉ được duyệt',s.leaveDays??0,'Theo đơn đã phê duyệt','file')}</div>${branchReport(data.branches||[])}<section class="card"><div class="card-head"><h2>Bảng công theo ca</h2><span class="tag">${data.summary.assignments} CA</span></div>${filterBar({reports:true})}<div class="card-body modal-actions"><button class="btn" data-action="report-xlsx-all" ${data.summary.assignments?'':'disabled'}>Xuất Excel tổng chấm công</button><button class="btn secondary" data-action="report-documents" ${data.summary.assignments?'':'disabled'}>Excel / In bảng công</button></div><div id="report-page"></div></section>`;drawReportPage();
 }
 function handoverCards(rows){
  return rows.map(r=>`<article class="assignment-card"><strong>${esc(r.branch_name)} · ${esc(r.shift_name)}</strong><p class="hint">${esc(r.full_name)} · ${dt(r.created_at)}</p><p class="request-reason">${esc(r.message)}</p></article>`).join('');
@@ -558,9 +587,9 @@ function prepareResponsiveTables(){
 async function navigate(view=state.view) {
   if(!state.user||pendingCapture?.sending||pendingCapture?.checking||recoveryBusy)return;
   const allowed=new Set(navItems().map(x=>x[0]));allowed.add('extra');if(!allowed.has(view))view=landing();
-  const changed=state.view!==view;stopChat();if(documentPreview)closeModal();stopCamera();if(pendingCapture&&!pendingCapture.sending)closeModal();
+  const changed=state.view!==view;abortRequests(true);stopChat();if(documentPreview)closeModal();stopCamera();if(pendingCapture&&!pendingCapture.sending)closeModal();
   if(changed){viewFilters[state.view]={...state.filters};state.filters={...(viewFilters[view]||defaultFilters())};}
-  state.view=view;listState=null;const id=++state.renderId;stopMotion();shell();
+  state.view=view;listState=null;reportPaging=null;state.reports=[];state.reportData=null;const id=++state.renderId;stopMotion();shell();
   if(changed)window.scrollTo({top:0,left:0,behavior:'instant'});
   try {
     await ({overview:renderOverview,today:renderToday,history:renderHistory,schedule:renderSchedule,admin:renderAdmin,reports:renderReports,requests:renderRequests,alerts:renderAlerts,extra:renderExtra,handover:renderHandover,push:renderPush,sessions:renderSessions,payroll:renderPayroll,messages:renderMessages}[view])(id);
@@ -582,7 +611,7 @@ async function startCamera(facing=cameraFacing,{strict=false}={}) {
  if(cameraOpening||captureAbort&&!captureAbort.signal.aborted)return;
  stopCamera();const ticket=cameraTicket,epoch=state.sessionEpoch;cameraOpening=true;cameraControls();
  try{
-  const stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:strict?{exact:facing}:{ideal:facing},width:{ideal:1200},height:{ideal:1600}},audio:false});
+  const stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:strict?{exact:facing}:{ideal:facing},width:{ideal:1200},height:{ideal:1600},frameRate:{ideal:24,max:30}},audio:false});
   if(ticket!==cameraTicket||epoch!==state.sessionEpoch||document.hidden){stream.getTracks().forEach(t=>t.stop());return;}
   const video=$('#camera');if(!video){stream.getTracks().forEach(t=>t.stop());return;}
   state.stream=stream;video.srcObject=stream;
@@ -618,7 +647,7 @@ async function capture(type,button) {
   if(type==='OUT'&&a.out_id)throw new Error('Ca này đã có lượt tan ca.');
   if(captureAbort)throw new Error('Đang xử lý một lượt chấm công.');
   const run=new AbortController();captureAbort=run;cameraControls();
-  const renderId=state.renderId,stream=state.stream;
+  const renderId=state.renderId,stream=state.stream;let frame;
   const stillCurrent=()=>{if(run.signal.aborted||epoch!==state.sessionEpoch||renderId!==state.renderId||state.stream!==stream||document.hidden||$('#capture-assignment')?.value!==assignment_id)throw new Error('Ca hoặc camera đã thay đổi. Vui lòng chấm lại.');};
   const status=$('#capture-status');
   document.querySelectorAll('[data-action="capture"]').forEach(b=>b.disabled=true);
@@ -626,12 +655,13 @@ async function capture(type,button) {
     status.textContent='Đang lấy vị trí chính xác…';
     const location=await currentPosition({signal:run.signal,onProgress:m=>{if(status.isConnected)status.textContent='Đang cải thiện độ chính xác GPS: ±'+Math.round(m)+' m (cần ≤ 50 m)…';}});
     stillCurrent();
-    const frame=cameraFrame($('#camera'));
+    const {cameraFrame,composeTimemark}=await captureTools();stillCurrent();
+    frame=cameraFrame($('#camera'));
     status.textContent='Đang xác thực ca làm và thời gian máy chủ…';
     const prepared=await api('/api/attendance/prepare',{method:'POST',body:{assignment_id,type,...location},timeout:20000});
     stillCurrent();
     status.textContent='Đang ghép Timemark và nén ảnh…';
-    const photo=await composeTimemark(frame,prepared.metadata);
+    const photo=await composeTimemark(frame,prepared.metadata,{signal:run.signal});
     stillCurrent();
     stopCamera();
     const url=URL.createObjectURL(photo);
@@ -641,7 +671,7 @@ async function capture(type,button) {
     const expires=Number(prepared.expires_at);
     const tick=()=>{if(!pendingCapture||pendingCapture.ticket!==ticket)return;const left=Math.max(0,Math.ceil((expires-Date.now())/1000));const el=$('[data-confirm-expiry]');if(el)el.textContent=left?'Còn '+left+' giây để xác nhận.':recoveryRecord()?'Ảnh đã hết hạn. Xác minh hoặc hủy yêu cầu chưa xử lý.':'Ảnh đã hết hạn. Hãy chụp lại.';syncCaptureControls();};
     tick();confirmationTimer=setInterval(tick,500);
-  } finally { if(captureAbort===run)captureAbort=null;cameraControls();if(status.isConnected)status.textContent=''; }
+  } finally { if(frame){frame.width=0;frame.height=0;}if(captureAbort===run)captureAbort=null;cameraControls();if(status.isConnected)status.textContent=''; }
 }
 async function confirmCapture(button){
  const p=pendingCapture;
@@ -663,7 +693,7 @@ async function confirmCapture(button){
 }
 async function showEmployeeCV(id=state.user?.id){
  const epoch=state.sessionEpoch,render=state.renderId;
- const d=await api('/api/employee-cv?'+query({user_id:id}));
+ const [{cvFields,hrFields,hrDeadlines},d]=await Promise.all([import('./employee-cv.mjs'),api('/api/employee-cv?'+query({user_id:id}))]);
  if(epoch!==state.sessionEpoch||render!==state.renderId)return;
  if(!d.available){showModal('Hồ sơ CV','<p class="hint">Cần migration 0021 để mở hồ sơ nhân sự. Dữ liệu chấm công hiện tại không bị ảnh hưởng.</p>');return;}
  const p=d.profile,cv=d.cv||{},renderFields=items=>items.map(([key,label,type,max])=>d.can_edit?`<label class="${type==='textarea'?'full':''}">${esc(label)}${type==='textarea'?`<textarea name="${key}" maxlength="${max}" rows="3">${esc(cv[key]||'')}</textarea>`:`<input name="${key}" type="${type}" maxlength="${max}" value="${esc(cv[key]||'')}" ${key==='birth_date'?'max="'+today()+'"':''} autocomplete="off">`}</label>`:`<div class="cv-read-field"><small>${esc(label)}</small><p>${esc(cv[key]||'Chưa cập nhật')}</p></div>`).join('');
@@ -678,14 +708,17 @@ async function showEmployeeCV(id=state.user?.id){
 async function showPhoto(id) {
   const epoch=state.sessionEpoch,ticket=showModal('Ảnh chấm công',loading());
   try {
-    const response=await api(`/api/cloudflare/photo/${encodeURIComponent(id)}`,{raw:true});
-    const url=URL.createObjectURL(await response.blob());photoURLs.push(url);
-    if(!modal.open||ticket!==modalTicket||epoch!==state.sessionEpoch){URL.revokeObjectURL(url);return;}
+    const response=await api(`/api/cloudflare/photo/${encodeURIComponent(id)}`,{raw:true,signal:modalAbort.signal});
+    const blob=await response.blob();
+    if(!modal.open||ticket!==modalTicket||epoch!==state.sessionEpoch)return;
+    const url=URL.createObjectURL(blob);photoURLs.push(url);
     $('.modal-body').innerHTML=`<img class="photo-view" src="${url}" alt="Ảnh Timemark chấm công"><p class="hint">Ảnh ghép trên thiết bị; dùng bản ghi công máy chủ và quy trình đối soát để kiểm tra.</p>`;
   } catch(e) { if(modal.open&&ticket===modalTicket&&epoch===state.sessionEpoch)$('.modal-body').innerHTML=`<p class="error-text">${esc(e.message)}</p>`; }
 }
 async function openDocumentPreview(kind,person='',pos=false){
- const data=kind==='report'?state.reportData:state.payrollData,epoch=state.sessionEpoch,render=state.renderId;
+ const epoch=state.sessionEpoch,render=state.renderId;
+ const data=kind==='report'?(state.view==='reports'?await fullReport():state.reportData):state.payrollData;
+ if(epoch!==state.sessionEpoch||render!==state.renderId)return;
  if(!data||!state.user||kind==='payroll'&&state.user.role!=='admin')throw Error('Không có quyền hoặc dữ liệu chưa sẵn sàng.');
  const mod=await documents();if(epoch!==state.sessionEpoch||render!==state.renderId)return;
  const list=mod.people(kind,data);if(!list.length)throw Error('Không có dữ liệu để in.');
@@ -707,8 +740,9 @@ document.addEventListener('change',e=>{if(documentPreview&&['document-person','d
 window.addEventListener('afterprint',()=>{document.body.classList.remove('printing-document');$('#print-document').innerHTML='';});
 function printSelectedDocument(){const d=documentSelection(),root=$('#print-document');root.innerHTML=d.mod.printDocument(d.kind,d.data,d.id,d.paper);document.body.classList.add('printing-document');try{window.print();}catch(e){document.body.classList.remove('printing-document');root.innerHTML='';throw e;}}
 async function exportFullAttendance(button){
- if(!['admin','manager'].includes(state.user?.role)||state.view!=='reports'||!state.reportData?.rows?.length)throw Error('Không có quyền hoặc dữ liệu chưa sẵn sàng.');
- const data=state.reportData,epoch=state.sessionEpoch,render=state.renderId;button.disabled=true;
+ if(!['admin','manager'].includes(state.user?.role)||state.view!=='reports'||!state.reportData?.summary?.assignments)throw Error('Không có quyền hoặc dữ liệu chưa sẵn sàng.');
+ const epoch=state.sessionEpoch,render=state.renderId;button.disabled=true;
+ const data=await fullReport();if(epoch!==state.sessionEpoch||render!==state.renderId)return;
  const mod=await documents();if(epoch!==state.sessionEpoch||render!==state.renderId)return;
  const bytes=mod.workbook('report',data),url=URL.createObjectURL(new Blob([bytes],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'})),a=document.createElement('a');a.href=url;a.download='BABY_MARK_CHAM_CONG_TONG_'+data.from+'_'+data.to+'.xlsx';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);notify('Đã xuất Excel chấm công, 6 trang tính theo bộ lọc.');
 }
@@ -750,6 +784,7 @@ document.addEventListener('click',async event=>{
       const target=$('.overview-attendance');if(target){target.focus({preventScroll:true});target.scrollIntoView({block:'start',behavior:'instant'});}
       return;
     }
+    if(action==='report-prev'||action==='report-next')return await changeReportPage(action==='report-next'?1:-1);
     if(action==='list-prev'||action==='list-next'){if(listState){listState.page+=action==='list-next'?1:-1;drawList();}return;}
     if(action==='admin-prev'||action==='admin-next'){adminList.page+=action==='admin-next'?1:-1;renderAdminList();return;}
     if(action==='mobile-menu'){mobileMenu(button.getAttribute('aria-expanded')!=='true');return;}
@@ -931,7 +966,7 @@ document.addEventListener('click',async event=>{
         window.open('https://www.google.com/maps/search/?api=1&query='+encodeURIComponent(lat.value+','+lng.value),'_blank','noopener,noreferrer');return;
       }
       const ticket=modalTicket;button.disabled=true;show('Đang yêu cầu quyền vị trí…');
-      try{const p=await currentPosition();if(ticket!==modalTicket||!form.isConnected)return;lat.value=p.lat;lng.value=p.lng;show('Đã điền GPS; sai số ±'+Math.round(p.accuracy)+' m. Kiểm tra trước khi lưu.');}
+      try{const p=await currentPosition({signal:modalAbort.signal});if(ticket!==modalTicket||!form.isConnected)return;lat.value=p.lat;lng.value=p.lng;show('Đã điền GPS; sai số ±'+Math.round(p.accuracy)+' m. Kiểm tra trước khi lưu.');}
       catch(e){if(ticket===modalTicket)show(e.message,true);}
       finally{if(button.isConnected)button.disabled=false;}
       return;
@@ -964,7 +999,7 @@ document.addEventListener('click',async event=>{
     }
     if(action==='cv-print'){
       const epoch=state.sessionEpoch,render=state.renderId,ticket=modalTicket;button.disabled=true;
-      const d=await api('/api/employee-cv?'+query({user_id:button.dataset.id}),{timeout:15000});
+      const [{cvPrint},d]=await Promise.all([import('./cv-print.mjs'),api('/api/employee-cv?'+query({user_id:button.dataset.id}),{timeout:15000})]);
       if(epoch!==state.sessionEpoch||render!==state.renderId||ticket!==modalTicket||!modal.open)return;
       const root=$('#print-document');root.innerHTML=cvPrint(d);document.body.classList.add('printing-document');
       try{window.print();}catch(e){document.body.classList.remove('printing-document');root.innerHTML='';throw e;}return;
@@ -1027,6 +1062,8 @@ document.addEventListener('submit',async event=>{
     if(form.dataset.form==='revoke-device'){await api('/api/auth/revoke-device',{method:'POST',body:{id:form.dataset.id}});closeModal();await navigate('sessions');notify('Đã thu hồi phiên đã chọn.');return;}
     if(form.dataset.form==='employee-cv'){
       const id=form.dataset.id,epoch=state.sessionEpoch,ticket=modalTicket;
+      const {cvFields}=await import('./employee-cv.mjs');
+      if(epoch!==state.sessionEpoch||ticket!==modalTicket)return;
       await api('/api/employee-cv',{method:'POST',body:{user_id:id,expected_revision:Number(form.dataset.revision),cv:Object.fromEntries(cvFields.map(([key])=>[key,values[key]||'']))}});
       if(epoch!==state.sessionEpoch||ticket!==modalTicket)return;
       await showEmployeeCV(id);notify('Đã lưu hồ sơ CV nhân viên.');return;
@@ -1154,17 +1191,31 @@ document.addEventListener('submit',async event=>{
   finally{if(button.isConnected){button.disabled=false;button.innerHTML=old;}}
 });
 modal.addEventListener('cancel',event=>{event.preventDefault();if(!pendingCapture?.sending&&!pendingCapture?.checking){closeModal();drawRecovery();}});
-window.addEventListener('pagehide',()=>{stopCamera();clearTimeout(chatTimer);chatTimer=null;if(pendingCapture&&!pendingCapture.sending)closeModal();clearPhotos();});
+window.addEventListener('pagehide',()=>{stopMotion();stopCamera();chatAbort?.abort();clearTimeout(chatTimer);chatTimer=null;if(pendingCapture&&!pendingCapture.sending)closeModal();clearPhotos();});
 window.addEventListener('pageshow',e=>{if(e.persisted&&state.user&&state.view==='messages'&&chatPage)scheduleChat(state.renderId,1000);});
 document.addEventListener('visibilitychange',()=>{
- if(document.hidden){stopCamera();clearTimeout(chatTimer);chatTimer=null;}
- else if(state.user&&state.view==='messages'&&chatPage){chatIdle=0;scheduleChat(state.renderId,1000);}
+ if(document.hidden){stopMotion();stopCamera();chatAbort?.abort();clearTimeout(chatTimer);chatTimer=null;}
+ else observeMotion($('#content'));
+ if(!document.hidden&&state.user&&state.view==='messages'&&chatPage){chatIdle=0;scheduleChat(state.renderId,1000);}
 });
 
+window.addEventListener('offline',()=>{chatAbort?.abort();clearTimeout(chatTimer);chatTimer=null;});
+window.addEventListener('online',()=>{
+ if(document.hidden)return;
+ if(state.user&&state.view==='messages'&&chatPage){chatIdle=0;chatFailures=0;scheduleChat(state.renderId,1000);}
+ else if(state.token&&!state.user)void boot();
+});
+
+let bootRun=null;
 async function boot(){
   if(!state.token)return renderLogin();
-  try{state.user=(await api('/api/auth/me')).user;await navigate(landing());}
-  catch(e){if(e.status===401||e.status===403){setSession(null);renderLogin(e.message);}else{app.innerHTML='<main class="login-panel"><section class="login-box"><h2>Chưa thể kết nối BABY MARK</h2><p class="muted">Phiên đã lưu chưa bị xóa. Kiểm tra mạng và thử lại.</p><button class="btn" data-action="session-retry">Thử lại</button><button class="btn secondary" data-action="logout">Đăng xuất</button></section></main>';}}
+  const epoch=state.sessionEpoch;if(bootRun?.epoch===epoch)return bootRun.promise;
+  const run={epoch};bootRun=run;
+  run.promise=(async()=>{
+   try{const data=await api('/api/auth/me');if(epoch!==state.sessionEpoch)return;state.user=data.user;await navigate(landing());}
+   catch(e){if(epoch!==state.sessionEpoch)return;if(e.status===401||e.status===403){setSession(null);renderLogin(e.message);}else{app.innerHTML='<main class="login-panel"><section class="login-box"><h2>Chưa thể kết nối BABY MARK</h2><p class="muted">Phiên đã lưu chưa bị xóa. Kiểm tra mạng và thử lại.</p><button class="btn" data-action="session-retry">Thử lại</button><button class="btn secondary" data-action="logout">Đăng xuất</button></section></main>';}}
+  })();
+  try{return await run.promise;}finally{if(bootRun===run)bootRun=null;}
 }
-window.addEventListener('storage',event=>{if(event.key!==SESSION_KEY&&event.key!==null)return;if(!state.token)return;let old=null;try{old=JSON.parse(event.oldValue||'null');}catch{}if(event.key!==null&&old?.token!==state.token)return;recentApiErrors=[];state.user=null;stopCamera();closeModal();resetChat();recoveryBusy=null;state.sessionEpoch++;state.renderId++;state.token=null;overviewDay='';overviewBranch='';overviewStatus='';state.overview=null;state.assignments=[];state.attendances=[];state.admin={};state.reports=[];state.reportData=null;state.requests=[];state.handover=null;state.extra=null;state.payrollData=null;state.payrollMonth=null;state.payrollRevision=null;viewFilters={};state.filters=defaultFilters();state.adminTab='employees';try{sessionStorage.removeItem(SESSION_KEY)}catch{}renderLogin('Phiên trên thiết bị đã thay đổi. Vui lòng mở lại ứng dụng hoặc đăng nhập.');});
+window.addEventListener('storage',event=>{if(event.key!==SESSION_KEY&&event.key!==null)return;if(!state.token)return;let old=null;try{old=JSON.parse(event.oldValue||'null');}catch{}if(event.key!==null&&old?.token!==state.token)return;recentApiErrors=[];abortRequests();state.user=null;stopCamera();closeModal();resetChat();reportPaging=null;recoveryBusy=null;state.sessionEpoch++;state.renderId++;state.token=null;overviewDay='';overviewBranch='';overviewStatus='';state.overview=null;state.assignments=[];state.attendances=[];state.admin={};state.reports=[];state.reportData=null;state.requests=[];state.handover=null;state.extra=null;state.payrollData=null;state.payrollMonth=null;state.payrollRevision=null;viewFilters={};state.filters=defaultFilters();state.adminTab='employees';try{sessionStorage.removeItem(SESSION_KEY)}catch{}renderLogin('Phiên trên thiết bị đã thay đổi. Vui lòng mở lại ứng dụng hoặc đăng nhập.');});
 await boot();

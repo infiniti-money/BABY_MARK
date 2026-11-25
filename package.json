@@ -11,6 +11,8 @@
     "build": "node scripts/build.mjs",
     "test": "node --test cloudflare/tests/*.test.mjs tests/*.test.mjs",
     "test:browser": "playwright test",
+    "test:mobile": "playwright test -c playwright.mobile.config.mjs",
+    "perf:local": "node scripts/measure-performance.mjs",
     "dev": "npm run build && wrangler pages dev dist --port 8788",
     "check:runtime": "npm run build && wrangler pages functions build functions --outdir work/functions-build --compatibility-date 2026-11-24",
     "demo": "npm run check:runtime && node scripts/local-test-server.mjs --demo"

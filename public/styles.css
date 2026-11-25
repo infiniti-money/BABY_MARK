@@ -665,3 +665,15 @@ td,th{overflow-wrap:anywhere}
 }
 
 .cv-print{font-size:12px;overflow-wrap:anywhere}.cv-print header img{object-fit:contain}.cv-print h3{margin:12px 0 5px}.cv-print-field{margin:4px 0 8px;border-bottom:1px solid #ddd;padding:3px 0;break-inside:avoid}.cv-print-field p{white-space:pre-wrap;margin:2px 0 4px}@page babymark-cv{size:A4 portrait;margin:12mm}@media print{#print-document .cv-print{page:babymark-cv}}
+
+/* Keep close controls reachable and text contained on small touch screens. */
+@media screen and (max-width:900px){
+ dialog .close{min-width:44px;min-height:44px;touch-action:manipulation}
+ .chat-layout>*,.chat-thread>*{min-width:0;max-width:100%}
+ .chat-room .card-head>div{min-width:0;max-width:100%}
+ .chat-room .card-head h2{overflow-wrap:anywhere}
+ .chat-layout #chat-threads{max-height:30dvh;overscroll-behavior:contain}
+ .chat-message p{overflow-wrap:anywhere}
+ dialog .modal-body{overflow-wrap:anywhere}
+ .admin-pager>div{flex-wrap:wrap}
+}
