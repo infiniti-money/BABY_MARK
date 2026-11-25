@@ -53,6 +53,7 @@ async function submit(request,env,user){
  if(c.state==='COMPLETED'){
   if(c.photo_sha256!==sha)fail(409,'Ảnh khác với yêu cầu đã ghi nhận','REPLAY_MISMATCH');
   const t=await env.DB.prepare('SELECT * FROM attendances WHERE id=? AND user_id=?').bind(c.attendance_id,user.id).first();
+  if(!t)fail(409,'Chưa thể xác minh bản ghi đã hoàn tất; liên hệ quản trị','ATTENDANCE_UNKNOWN');
   return reply({attendance:t,idempotent:true});
  }
  if(c.state!=='READY')fail(409,'Yêu cầu đã sử dụng hoặc đang xử lý; kiểm tra lịch sử','CHALLENGE_USED');
@@ -65,7 +66,7 @@ async function submit(request,env,user){
  if(c.type==='OUT'&&!await existing(env.DB,a.id,'IN'))fail(409,'Cần chấm vào trước khi tan ca','IN_REQUIRED');
  const id=crypto.randomUUID(),key='timemark/'+id+'.jpg';
  let claimed;try{claimed=await env.DB.prepare("UPDATE attendance_challenges SET state='PROCESSING',photo_sha256=?,attendance_id=? WHERE id=? AND user_id=? AND state='READY' AND expires_at>? RETURNING id")
-  .bind(sha,id,c.id,user.id,receivedAt).first();}catch{fail(409,'Có yêu cầu chấm công khác đang xử lý','ATTENDANCE_PROCESSING');}
+  .bind(sha,id,c.id,user.id,Date.now()).first();}catch{fail(409,'Có yêu cầu chấm công khác đang xử lý','ATTENDANCE_PROCESSING');}
  if(!claimed)fail(409,'Yêu cầu đã được sử dụng','CHALLENGE_USED');
  try{
   // Recheck after claiming: PROCESSING triggers now freeze both the assignment
@@ -100,11 +101,32 @@ async function submit(request,env,user){
   throw e;
  }
 }
+// A single read snapshot: another challenge may already have recorded this
+// assignment/type. Never disclose another user's challenge or photo metadata.
+async function readStatus(db,user,id){
+ const c=await db.prepare(`SELECT c.state,c.expires_at,t.id AS record_id,t.assignment_id,t.type,t.server_timestamp
+ FROM attendance_challenges c LEFT JOIN attendances t
+ ON t.assignment_id=c.assignment_id AND t.type=c.type AND t.user_id=c.user_id
+ WHERE c.id=? AND c.user_id=?`).bind(id,user.id).first();
+ if(!c)fail(404,'Không tìm thấy yêu cầu');
+ const t=c.record_id?{id:c.record_id,assignment_id:c.assignment_id,type:c.type,server_timestamp:c.server_timestamp}:null;
+ return {state:t?'COMPLETED':c.state==='COMPLETED'?'UNKNOWN':c.state==='READY'&&c.expires_at<=Date.now()?'EXPIRED':c.state,attendance:t,expires_at:c.expires_at};
+}
+async function cancelReady(request,env,user){
+ const b=await jsonLimited(request);
+ if(!idPattern.test(b?.challenge_id||''))fail(400,'Mã yêu cầu không hợp lệ');
+ // Atomic transition: a delayed submit and cancel cannot both claim READY.
+ // FAILED is a terminal, unused challenge; never touch PROCESSING/COMPLETED,
+ // existing attendance, KV objects, or storage locks.
+ await env.DB.prepare("UPDATE attendance_challenges SET state='FAILED' WHERE id=? AND user_id=? AND state='READY'").bind(b.challenge_id,user.id).run();
+ return reply(await readStatus(env.DB,user,b.challenge_id));
+}
 export async function onRequestPost({request,env,params}){
- if(!env.DB||!env.TIMEMARKS)return reply({error:'Chưa cấu hình D1/KV'},503);
+ if(!env.DB||(!env.TIMEMARKS&&params.action!=='cancel'))return reply({error:'Chưa cấu hình D1/KV'},503);
  try{const user=await sessionUser(request,env.DB);if(!user)return reply({error:'Chưa đăng nhập'},401);
   if(params.action==='prepare')return await prepare(request,env,user);
   if(params.action==='submit')return await submit(request,env,user);
+  if(params.action==='cancel')return await cancelReady(request,env,user);
   return reply({error:'Không tìm thấy API'},404);
  }catch(e){return errorResponse(e);}
 }
@@ -114,9 +136,7 @@ export async function onRequestGet({request,env,params}){
   const user=await sessionUser(request,env.DB);if(!user)return reply({error:'Chưa đăng nhập'},401);
   if(params.action==='status'){
    const id=new URL(request.url).searchParams.get('challenge_id');if(!idPattern.test(id||''))fail(400,'Mã yêu cầu không hợp lệ');
-   const c=await env.DB.prepare('SELECT id,state,expires_at,attendance_id FROM attendance_challenges WHERE id=? AND user_id=?').bind(id,user.id).first();if(!c)fail(404,'Không tìm thấy yêu cầu');
-   const t=c.attendance_id?await env.DB.prepare('SELECT id,assignment_id,type,server_timestamp FROM attendances WHERE id=? AND user_id=?').bind(c.attendance_id,user.id).first():null;
-   return reply({state:t?'COMPLETED':c.state==='COMPLETED'?'UNKNOWN':c.state==='READY'&&c.expires_at<=Date.now()?'EXPIRED':c.state,attendance:t,expires_at:c.expires_at});
+   return reply(await readStatus(env.DB,user,id));
   }
   if(params.action!=='history')return reply({error:'Không tìm thấy API'},404);
   const u=new URL(request.url),from=u.searchParams.get('from')||new Date(Date.now()+7*3600000-31*86400000).toISOString().slice(0,10),to=u.searchParams.get('to')||new Date(Date.now()+7*3600000).toISOString().slice(0,10);

@@ -8,10 +8,10 @@ import {policy} from '../../../cloudflare/lib/policy.mjs';
 export async function onRequestGet({request,env}){
  try{
   await actorFor(request,env,{admin:true});const db=env.DB,now=Date.now();
-  const schema=await schemaReadiness(db),issues=[];
+  const started=performance.now(),schema=await schemaReadiness(db),issues=[],probes={};
   const add=(code,severity,count=null)=>issues.push({code,severity,count});
   for(const m of schema.migrations.filter(m=>m.status==='missing'))add('MIGRATION_'+m.id,'blocking',m.missing.length);
-  const check=async(code,fn)=>{try{return await fn()}catch{add(code,'unknown');return null}};
+  const check=async(code,fn)=>{const at=performance.now();try{const value=await fn();probes[code]={ok:true,ms:Math.round(performance.now()-at)};return value}catch{probes[code]={ok:false,ms:Math.round(performance.now()-at)};add(code,'unknown');return null}};
   const kv=await check('KV_READ_FAILED',async()=>{if(!env.TIMEMARKS)throw Error();await env.TIMEMARKS.get('_health_probe_nonexistent','arrayBuffer');return true});
   const recovery=await check('RECOVERY_SCHEMA_UNAVAILABLE',async()=>{
    const lock=await db.prepare('SELECT acquired_at,CASE WHEN owner IS NULL THEN 0 ELSE 1 END AS held FROM photo_storage_lock WHERE id=1').first();
@@ -40,11 +40,18 @@ export async function onRequestGet({request,env}){
    const failed=recent.filter(x=>x.state==='failed').length,uncertain=recent.filter(x=>x.state==='claimed'&&x.claimed_at<now-600000).length;
    if(failed||uncertain)add('PUSH_DELIVERY_REVIEW','review',failed+uncertain);
    const queueReady=!!await db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='push_queue'").first();
-   const queue=queueReady?(await db.prepare("SELECT state,count(*) AS n FROM push_queue WHERE state IN ('pending','claimed','expired') GROUP BY state").all()).results:[];
+   const queue=[];
+   if(queueReady)for(const state of ['pending','claimed','expired']){
+    const row=await db.prepare('SELECT COUNT(*) AS n FROM (SELECT 1 FROM push_queue WHERE state=? LIMIT 101)').bind(state).first();
+    queue.push({state,n:row.n,capped:row.n===101});
+   }
+   const oldest=queueReady?await db.prepare("SELECT expires_at FROM push_queue WHERE state='pending' ORDER BY expires_at LIMIT 1").first():null;
+   if(oldest&&oldest.expires_at<=now)add('PUSH_QUEUE_OVERDUE','review');
+   if(queue.some(x=>x.state==='claimed'&&x.n))add('PUSH_QUEUE_CLAIMED','review',queue.find(x=>x.state==='claimed').n);
    if(queue.some(x=>x.state==='expired'&&x.n))add('PUSH_QUEUE_EXPIRED','review',queue.find(x=>x.state==='expired').n);
-   return {queue_ready:queueReady,queue,schema_ready:s.available,enabled:s.enabled,vapid_ready:v.ready,cron_secret_ready:cron,recent_receipts:recent.length,failed,uncertain,receipt_sample_limit:100,last_receipt_at:receipts[0]?.claimed_at??null};
+   return {queue_ready:queueReady,queue,queue_count_cap:101,oldest_pending_deadline:oldest?.expires_at??null,schema_ready:s.available,enabled:s.enabled,vapid_ready:v.ready,cron_secret_ready:cron,recent_receipts:recent.length,failed,uncertain,receipt_sample_limit:100,last_receipt_at:receipts[0]?.claimed_at??null};
   });
   const retention=await check('RETENTION_UNAVAILABLE',async()=>{const p=await policy(env);return {attendance_enabled:p.attendance_retention,photo_eviction_enabled:p.photo_eviction}});
-  return reply({version:'1.2.0-rc',generated_at:now,schema,kv_read_ready:kv===true,recovery,roster,push,retention,issues,backup:{status:'manual_verification_required',restore_mode:'isolated_environment_only',offline_tool:'npm run backup:local',kv_included:false}});
+  return reply({version:'1.2.0-rc',generated_at:now,diagnostic_ms:Math.round(performance.now()-started),probes,schema,kv_read_ready:kv===true,recovery,roster,push,retention,issues,backup:{status:'manual_verification_required',restore_mode:'isolated_environment_only',offline_tool:'npm run backup:local',kv_included:false}});
  }catch(e){return apiFailure(e)}
 }

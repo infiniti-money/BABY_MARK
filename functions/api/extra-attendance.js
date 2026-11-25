@@ -1,5 +1,5 @@
 import {actorFor,apiFailure,ApiError,identifier,invalid,textField,dayVN,shiftInterval,assignmentScope,dateRange,managementAudit} from '../../cloudflare/lib/access.mjs';
-import {reply} from '../../cloudflare/lib/auth.mjs';
+import {reply,digest} from '../../cloudflare/lib/auth.mjs';
 import {jsonLimited} from '../../cloudflare/lib/http.mjs';
 async function available(db){return !!await db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='extra_attendance'").first();}
 export async function onRequestGet({request,env}){
@@ -45,10 +45,11 @@ export async function onRequestPost({request,env}){
    if(actor.role==='staff')throw new ApiError(403,'Chỉ quản lý hoặc Admin');
    const id=identifier(b.assignment_id),state=b.state,note=textField(b.note||'',500,true);
    if(!['APPROVED','REJECTED'].includes(state)||state==='REJECTED'&&!note)invalid('Chọn quyết định; từ chối cần lý do');
-   const scope=assignmentScope(actor),now=Date.now();
-   const guard="assignment_id=? AND state='PENDING' AND EXISTS(SELECT 1 FROM assignments a WHERE a.id=extra_attendance.assignment_id AND a.user_id<>? AND "+scope.sql+")";
-   const res=await db.batch([db.prepare("INSERT INTO management_audit(id,actor_id,resource,resource_id,action,details_json,created_at) SELECT ?,?,'extra-attendance',assignment_id,?,?,? FROM extra_attendance WHERE "+guard).bind(crypto.randomUUID(),actor.id,state,JSON.stringify({note}),now,id,actor.id,...scope.values),
-    db.prepare('UPDATE extra_attendance SET state=?,decided_by=?,decided_at=?,decision_note=? WHERE '+guard).bind(state,actor.id,now,note,id,actor.id,...scope.values)]);
+   const now=Date.now(),hash=await digest('babymark-session-v1:'+request.headers.get('authorization').slice(7));
+   const guard="assignment_id=? AND state='PENDING' AND EXISTS(SELECT 1 FROM assignments a JOIN sessions ss ON ss.token_hash=? AND ss.expires_at>? JOIN profiles p ON p.id=ss.user_id AND p.id=? AND p.active=1 JOIN credentials c ON c.user_id=p.id AND c.version=ss.credential_version WHERE a.id=extra_attendance.assignment_id AND a.user_id<>p.id AND (p.role='admin' OR (p.role='manager' AND EXISTS(SELECT 1 FROM branch_managers bm WHERE bm.user_id=p.id AND bm.branch_id=a.branch_id))))";
+   const args=[id,hash,Date.now(),actor.id];
+   const res=await db.batch([db.prepare("INSERT INTO management_audit(id,actor_id,resource,resource_id,action,details_json,created_at) SELECT ?,?,'extra-attendance',assignment_id,?,?,? FROM extra_attendance WHERE "+guard).bind(crypto.randomUUID(),actor.id,state,JSON.stringify({note}),now,...args),
+    db.prepare('UPDATE extra_attendance SET state=?,decided_by=?,decided_at=?,decision_note=? WHERE '+guard).bind(state,actor.id,now,note,...args)]);
    if(res[1].meta.changes!==1)throw new ApiError(409,'Không có quyền hoặc yêu cầu đã xử lý');
    return reply({ok:true});
   }

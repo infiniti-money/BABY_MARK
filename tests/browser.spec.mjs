@@ -129,6 +129,8 @@ test.describe.serial('Cloudflare local frontend and actual D1/KV endpoints',()=>
       if(type==='in'){await page.getByRole('button',{name:'Chụp lại',exact:true}).click();expect(submitted).toBe(0);await expect.poll(()=>page.locator('#camera').evaluate(v=>v.videoWidth>0&&v.readyState>=2)).toBeTruthy();await page.getByTestId('attendance-in').click();await expect(page.getByRole('heading',{name:'Xác nhận ảnh chấm công',exact:true})).toBeVisible({timeout:30000});expect(submitted).toBe(0);}
       await page.getByRole('button',{name:'Xác nhận chấm công',exact:true}).click();
       await expect(page.getByRole('heading',{name:title,exact:true})).toBeVisible({timeout:30000});
+      await expect(page.locator('.attendance-upload-success')).toContainText('Chấm công thành công!');
+      await expect(page.locator('[data-upload-progress]')).toHaveCount(0);
       expect(submitted).toBe(1);page.off('request',countSubmit);
       const preview=page.getByRole('img',{name:'Ảnh Timemark vừa ghi nhận',exact:true});
       await expect.poll(()=>preview.evaluate(img=>img.complete&&img.naturalWidth>0)).toBeTruthy();
@@ -486,7 +488,7 @@ test('v1.2 admin opens diagnostics from overview; staff is denied',async({page,r
  await login(page);
  await page.getByRole('button',{name:'Sức khỏe và phục hồi',exact:true}).click();
  await expect(page.getByRole('heading',{name:'Sức khỏe hệ thống · v1.2.0 RC',exact:true})).toBeVisible();
- await expect(page.getByRole('heading',{name:'Migration đến 0020',exact:true})).toBeVisible();
+ await expect(page.getByRole('heading',{name:'Migration đến 0021',exact:true})).toBeVisible();
  await expect(page.getByText('0016 · Có dấu hiệu schema',{exact:true})).toBeVisible();
  await expect(page.getByRole('heading',{name:'Sao lưu và phục hồi',exact:true})).toBeVisible();
  const staff=await apiToken(request,'staff');
@@ -570,7 +572,7 @@ test('RC.8 motion follows scroll and accessibility preferences without delaying 
  await expect(page.locator('.scroll-progress')).toBeHidden();
  await page.getByRole('button',{name:'Sức khỏe và phục hồi',exact:true}).click();
  await expect(page.getByRole('dialog')).toHaveCSS('animation-name','none');
- await expect(page.getByRole('heading',{name:'Migration đến 0020',exact:true})).toBeVisible();
+ await expect(page.getByRole('heading',{name:'Migration đến 0021',exact:true})).toBeVisible();
 });
 
 
@@ -713,4 +715,76 @@ test('RC.14 frosted surfaces keep navigation, camera and print readable',async({
  expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBeTruthy();
  await page.emulateMedia({media:'print'});
  expect(await page.evaluate(()=>getComputedStyle(document.documentElement).getPropertyValue('--glass-panel').trim())).toBe('');
+});
+
+test('RC.15 500 and lost response lock repeat capture; reload recovers committed attendance',async({page,request})=>{
+ const admin=await apiToken(request,'admin'),employee=await disposableAccount(request,admin,'test-recovery');
+ const now=Date.now(),start=now-3600000,end=now+7200000,clock=t=>new Intl.DateTimeFormat('en-GB',{timeZone:'Asia/Ho_Chi_Minh',hour:'2-digit',minute:'2-digit',hourCycle:'h23'}).format(t);
+ const shift=await request.post('/api/admin/shifts',{headers:auth(admin),data:{name:'Ca phục hồi '+now,start_time:clock(start),end_time:clock(end),grace_period:5}});
+ expect(shift.status()).toBe(201);
+ const assignment=await request.post('/api/admin/assignments',{headers:auth(admin),data:{user_id:employee.id,branch_id:'BM-001',shift_id:(await shift.json()).id,work_date:dayVN(start)}});
+ expect(assignment.status()).toBe(201);
+ await loginAccount(page,employee.username,employee.secret);
+ await page.getByRole('button',{name:'Bật camera',exact:true}).click();
+ await expect.poll(()=>page.locator('#camera').evaluate(v=>v.videoWidth>0&&v.readyState>=2)).toBeTruthy();
+ await page.getByTestId('attendance-in').click();
+ await expect(page.getByRole('heading',{name:'Xác nhận ảnh chấm công',exact:true})).toBeVisible({timeout:30000});
+ let submissions=0,release;
+ const gate=new Promise(r=>release=r);
+ await page.emulateMedia({reducedMotion:'no-preference'});
+ await page.route('**/api/attendance/submit',async route=>{
+  submissions++;
+  if(submissions===1){await gate;return route.fulfill({status:500,contentType:'application/json',body:JSON.stringify({error:'Lỗi giả lập'})});}
+  const accepted=await route.fetch();
+  // 201 initial commit, 200 idempotent replay; validate the actual record.
+  expect([200,201]).toContain(accepted.status());
+  const result=await accepted.json();expect(result.attendance?.id).toBeTruthy();expect(result.attendance.assignment_id).toBe((await assignment.json()).id);
+  await route.abort('failed');
+ });
+ const confirm=page.getByRole('button',{name:'Xác nhận chấm công',exact:true}),retake=page.getByRole('button',{name:'Chụp lại',exact:true});
+ try{
+  await confirm.click();
+  const progress=page.locator('[data-upload-progress]');
+  await expect(progress).toBeVisible();
+  await expect(progress.locator('img')).toHaveAttribute('src','/brand/logo.png');
+  await expect(progress.locator('.attendance-upload-ring')).toHaveCSS('animation-name','bm-upload-spin');
+  await expect(confirm).toBeDisabled();await expect(retake).toBeDisabled();
+  await expect(page.locator('.attendance-upload-success')).toHaveCount(0);
+  await page.emulateMedia({reducedMotion:'reduce'});
+  await expect(progress.locator('.attendance-upload-ring')).toHaveCSS('animation-name','none');
+ }finally{release();}
+ await expect(page.locator('[data-confirm-error]')).toContainText('Kiểm tra trạng thái');
+ await expect(page.locator('[data-upload-progress]')).toBeHidden();
+ await expect(confirm).toBeDisabled();await expect(retake).toBeDisabled();
+ await page.getByRole('button',{name:'Kiểm tra trạng thái',exact:true}).click();
+ await expect(confirm).toBeEnabled();await expect(retake).toBeDisabled();
+ await confirm.click();await expect(confirm).toBeDisabled();await expect(page.locator('[data-confirm-error]')).toContainText('Kiểm tra trạng thái');
+ expect(submissions).toBe(2);await page.reload();
+ await expect(page.getByRole('button',{name:'Kiểm tra yêu cầu trước',exact:true})).toBeVisible();
+ await expect(page.getByTestId('attendance-in')).toBeDisabled();
+ await page.getByRole('button',{name:'Kiểm tra yêu cầu trước',exact:true}).click();
+ await expect(page.locator('[data-capture-recovery]')).toBeHidden();
+ await expect(page.locator('#notice')).toContainText('Máy chủ đã ghi nhận');
+ const token=(await (await request.post('/api/auth/login',{data:{username:employee.username,secret:employee.secret}})).json()).token;
+ const history=await (await request.get('/api/attendance/history?from='+dayVN(start)+'&to='+dayVN(end),{headers:auth(token)})).json();
+ expect(history.attendances.filter(a=>a.type==='IN')).toHaveLength(1);
+});
+
+test('employee CV is editable by admin, private and visible to the employee',async({page,request})=>{
+ const admin=await apiToken(request,'admin'),employee=await disposableAccount(request,admin,'test-cv');
+ await login(page);await page.getByRole('button',{name:'Quản trị',exact:true}).click();
+ const row=page.getByRole('row').filter({hasText:employee.employee_code});await expect(row).toBeVisible();
+ await row.getByRole('button',{name:'Hồ sơ CV',exact:true}).click();
+ await page.getByLabel('Vị trí công việc',{exact:true}).fill('Tư vấn bán hàng');
+ await page.getByLabel('Kỹ năng chuyên môn',{exact:true}).fill('<script>CV test</script>');
+ await page.getByRole('button',{name:'Lưu hồ sơ CV',exact:true}).click();
+ await expect(page.locator('#notice')).toContainText('Đã lưu hồ sơ CV');
+ await expect(page.getByLabel('Vị trí công việc',{exact:true})).toHaveValue('Tư vấn bán hàng');
+ await page.getByRole('button',{name:'Đóng',exact:true}).click();
+ await page.getByRole('button',{name:'Đăng xuất tài khoản',exact:true}).click();
+ await loginAccount(page,employee.username,employee.secret);
+ await page.getByRole('button',{name:'Hồ sơ của tôi',exact:true}).click();
+ await expect(page.getByRole('dialog')).toContainText('Tư vấn bán hàng');
+ await expect(page.getByRole('dialog')).toContainText('<script>CV test</script>');
+ await expect(page.getByRole('button',{name:'Lưu hồ sơ CV',exact:true})).toHaveCount(0);
 });
