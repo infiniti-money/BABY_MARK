@@ -721,3 +721,25 @@ td,th{overflow-wrap:anywhere}
  .request-table.responsive-table td[data-field=person] strong{font-size:15px}
  .request-table.responsive-table td[data-field=reason]{line-height:1.6}
 }
+
+/* Mobile table hotfix: labels must participate in flow, never float over the
+   following cell when Safari wraps text. Keep desktop/print table semantics. */
+@media screen and (max-width:900px){
+ .table-wrap{min-width:0;max-width:100%;overflow-x:auto}
+ .table-wrap table td{overflow-wrap:anywhere}
+ .table-wrap table td .btn{white-space:normal;overflow-wrap:anywhere;max-width:100%}
+}
+@media screen and (max-width:620px){
+ .table-wrap:has(.responsive-table){overflow:visible;min-width:0;padding:8px}
+ .table-wrap .responsive-table,.table-wrap .responsive-table tbody{min-width:0;max-width:100%;width:100%}
+ .table-wrap .responsive-table tbody{grid-template-columns:minmax(0,1fr);gap:10px}
+ .table-wrap .responsive-table tbody tr{min-width:0;max-width:100%;padding:6px 12px;border-radius:16px;background:#fff}
+ .table-wrap .responsive-table td[data-label]{position:static;display:block;min-width:0;max-width:100%;min-height:0;padding:10px 0;text-align:start;white-space:normal;font-size:14px;line-height:1.5;overflow-wrap:anywhere}
+ .table-wrap .responsive-table td[data-label]::before{display:block;position:static;width:auto;max-width:100%;margin:0 0 4px;font-size:12px;font-weight:650;line-height:1.4;white-space:normal;overflow-wrap:anywhere;color:var(--muted)}
+ .table-wrap .responsive-table td[data-label=""]::before{display:none}
+ .table-wrap .responsive-table td[data-label]>*{min-width:0;max-width:100%;overflow-wrap:anywhere}
+ .table-wrap .responsive-table td[data-label] .btn{width:100%;min-height:44px;min-width:0;white-space:normal;overflow-wrap:anywhere;text-align:center;padding:9px 12px;margin:3px 0}
+ .table-wrap .responsive-table td[data-label] .tag{white-space:normal;max-width:100%;overflow-wrap:anywhere}
+ .table-wrap .responsive-table td[data-label] .tag .icon{flex-shrink:0}
+ .table-wrap .responsive-table td[data-label] small{font-size:12px;line-height:1.5}
+}
