@@ -9,3 +9,6 @@ Operator check: on iPhone open the installed web app, navigate to attendance/rep
 ## Floating navigation dock
 
 The mobile navigation uses an inset rounded glass container inspired by the supplied iPhone home-screen dock, with four role-scoped actions, distinct rounded icon tiles, active red brand tile and visible labels. It reserves vertical space including the safe area; compact landscape keeps 44px touch targets. Solid fallback, reduced transparency and forced-colors styles are provided. Desktop sidebar, role permissions and data are unchanged. Added WebKit/Chromium geometry and interaction regression tests; physical device acceptance still required.
+
+## Prototype refinement
+Applied the supplied design direction to actual UI: larger glass icon tiles (54px, 48px on narrow phones), compact bold labels, active red shine and underline, more translucent dock (46% base opacity with backdrop support), safe-area reservation and accessibility fallbacks. Phone employee dashboard uses real authenticated name and role, actual server attendance timestamps only for a single displayed shift, and a visible "Nhiều ca" indicator otherwise; no fake sample names, avatars, notifications, break times, or fingerprint authentication. Existing camera, shift selection, IN/OUT controls, permissions, and quick actions remain. Added browser checks; verify physical devices after CI.

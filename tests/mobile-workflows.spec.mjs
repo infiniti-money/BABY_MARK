@@ -52,11 +52,21 @@ test('floating iOS-style dock has four touch targets, inset edges and room below
   expect(geometry.bottom).toBeLessThanOrEqual(viewport.height-5);expect(geometry.radius).toBeGreaterThanOrEqual(20);
   expect(geometry.reserve).toBeGreaterThanOrEqual(geometry.height+viewport.height-geometry.bottom);
   expect(geometry.targets).toHaveLength(4);
-  for(const t of geometry.targets){expect(t.w).toBeGreaterThanOrEqual(44);expect(t.h).toBeGreaterThanOrEqual(44);expect(t.iconW).toBeGreaterThanOrEqual(32);expect(t.iconH).toBeGreaterThanOrEqual(32);}
+  for(const t of geometry.targets){expect(t.w).toBeGreaterThanOrEqual(44);expect(t.h).toBeGreaterThanOrEqual(44);expect(t.iconW).toBeGreaterThanOrEqual(viewport.width===844?34:48);expect(t.iconH).toBeGreaterThanOrEqual(viewport.width===844?34:48);}
   const sorted=[...geometry.targets].sort((a,b)=>a.x-b.x);for(let i=1;i<sorted.length;i++)expect(sorted[i].x).toBeGreaterThanOrEqual(sorted[i-1].right-1);
   expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1)).toBe(true);
  }
  await page.setViewportSize({width:390,height:844});await nav.locator('[data-view="schedule"]').click();await expect(nav.locator('[data-view="schedule"]')).toHaveAttribute('aria-current','page');
  await nav.locator('[data-action="mobile-menu"]').click();await expect(page.locator('#navigation-menu')).toBeVisible();await page.keyboard.press('Escape');
  await page.setViewportSize({width:1440,height:900});await expect(nav.locator('[data-action="mobile-menu"]')).toBeHidden();await expect(nav.locator('[data-view="schedule"]')).toBeVisible();
+});
+
+test('prototype keeps real employee identity and attendance controls, without fabricated times',async({page})=>{
+ await page.emulateMedia({reducedMotion:'reduce'});await page.setViewportSize({width:390,height:844});await login(page,'staff');
+ const welcome=page.locator('.ios-welcome');await expect(welcome).toBeVisible();await expect(welcome.locator('strong')).toHaveText(await page.locator('.profile strong').innerText());
+ await expect(page.locator('.ios-attendance-times')).toBeVisible();await expect(page.getByTestId('attendance-in')).toBeVisible();await expect(page.getByTestId('attendance-out')).toBeVisible();
+ await expect(page.locator('.employee-tool-grid button')).toHaveCount(6);
+ const dock=page.locator('#main-nav .primary-nav.active');await expect(dock.locator('.icon')).toHaveCSS('width','54px');await expect(dock).toHaveCSS('font-size','10px');
+ for(const width of [320,375,390,430]){await page.setViewportSize({width,height:844});expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1)).toBe(true);}
+ await page.setViewportSize({width:1440,height:900});await expect(welcome).toBeHidden();await expect(page.locator('.ios-attendance-times')).toBeHidden();
 });
