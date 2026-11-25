@@ -330,3 +330,90 @@ td,th{overflow-wrap:anywhere}
  .brand-intro{display:none!important}
  .motion-revealed[data-motion-side]{animation:none!important;transform:none!important;opacity:1!important}
 }
+
+
+/* RC.10 responsive refinement: phone-first touch workspace, tablet expansion,
+   desktop retains data-rich tables. All rules below are screen-only. */
+@media screen{
+ .mobile-brand-logo,.mobile-brand-name{display:none}
+ .topbar-path .desktop-path{margin:0;color:#927b8b}
+ .topbar-path .current-page{margin-left:4px}
+ .employee-workspace>.card,.employee-checkin-body,.employee-tool-grid>*{min-width:0}
+ @media(max-width:900px){
+  :root{--bottom-nav:76px}
+  .topbar{min-width:0;gap:8px;padding-top:calc(8px + env(safe-area-inset-top));padding-bottom:8px}
+  .topbar-path{display:flex;align-items:center;gap:7px;min-width:0;flex:1}
+  .topbar-path:before{content:none}
+  .mobile-brand-logo{display:block;flex:0 0 32px;border-radius:8px;object-fit:contain}
+  .topbar-path-text{min-width:0}
+  .topbar-path .desktop-path{display:none}
+  .topbar-path .mobile-brand-name{display:block;color:var(--wine);font-size:11px;font-weight:750;letter-spacing:.7px;margin:0}
+  .topbar-path .current-page{display:block;margin:2px 0 0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:10px}
+  .profile{flex:0 1 auto;gap:5px;min-width:0}.profile strong{max-width:clamp(60px,25vw,165px)}.profile small{max-width:clamp(60px,25vw,165px);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .topbar .mobile-logout{min-width:44px;min-height:44px;padding:7px}
+  .sidebar{padding-top:5px;padding-bottom:calc(5px + env(safe-area-inset-bottom));scroll-padding:8px;max-height:min(76dvh,520px)}
+  .nav{gap:3px}.nav button{min-height:56px;line-height:1.2;font-size:11px}.nav button span{overflow-wrap:anywhere}
+  .sidebar.menu-open .nav{row-gap:6px}.sidebar.menu-open .nav button{background:#f8f3f6}.sidebar.menu-open .nav button.active{background:var(--pink)}
+  .main{padding-bottom:16px}.page-head h1{font-size:clamp(22px,4.4vw,28px)}
+  .btn,.btn.small,.admin-nav button,.tabs button,.chat-thread{min-height:44px}
+  input:not([type=checkbox]):not([type=radio]),select,textarea,.toolbar input,.toolbar select{font-size:16px}
+  .employee-checkin-body{gap:8px}
+  .employee-checkin-body .camera-toolbar{display:flex;gap:5px;flex-wrap:wrap}
+  .employee-checkin-body .camera-toolbar .btn{flex:0 1 auto;min-height:44px;padding:7px 9px}
+  .employee-capture-actions .btn{min-height:52px;font-size:13px;line-height:1.3}
+  .employee-tool-grid .btn{min-height:52px;line-height:1.35}
+  .employee-checkin-body .camera-placeholder .btn{min-height:48px}
+  .employee-policy summary{min-height:44px}
+  dialog{width:min(680px,calc(100vw - 20px - env(safe-area-inset-left) - env(safe-area-inset-right)));max-height:calc(100dvh - 16px - env(safe-area-inset-top) - env(safe-area-inset-bottom));scroll-padding-block:72px 20px}
+  dialog .modal-head{gap:8px}.modal-head .close{flex-shrink:0}
+  .notice{max-width:calc(100vw - 20px - env(safe-area-inset-left) - env(safe-area-inset-right))}
+  .chat-layout .chat-stream{overscroll-behavior:contain;max-height:45dvh}
+ }
+ @media(max-width:620px){
+  .main{padding-inline:max(10px,env(safe-area-inset-left)) max(10px,env(safe-area-inset-right))}
+  .page-head{margin-bottom:10px}.page-head .muted{font-size:12px;line-height:1.45}.page-head .eyebrow{letter-spacing:1px}
+  .employee-workspace .card-head{gap:6px}.employee-workspace .card-head h2{font-size:16px}
+  .employee-workspace .card-head>div{flex-basis:130px}
+  .employee-metrics{grid-template-columns:repeat(6,minmax(0,1fr))}
+  .employee-metrics>div{grid-column:span 2;padding:9px 8px}
+  .employee-metrics>div:nth-last-child(-n+2){grid-column:span 3}
+  .employee-metrics span{font-size:12px}
+  .employee-tool-grid .btn{font-size:13px;padding:8px;text-align:left}
+  .employee-shift-list .assignment-details,.employee-shift-list .assignment-footer{gap:6px 12px}
+  .employee-camera:not(:has(#camera-placeholder:not([hidden]))){max-height:min(330px,43dvh)}
+  .employee-capture-actions{grid-template-columns:repeat(2,minmax(0,1fr));gap:6px}
+  .login-panel{align-items:center;min-height:100dvh}.login-box form{gap:12px}
+  .login-box .btn.wide{min-height:52px}.login-box h2{font-size:25px}
+  .responsive-table td{min-height:42px}.responsive-table td .btn{min-height:44px}
+  .modal-actions .btn{min-height:48px}
+ }
+ @media(max-width:360px){
+  .mobile-brand-logo{width:28px;height:28px;flex-basis:28px}
+  .profile small{display:none}.topbar-path{gap:5px}
+  .employee-workspace .card-head .btn{flex:0 1 auto;min-height:44px}
+  .employee-tool-grid .btn{font-size:12px}.employee-capture-actions .btn{font-size:12px}
+ }
+ @media(min-width:701px) and (max-width:900px) and (min-height:501px){
+  .employee-workspace{grid-template-columns:minmax(0,1.12fr) minmax(0,.88fr);grid-template-areas:"checkin summary" "checkin shifts" "tools tools" "guidance guidance";align-items:start}
+  .employee-metrics{grid-template-columns:repeat(6,minmax(0,1fr))}
+  .employee-metrics>div{grid-column:span 2}
+  .employee-metrics>div:nth-last-child(-n+2){grid-column:span 3}
+  .employee-camera{max-height:360px}
+  .overview-kpis{grid-template-columns:repeat(5,minmax(0,1fr))}
+  .employee-tool-grid{grid-template-columns:repeat(3,minmax(0,1fr))}
+ }
+ @media(max-width:900px) and (orientation:landscape) and (max-height:500px){
+  :root{--bottom-nav:62px}
+  .topbar{padding-top:calc(4px + env(safe-area-inset-top));padding-bottom:4px}
+  .nav button{min-height:44px;flex-direction:row;gap:6px;font-size:10px}
+  .nav button .icon{width:17px;height:17px;flex-basis:17px}
+  .sidebar{max-height:85dvh}
+  .employee-camera:not(:has(#camera-placeholder:not([hidden]))){aspect-ratio:16/9;max-height:48dvh}
+  .employee-camera:has(#camera-placeholder:not([hidden])) .camera-placeholder{grid-template-columns:minmax(0,1fr)}
+  .employee-camera:has(#camera-placeholder:not([hidden])) .camera-placeholder p{grid-column:auto}
+  .login-panel{align-items:flex-start}
+ }
+ @media(min-width:901px){
+  html{scroll-padding-bottom:16px}
+ }
+}

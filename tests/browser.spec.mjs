@@ -595,3 +595,33 @@ test('RC.9 viewport reveals alternate left and right without layout overflow',as
  expect(await page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth)).toBeTruthy();
  await page.emulateMedia({reducedMotion:'reduce'});await expect(left).toHaveCSS('animation-name','none');await expect(right).toHaveCSS('animation-name','none');
 });
+
+
+test('RC.10 phone-first employee layout, tablet expansion and desktop navigation',async({page})=>{
+ await page.emulateMedia({reducedMotion:'reduce'});await page.setViewportSize({width:390,height:844});await login(page,'staff');
+ const more=page.getByRole('button',{name:'Thêm',exact:true}),work=page.locator('.employee-workspace');
+ const fits=()=>page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth);
+ for(const width of [320,360,390,430]){
+  await page.setViewportSize({width,height:844});
+  expect(await fits()).toBeTruthy();
+  await expect(page.locator('.mobile-brand-logo')).toBeVisible();
+  await expect(more).toBeVisible();
+  for(const id of ['attendance-in','attendance-out']){
+   const b=await work.getByTestId(id).boundingBox();expect(b.height).toBeGreaterThanOrEqual(44);
+  }
+  await expect(work.locator('#capture-assignment')).toHaveCSS('font-size','16px');
+ }
+ await more.click();await expect(more).toHaveAttribute('aria-expanded','true');
+ await page.getByRole('heading',{name:'Ghi nhận chấm công',exact:true}).click();
+ await expect(more).toHaveAttribute('aria-expanded','false');
+ for(const size of [{width:768,height:1024},{width:820,height:1180}]){
+  await page.setViewportSize(size);expect(await fits()).toBeTruthy();
+  const a=await work.locator('.employee-checkin').boundingBox(),b=await work.locator('.employee-summary').boundingBox();
+  expect(b.x).toBeGreaterThan(a.x);expect(Math.abs(a.y-b.y)).toBeLessThan(2);
+ }
+ for(const size of [{width:1024,height:768},{width:1440,height:900},{width:1920,height:1080}]){
+  await page.setViewportSize(size);expect(await fits()).toBeTruthy();await expect(more).toBeHidden();await expect(page.getByRole('button',{name:'Lịch làm việc',exact:true})).toBeVisible();
+ }
+ await page.setViewportSize({width:844,height:390});await expect(more).toBeVisible();expect(await fits()).toBeTruthy();
+ await expect(page.locator('.employee-checkin')).toBeVisible();
+});

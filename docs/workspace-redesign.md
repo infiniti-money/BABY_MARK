@@ -17,3 +17,6 @@ Logo, tiêu đề và nội dung mở trang dùng chuyển động ngắn 140–
 
 ## RC.9 logo mở trang và chữ trượt hai phía
 Dùng logo thật /brand/logo.png, vòng sáng xoay nhẹ, logo scale/rotate và hai chữ BABY/MARK hội tụ, lớp trang trí tự kết thúc sau 720 ms hoặc biến mất ngay khi tương tác. Không trì hoãn boot, không chặn chuột, bàn phím, camera hoặc GPS. Khi cuộn, các nhóm chữ xuất hiện xen kẽ trái/phải (18px desktop, 8px mobile), một lần mỗi phần tử; chữ luôn đọc được, không dịch chuyển layout. Tôn trọng reduced motion, không ảnh hưởng in ấn, không đổi API.
+
+## RC.10 mobile-first refinement
+Phone: compact logo header, safe-area insets, four primary bottom navigation controls, outside tap closes expanded menu without suppressing action, responsive form 16px text, capture buttons >=52px, balanced five-metric grid and larger touch targets. Portrait tablet 701–900px splits employee check-in and summary/shifts; landscape phone uses compact bottom bar and camera height. PC keeps sidebar, full-width operational dashboard and tables. Existing brand intro and reduced-motion behavior preserved. Browser test covers 320/360/390/430, 768/820 tablet, 1024/1440/1920 desktop and short landscape. Physical iOS/Android/tablet and Safari still require acceptance.
