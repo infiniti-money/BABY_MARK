@@ -39,8 +39,9 @@ export async function onRequestPost({request,env}){
  if(t.kind==='SYSTEM'&&actor.role!=='admin')throw new ApiError(403,'Chỉ Admin được gửi thông báo hệ thống');
  const rate=await db.prepare('SELECT COUNT(*) AS n FROM chat_messages WHERE sender_id=? AND created_at>?').bind(actor.id,now-60000).first();
  if(rate.n>=30)throw new ApiError(429,'Gửi tối đa 30 tin/phút; thử lại sau');
- const result=await db.prepare("INSERT INTO chat_messages(thread_id,sender_id,body,created_at) SELECT t.id,p.id,?,? FROM chat_threads t JOIN profiles p ON p.id=? AND p.active=1 WHERE t.id=? AND ((t.kind='SYSTEM' AND p.role='admin') OR (t.kind<>'SYSTEM' AND EXISTS(SELECT 1 FROM chat_members cm WHERE cm.thread_id=t.id AND cm.user_id=p.id)))").bind(body,now,actor.id,id).run();
- if(result.meta.changes!==1)throw new ApiError(403,'Không còn quyền gửi');
+ const hash=await digest('babymark-session-v1:'+request.headers.get('authorization').slice(7));
+ const result=await db.prepare("INSERT INTO chat_messages(thread_id,sender_id,body,created_at) SELECT t.id,p.id,?,? FROM chat_threads t JOIN profiles p ON p.id=? AND p.active=1 JOIN credentials c ON c.user_id=p.id JOIN sessions s ON s.user_id=p.id AND s.credential_version=c.version AND s.token_hash=? AND s.expires_at>? WHERE t.id=? AND ((t.kind='SYSTEM' AND p.role='admin') OR (t.kind<>'SYSTEM' AND EXISTS(SELECT 1 FROM chat_members cm WHERE cm.thread_id=t.id AND cm.user_id=p.id))) AND (SELECT COUNT(*) FROM chat_messages WHERE sender_id=p.id AND created_at>?)<30").bind(body,now,actor.id,hash,Date.now(),id,now-60000).run();
+ if(result.meta.changes!==1){const latest=await db.prepare('SELECT COUNT(*) AS n FROM chat_messages WHERE sender_id=? AND created_at>?').bind(actor.id,now-60000).first();if(latest.n>=30)throw new ApiError(429,'Gửi tối đa 30 tin/phút; thử lại sau');throw new ApiError(403,'Không còn quyền gửi');}
  return reply({ok:true},201);
  }
  if(b?.action==='read'){
