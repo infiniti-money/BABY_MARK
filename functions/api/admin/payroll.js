@@ -49,8 +49,8 @@ export async function onRequestPost({request,env}){
   const bounds=monthBounds(month),{assignments}=await readAssignments(db,actor,new URL('https://internal.invalid/?from='+bounds.from+'&to='+bounds.to));
   const a=assignments.find(x=>x.id===id),s=a&&summarizeAssignment(a);
   if(!s?.short_full_day||a.request_state==='PENDING'||a.extra_state==='PENDING')throw new ApiError(409,'Chỉ đối soát công ca cả ngày có đủ lượt hợp lệ, không chờ duyệt');
-  const result=await db.batch([db.prepare('INSERT INTO work_unit_reviews(assignment_id,evidence,units,reason,reviewed_by,reviewed_at) SELECT ?,?,?,?,?,? WHERE EXISTS(SELECT 1 FROM payroll_epoch WHERE id=1 AND version=?)').bind(id,workUnitEvidence(a),units,reason,actor.id,Date.now(),version),db.prepare("INSERT INTO management_audit(id,actor_id,resource,resource_id,action,details_json,created_at) SELECT ?,?,'payroll',?,'REVIEW_UNITS',?,? WHERE changes()=1").bind(crypto.randomUUID(),actor.id,id,JSON.stringify({units,reason}),Date.now())]);
-  if(result[0].meta.changes!==1)throw new ApiError(409,'Dữ liệu đã thay đổi; tải lại');return reply({ok:true},201);
+  const result=await db.batch([db.prepare('INSERT INTO work_unit_reviews(assignment_id,evidence,units,reason,reviewed_by,reviewed_at) SELECT ?,?,?,?,?,? WHERE EXISTS(SELECT 1 FROM payroll_epoch WHERE id=1 AND version=?) RETURNING id').bind(id,workUnitEvidence(a),units,reason,actor.id,Date.now(),version),db.prepare("INSERT INTO management_audit(id,actor_id,resource,resource_id,action,details_json,created_at) SELECT ?,?,'payroll',?,'REVIEW_UNITS',?,? WHERE changes()=1").bind(crypto.randomUUID(),actor.id,id,JSON.stringify({units,reason}),Date.now())]);
+  if(result[0].results?.length!==1)throw new ApiError(409,'Dữ liệu đã thay đổi; tải lại');return reply({ok:true},201);
  }
  if(b.action==='close'){
   const reason=textField(b.reason,500);if(reason.length<5||b.reviewed!==true)invalid('Cần lý do và xác nhận đối soát');

@@ -2,6 +2,7 @@
 const preference=window.matchMedia('(prefers-reduced-motion: reduce)');
 const targets='.card-head h2,.stat strong,.employee-metrics strong,.overview-store>strong,.assignment-card h3,.calendar-day>strong';
 let observer=null;
+const observed=new Set();
 const seen=new WeakSet();
 const intro=document.querySelector('#brand-intro');
 // Decorative only: dismiss immediately on any interaction; never delay boot.
@@ -10,13 +11,15 @@ window.addEventListener('pointerdown',dismissIntro,{capture:true,once:true,passi
 window.addEventListener('keydown',dismissIntro,{capture:true,once:true});
 window.addEventListener('focusin',dismissIntro,{capture:true,once:true});
 intro?.addEventListener('animationend',event=>{if(event.target===intro)dismissIntro();});
-export function stopMotion(){observer?.disconnect();observer=null;}
+export function stopMotion(){observer?.disconnect();observer=null;observed.clear();}
 export function observeMotion(root){
  if(!root||preference.matches||typeof IntersectionObserver!=='function')return;
+ for(const node of observed)if(!node.isConnected){observer?.unobserve(node);observed.delete(node);}
  if(!observer)observer=new IntersectionObserver(entries=>{
   for(const {target,isIntersecting} of entries){
-   if(!isIntersecting)continue;
+   if(!isIntersecting&&target.isConnected)continue;
    observer?.unobserve(target);
+   observed.delete(target);
    if(!target.isConnected||preference.matches||seen.has(target))continue;
    seen.add(target);target.classList.add('motion-revealed');
   }
@@ -27,6 +30,7 @@ export function observeMotion(root){
   if(seen.has(node))continue;
   if(!node.dataset.motionSide)node.dataset.motionSide=index%2===0?'left':'right';
   observer.observe(node);
+  observed.add(node);
  }
 }
 const changed=()=>{stopMotion();if(preference.matches)dismissIntro();else observeMotion(document.querySelector('#content'));};

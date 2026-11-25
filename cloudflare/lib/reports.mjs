@@ -1,25 +1,45 @@
-import {assignmentScope,dateRange,identifier,ApiError} from './access.mjs';
+import {assignmentScope,dateRange,identifier,validDay,invalid,ApiError} from './access.mjs';
 
-export async function readAssignments(db,actor,url){
+export async function readAssignments(db,actor,url,{paginate=false}={}){
  const {from,to}=dateRange(url),scope=assignmentScope(actor),conditions=[scope.sql,'a.work_date>=?','a.work_date<=?'],values=[...scope.values,from,to];
  for(const [parameter,column] of [['branch_id','a.branch_id'],['user_id','a.user_id']]){
   const value=url.searchParams.get(parameter);
   if(value){conditions.push(`${column}=?`);values.push(identifier(value));}
  }
+ let size,cursor;
+ if(paginate){
+  const raw=url.searchParams.get('page_size');
+  if(!/^[1-9]\d{0,2}$/.test(raw??'')||Number(raw)>100)invalid('Kích thước trang từ 1 đến 100');
+  size=Number(raw);
+  const parts=['after_date','after_start','after_code','after_id'].map(k=>url.searchParams.get(k));
+  if(parts.some(v=>v!==null)){
+   const [date,start,code,id]=parts;
+   if(parts.some(v=>v===null)||!validDay(date)||date<from||date>to||!/^\d{1,16}$/.test(start)||!Number.isSafeInteger(Number(start))||!code||code.length>120)invalid('Mốc phân trang không hợp lệ');
+   cursor={date,start:Number(start),code,id:identifier(id)};
+  }
+ }
  const extra=!!await db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='extra_attendance'").first();
  const reviews=!!await db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='work_unit_reviews'").first();
- const sql=`SELECT a.*,${reviews?'u.id AS unit_review_id,u.evidence AS unit_review_evidence,u.units AS unit_review_units,':''}${extra?'x.kind AS extra_kind,x.state AS extra_state,x.replaced_name,x.reason AS extra_reason,':''}p.employee_code,p.full_name,p.department,b.name AS branch_name,b.code AS branch_code,b.address_text,b.latitude,b.longitude,b.allowed_radius,s.name AS shift_name,
+ const order='a.work_date,a.starts_at,p.employee_code,a.id';
+ // Page assignment keys first: costly attendance/request/review joins see at most size+1 rows.
+ const pageWhere=cursor?' AND (a.work_date,a.starts_at,p.employee_code,a.id)>(?,?,?,?)':'';
+ const prefix=paginate?`WITH selected AS (SELECT a.id FROM assignments a JOIN profiles p ON p.id=a.user_id WHERE ${conditions.join(' AND ')}${pageWhere} ORDER BY ${order} LIMIT ?) `:'';
+ const sql=prefix+`SELECT a.*,${reviews?'u.id AS unit_review_id,u.evidence AS unit_review_evidence,u.units AS unit_review_units,':''}${extra?'x.kind AS extra_kind,x.state AS extra_state,x.replaced_name,x.reason AS extra_reason,':''}p.employee_code,p.full_name,p.department,b.name AS branch_name,b.code AS branch_code,b.address_text,b.latitude,b.longitude,b.allowed_radius,s.name AS shift_name,
  i.id AS in_id,i.server_timestamp AS in_at,i.status AS in_status,i.late_minutes AS in_late,i.distance_m AS in_distance_m,i.accuracy_m AS in_accuracy_m,i.photo_source AS in_photo_source,
  o.id AS out_id,o.server_timestamp AS out_at,o.status AS out_status,o.early_minutes AS out_early,o.distance_m AS out_distance_m,o.accuracy_m AS out_accuracy_m,o.photo_source AS out_photo_source,
  r.id AS request_id,r.kind AS request_kind,r.state AS request_state,r.proposed_in,r.proposed_out,r.decided_by,r.decided_at
- FROM assignments a JOIN profiles p ON p.id=a.user_id JOIN branches b ON b.id=a.branch_id JOIN shifts s ON s.id=a.shift_id
+ FROM ${paginate?'selected JOIN assignments a ON a.id=selected.id':'assignments a'} JOIN profiles p ON p.id=a.user_id JOIN branches b ON b.id=a.branch_id JOIN shifts s ON s.id=a.shift_id
 ${extra?' LEFT JOIN extra_attendance x ON x.assignment_id=a.id':''}
  ${reviews?'LEFT JOIN work_unit_reviews u ON u.id=(SELECT max(w.id) FROM work_unit_reviews w WHERE w.assignment_id=a.id)':''}
  LEFT JOIN attendances i ON i.assignment_id=a.id AND i.type='IN'
  LEFT JOIN attendances o ON o.assignment_id=a.id AND o.type='OUT'
  LEFT JOIN workforce_requests r ON r.id=(SELECT wr.id FROM workforce_requests wr WHERE wr.assignment_id=a.id ORDER BY CASE wr.state WHEN 'APPROVED' THEN 0 WHEN 'PENDING' THEN 1 ELSE 2 END,wr.created_at DESC,wr.id DESC LIMIT 1)
- WHERE ${conditions.join(' AND ')} ORDER BY a.work_date,a.starts_at,p.employee_code,a.id LIMIT 5001`;
- const {results}=await db.prepare(sql).bind(...values).all();
+ ${paginate?'':'WHERE '+conditions.join(' AND ')} ORDER BY ${order}${paginate?'':' LIMIT 5001'}`;
+ const {results}=await db.prepare(sql).bind(...values,...(cursor?[cursor.date,cursor.start,cursor.code,cursor.id]:[]),...(paginate?[size+1]:[])).all();
+ if(paginate){
+  const assignments=results.slice(0,size),last=assignments.at(-1);
+  return {assignments,from,to,page_size:size,next:results.length>size?{after_date:last.work_date,after_start:last.starts_at,after_code:last.employee_code,after_id:last.id}:null};
+ }
  if(results.length>5000)throw new ApiError(413,'Báo cáo quá 5.000 ca. Chọn khoảng ngày hoặc cửa hàng nhỏ hơn.');
  return {assignments:results,from,to};
 }

@@ -21,13 +21,16 @@ jobs:
       - run: npm ci
       - run: npm test
       - run: npm run check:runtime
-      - run: npx playwright install --with-deps chromium
+      - run: npx playwright install --with-deps chromium webkit
       - run: npm run test:browser
+      - run: npm run test:mobile
       - uses: actions/upload-artifact@v7.0.2
         if: failure()
         with:
           name: browser-failure-evidence
-          path: work/playwright-results
+          path: |
+            work/playwright-results
+            work/playwright-mobile-results
           retention-days: 7
 # Verification only. No deployment, remote migrations, resource provisioning,
 # scheduled cleanup, or production credentials are used by this workflow.

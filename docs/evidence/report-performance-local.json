@@ -1,0 +1,98 @@
+{
+  "environment": {
+    "node": "v26.13.0",
+    "sqlite": "3.54.0",
+    "scope": "synthetic in-memory; not D1 production or physical devices"
+  },
+  "fixture": {
+    "assignments": 1200,
+    "rejectedRequests": 24000
+  },
+  "median_ms_7_runs": {
+    "full_without_optional_indexes": 16.75,
+    "full_with_optional_indexes": 11.76,
+    "page_30_with_indexes": 0.69
+  },
+  "response_bytes": {
+    "full": 1579046,
+    "summary": 557,
+    "page": 39687
+  },
+  "query_plans": {
+    "before": [
+      "SCAN a",
+      "SEARCH p USING INDEX sqlite_autoindex_profiles_1 (id=?)",
+      "SEARCH b USING INDEX sqlite_autoindex_branches_1 (id=?)",
+      "SEARCH s USING INDEX sqlite_autoindex_shifts_1 (id=?)",
+      "SEARCH x USING INDEX sqlite_autoindex_extra_attendance_1 (assignment_id=?) LEFT-JOIN",
+      "SEARCH u USING INTEGER PRIMARY KEY (rowid=?) LEFT-JOIN",
+      "CORRELATED SCALAR SUBQUERY 1",
+      "SEARCH w USING COVERING INDEX work_unit_reviews_assignment (assignment_id=?)",
+      "SEARCH i USING INDEX sqlite_autoindex_attendances_3 (assignment_id=? AND type=?) LEFT-JOIN",
+      "SEARCH o USING INDEX sqlite_autoindex_attendances_3 (assignment_id=? AND type=?) LEFT-JOIN",
+      "SEARCH r USING INDEX sqlite_autoindex_workforce_requests_1 (id=?) LEFT-JOIN",
+      "CORRELATED SCALAR SUBQUERY 2",
+      "SEARCH wr USING INDEX workforce_assignment_retention (assignment_id=?)",
+      "USE TEMP B-TREE FOR ORDER BY",
+      "USE TEMP B-TREE FOR ORDER BY"
+    ],
+    "after": [
+      "SEARCH a USING INDEX assignment_report_date (work_date>? AND work_date<?)",
+      "SEARCH p USING INDEX sqlite_autoindex_profiles_1 (id=?)",
+      "SEARCH b USING INDEX sqlite_autoindex_branches_1 (id=?)",
+      "SEARCH s USING INDEX sqlite_autoindex_shifts_1 (id=?)",
+      "SEARCH x USING INDEX sqlite_autoindex_extra_attendance_1 (assignment_id=?) LEFT-JOIN",
+      "SEARCH u USING INTEGER PRIMARY KEY (rowid=?) LEFT-JOIN",
+      "CORRELATED SCALAR SUBQUERY 1",
+      "SEARCH w USING COVERING INDEX work_unit_reviews_assignment (assignment_id=?)",
+      "SEARCH i USING INDEX sqlite_autoindex_attendances_3 (assignment_id=? AND type=?) LEFT-JOIN",
+      "SEARCH o USING INDEX sqlite_autoindex_attendances_3 (assignment_id=? AND type=?) LEFT-JOIN",
+      "SEARCH r USING INDEX sqlite_autoindex_workforce_requests_1 (id=?) LEFT-JOIN",
+      "CORRELATED SCALAR SUBQUERY 2",
+      "SEARCH wr USING COVERING INDEX request_report_choice (assignment_id=?)",
+      "USE TEMP B-TREE FOR LAST 2 TERMS OF ORDER BY"
+    ]
+  },
+  "startup_static_modules": {
+    "base": {
+      "bytes": 263860,
+      "files": [
+        "app.mjs",
+        "employee-cv.mjs",
+        "cv-print.mjs",
+        "motion.mjs",
+        "attendance-window.mjs",
+        "schedule-calendar.mjs",
+        "capture.mjs",
+        "timemark-layout.mjs",
+        "gps.mjs",
+        "payroll-components.mjs",
+        "maps-import.mjs",
+        "retail-staff.mjs",
+        "weekly-rotation.mjs",
+        "password.mjs",
+        "push.mjs",
+        "device-permissions.mjs"
+      ]
+    },
+    "current": {
+      "bytes": 234604,
+      "files": [
+        "app.mjs",
+        "motion.mjs",
+        "attendance-window.mjs",
+        "schedule-calendar.mjs",
+        "gps.mjs",
+        "polling.mjs",
+        "workspace.mjs",
+        "payroll-components.mjs",
+        "maps-import.mjs",
+        "retail-staff.mjs",
+        "weekly-rotation.mjs",
+        "password.mjs",
+        "push.mjs",
+        "device-permissions.mjs"
+      ]
+    }
+  }
+}

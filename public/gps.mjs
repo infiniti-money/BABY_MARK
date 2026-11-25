@@ -18,9 +18,9 @@ export function currentPosition({onProgress=()=>{},signal,timeout=20000,geo=glob
         if(done)return;
         const {latitude:lat,longitude:lng,accuracy}=p.coords;
         if(![lat,lng,accuracy].every(Number.isFinite)||accuracy<0||Math.abs(lat)>90||Math.abs(lng)>180)return;
-        best=Math.min(best,accuracy);
+        const improved=accuracy<best;best=Math.min(best,accuracy);
         if(accuracy<=50)return finish(null,{lat,lng,accuracy});
-        onProgress(best);
+        if(improved){try{onProgress(best);}catch(e){finish(e);}}
       },e=>{if(e.code===1)finish(new Error('Chưa được cấp quyền vị trí. Hãy bật vị trí cho trang này trong trình duyệt.'));else if(e.code===3)expired();},{enableHighAccuracy:true,maximumAge:0,timeout});
       if(done)geo.clearWatch(watch);
     }catch(e){finish(e);}

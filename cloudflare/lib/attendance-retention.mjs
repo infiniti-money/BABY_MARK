@@ -28,9 +28,9 @@ export async function pruneAttendance(db,now=Date.now()){
  db.prepare("DELETE FROM photo_inventory WHERE state IN ('evicted','expired') AND photo_path IN (SELECT photo_path FROM attendances WHERE assignment_id IN ("+selected+"))").bind(id),
  db.prepare("DELETE FROM attendances WHERE assignment_id IN ("+selected+")").bind(id),
  db.prepare("DELETE FROM attendance_challenges WHERE assignment_id IN ("+selected+")").bind(id),
- db.prepare("DELETE FROM assignments WHERE id IN ("+selected+")").bind(id),
+ db.prepare("DELETE FROM assignments WHERE id IN ("+selected+") RETURNING id").bind(id),
  db.prepare("DELETE FROM retention_candidates WHERE run_id=?").bind(id)
  ];
  const results=await db.batch(sql);
- return {run_id:id,cutoff_at:cutoff,assignments_removed:results[9].meta.changes};
+ return {run_id:id,cutoff_at:cutoff,assignments_removed:results[9].results.length};
 }

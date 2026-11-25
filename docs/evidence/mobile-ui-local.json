@@ -1,0 +1,282 @@
+{
+  "environment": "Headless Chromium, 390 × 844 CSS px, fake local accounts; not physical phone testing",
+  "observed_at": "2026-11-25",
+  "screens": [
+    {
+      "role": "staff",
+      "view": "today",
+      "overflow": false,
+      "content_errors": [],
+      "runtime_errors": [],
+      "buttons_below_43px": [],
+      "buttons_outside_horizontal_viewport": []
+    },
+    {
+      "role": "staff",
+      "view": "schedule",
+      "overflow": false,
+      "content_errors": [],
+      "runtime_errors": [],
+      "buttons_below_43px": [],
+      "buttons_outside_horizontal_viewport": []
+    },
+    {
+      "role": "staff",
+      "view": "history",
+      "overflow": false,
+      "content_errors": [],
+      "runtime_errors": [],
+      "buttons_below_43px": [],
+      "buttons_outside_horizontal_viewport": []
+    },
+    {
+      "role": "staff",
+      "view": "requests",
+      "overflow": false,
+      "content_errors": [],
+      "runtime_errors": [],
+      "buttons_below_43px": [],
+      "buttons_outside_horizontal_viewport": []
+    },
+    {
+      "role": "staff",
+      "view": "handover",
+      "overflow": false,
+      "content_errors": [],
+      "runtime_errors": [],
+      "buttons_below_43px": [],
+      "buttons_outside_horizontal_viewport": []
+    },
+    {
+      "role": "staff",
+      "view": "messages",
+      "overflow": false,
+      "content_errors": [],
+      "runtime_errors": [],
+      "buttons_below_43px": [],
+      "buttons_outside_horizontal_viewport": []
+    },
+    {
+      "role": "staff",
+      "view": "push",
+      "overflow": false,
+      "content_errors": [],
+      "runtime_errors": [],
+      "buttons_below_43px": [],
+      "buttons_outside_horizontal_viewport": []
+    },
+    {
+      "role": "staff",
+      "view": "sessions",
+      "overflow": false,
+      "content_errors": [],
+      "runtime_errors": [],
+      "buttons_below_43px": [],
+      "buttons_outside_horizontal_viewport": []
+    },
+    {
+      "role": "manager",
+      "view": "today",
+      "overflow": false,
+      "content_errors": [],
+      "runtime_errors": [],
+      "buttons_below_43px": [],
+      "buttons_outside_horizontal_viewport": []
+    },
+    {
+      "role": "manager",
+      "view": "schedule",
+      "overflow": false,
+      "content_errors": [],
+      "runtime_errors": [],
+      "buttons_below_43px": [],
+      "buttons_outside_horizontal_viewport": []
+    },
+    {
+      "role": "manager",
+      "view": "history",
+      "overflow": false,
+      "content_errors": [],
+      "runtime_errors": [],
+      "buttons_below_43px": [],
+      "buttons_outside_horizontal_viewport": []
+    },
+    {
+      "role": "manager",
+      "view": "requests",
+      "overflow": false,
+      "content_errors": [],
+      "runtime_errors": [],
+      "buttons_below_43px": [],
+      "buttons_outside_horizontal_viewport": []
+    },
+    {
+      "role": "manager",
+      "view": "handover",
+      "overflow": false,
+      "content_errors": [],
+      "runtime_errors": [],
+      "buttons_below_43px": [],
+      "buttons_outside_horizontal_viewport": []
+    },
+    {
+      "role": "manager",
+      "view": "reports",
+      "overflow": false,
+      "content_errors": [],
+      "runtime_errors": [],
+      "buttons_below_43px": [],
+      "buttons_outside_horizontal_viewport": []
+    },
+    {
+      "role": "manager",
+      "view": "alerts",
+      "overflow": false,
+      "content_errors": [],
+      "runtime_errors": [],
+      "buttons_below_43px": [],
+      "buttons_outside_horizontal_viewport": []
+    },
+    {
+      "role": "manager",
+      "view": "messages",
+      "overflow": false,
+      "content_errors": [],
+      "runtime_errors": [],
+      "buttons_below_43px": [],
+      "buttons_outside_horizontal_viewport": []
+    },
+    {
+      "role": "manager",
+      "view": "push",
+      "overflow": false,
+      "content_errors": [],
+      "runtime_errors": [],
+      "buttons_below_43px": [],
+      "buttons_outside_horizontal_viewport": []
+    },
+    {
+      "role": "manager",
+      "view": "sessions",
+      "overflow": false,
+      "content_errors": [],
+      "runtime_errors": [],
+      "buttons_below_43px": [],
+      "buttons_outside_horizontal_viewport": []
+    },
+    {
+      "role": "admin",
+      "view": "overview",
+      "overflow": false,
+      "content_errors": [],
+      "runtime_errors": [],
+      "buttons_below_43px": [],
+      "buttons_outside_horizontal_viewport": []
+    },
+    {
+      "role": "admin",
+      "view": "admin",
+      "overflow": false,
+      "content_errors": [],
+      "runtime_errors": [],
+      "buttons_below_43px": [],
+      "buttons_outside_horizontal_viewport": []
+    },
+    {
+      "role": "admin",
+      "view": "schedule",
+      "overflow": false,
+      "content_errors": [],
+      "runtime_errors": [],
+      "buttons_below_43px": [],
+      "buttons_outside_horizontal_viewport": []
+    },
+    {
+      "role": "admin",
+      "view": "reports",
+      "overflow": false,
+      "content_errors": [],
+      "runtime_errors": [],
+      "buttons_below_43px": [],
+      "buttons_outside_horizontal_viewport": []
+    },
+    {
+      "role": "admin",
+      "view": "alerts",
+      "overflow": false,
+      "content_errors": [],
+      "runtime_errors": [],
+      "buttons_below_43px": [],
+      "buttons_outside_horizontal_viewport": []
+    },
+    {
+      "role": "admin",
+      "view": "payroll",
+      "overflow": false,
+      "content_errors": [],
+      "runtime_errors": [],
+      "buttons_below_43px": [],
+      "buttons_outside_horizontal_viewport": []
+    },
+    {
+      "role": "admin",
+      "view": "history",
+      "overflow": false,
+      "content_errors": [],
+      "runtime_errors": [],
+      "buttons_below_43px": [],
+      "buttons_outside_horizontal_viewport": []
+    },
+    {
+      "role": "admin",
+      "view": "requests",
+      "overflow": false,
+      "content_errors": [],
+      "runtime_errors": [],
+      "buttons_below_43px": [],
+      "buttons_outside_horizontal_viewport": []
+    },
+    {
+      "role": "admin",
+      "view": "handover",
+      "overflow": false,
+      "content_errors": [],
+      "runtime_errors": [],
+      "buttons_below_43px": [],
+      "buttons_outside_horizontal_viewport": []
+    },
+    {
+      "role": "admin",
+      "view": "messages",
+      "overflow": false,
+      "content_errors": [],
+      "runtime_errors": [],
+      "buttons_below_43px": [],
+      "buttons_outside_horizontal_viewport": []
+    },
+    {
+      "role": "admin",
+      "view": "push",
+      "overflow": false,
+      "content_errors": [],
+      "runtime_errors": [],
+      "buttons_below_43px": [],
+      "buttons_outside_horizontal_viewport": []
+    },
+    {
+      "role": "admin",
+      "view": "sessions",
+      "overflow": false,
+      "content_errors": [],
+      "runtime_errors": [],
+      "buttons_below_43px": [],
+      "buttons_outside_horizontal_viewport": []
+    }
+  ],
+  "validation": {
+    "logic_and_integration": 154,
+    "browser": 47,
+    "mobile": 12,
+    "physical_devices": false
+  }
+}
