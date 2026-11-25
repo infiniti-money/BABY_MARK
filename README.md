@@ -1,10 +1,10 @@
-# BABY MARK v1.2.0 RC — HR Management
+# BABY MARK v1.2.0 — HR Management
 Hệ thống quản lý nhân sự nội bộ cho chuỗi cửa hàng. Nền tảng đang hoạt động: `public/` + `functions/` trên **Cloudflare Pages + D1 + KV**. Không sử dụng API trả phí mới, không tự nâng cấp gói. Các thư mục Next.js/Expo/Supabase cũ chỉ là nguồn lịch sử, không nằm trong build Pages.
 
-**Candidate:** [v1.2.0 RC — scope and release gates](docs/releases/v1.2.0-rc.md). Not yet approved for production.
+**Phiên bản mã nguồn:** v1.2.0. [Ghi chú phát hành và phạm vi nghiệm thu](docs/releases/v1.2.0.md). GitHub Release chỉ được công bố sau kiểm thử commit phát hành.
 
-**Production (existing):** https://babymark.pages.dev/  
-**Bản phát hành:** [v1.1.0 — chức năng, kiểm thử và giới hạn](docs/releases/v1.1.0.md).
+**Production:** https://babymark.pages.dev/  
+**Lịch sử:** [v1.1.0](docs/releases/v1.1.0.md) · [v1.2.0 RC](docs/releases/v1.2.0-rc.md).
 
 ## Chức năng chính
 - Quản trị theo vai trò, 14 cửa hàng, 50 nhân viên/quản lý hoạt động, tài khoản và phiên đăng nhập.
@@ -25,8 +25,9 @@ Mở http://127.0.0.1:8788, dùng mã ngẫu nhiên xuất hiện ở Terminal. 
 ```sh
 npm test
 npm run check:runtime
-npx playwright install chromium
+npx playwright install chromium webkit
 npm run test:browser
+npm run test:mobile
 ```
 
 ## Vận hành
