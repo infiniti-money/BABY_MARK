@@ -788,3 +788,33 @@ test('employee CV is editable by admin, private and visible to the employee',asy
  await expect(page.getByRole('dialog')).toContainText('<script>CV test</script>');
  await expect(page.getByRole('button',{name:'Lưu hồ sơ CV',exact:true})).toHaveCount(0);
 });
+
+test('overview KPI shortcuts open active directories and filter attendance without losing date or branch',async({page})=>{
+ await page.setViewportSize({width:1440,height:900});await login(page);
+ const kpis=page.locator('.overview-kpis button.overview-kpi');
+ await expect(kpis).toHaveCount(10);
+ const form=page.locator('[data-form="overview-filter"]'),branch=form.locator('[name="branch"]'),day=await form.locator('[name="day"]').inputValue();
+ await branch.selectOption('BM-001');await form.getByRole('button',{name:'Xem tổng quan',exact:true}).click();
+ await expect(page.locator('.overview-filter [name="branch"]')).toHaveValue('BM-001');
+ for(const [key,label] of [['scheduled','Ca có lịch'],['completed','Đủ công'],['working','Đang làm'],['absent_or_missing','Chưa vào / vắng'],['missing_out','Thiếu chấm ra'],['units','Có công quy đổi'],['overtime','Có phút làm thêm'],['leave_or_pending','Nghỉ / chờ duyệt']]){
+  await page.locator('.overview-kpi[data-id="'+key+'"]').click();
+  await expect(page.locator('.overview-filter [name="status"]')).toHaveValue(key);
+  await expect(page.locator('.overview-filter [name="day"]')).toHaveValue(day);
+  await expect(page.locator('.overview-filter [name="branch"]')).toHaveValue('BM-001');
+  await expect(page.locator('.overview-attendance .card-head')).toContainText(label);
+  await expect(page.locator('.overview-kpi[data-id="'+key+'"]')).toHaveAttribute('aria-pressed','true');
+ }
+ await page.getByRole('button',{name:'Bỏ lọc',exact:true}).click();
+ await expect(page.locator('.overview-filter [name="status"]')).toHaveValue('');
+ await page.locator('.overview-kpi[data-id="branches"]').click();
+ await expect(page.getByRole('tab',{name:'Cửa hàng',exact:true})).toHaveAttribute('aria-selected','true');
+ await expect(page.locator('#admin-active-only')).toBeChecked();
+ await page.locator('#admin-active-only').uncheck();
+ await expect(page.locator('#admin-active-only')).not.toBeChecked();
+ await page.locator('button[data-view="overview"]').click();
+ await page.locator('.overview-kpi[data-id="employees"]').click();
+ await expect(page.getByRole('tab',{name:'Nhân viên',exact:true})).toHaveAttribute('aria-selected','true');
+ await expect(page.locator('#admin-active-only')).toBeChecked();
+ await page.setViewportSize({width:390,height:844});
+ expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBeTruthy();
+});
