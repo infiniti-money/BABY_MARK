@@ -37,11 +37,21 @@ test('server report pages keep totals and full Excel export beyond the visible p
 
 test('chat read polling backs off, respects Retry-After, pauses offline and resumes without sending',async({page,context})=>{
  await page.clock.install();await login(page);await page.getByRole('button',{name:'Tin nhắn',exact:true}).click();await expect(page.locator('#chat-stream')).toBeVisible();let polls=0,writes=0;
+ // A request reaching the route is not the response having been consumed.
+ // Observe the actual retry timer before advancing the browser's clock again.
+ await page.evaluate(()=>{const timer=window.setTimeout.bind(window);window.__retryTimers=0;window.setTimeout=(callback,delay,...args)=>{const id=timer(callback,delay,...args);if(delay>=119000)window.__retryTimers++;return id;};});
  page.on('request',r=>{if(r.url().includes('/api/messages')&&r.method()==='POST')writes++;});
- await page.route('**/api/messages?*',async route=>{polls++;return route.fulfill({status:429,headers:{'Retry-After':'120'},json:{error:'Synthetic throttling'}});});
+ let release;const delayed=new Promise(resolve=>release=resolve);
+ await page.route('**/api/messages?*',async route=>{polls++;if(polls===1)await delayed;return route.fulfill({status:429,headers:{'Retry-After':'120'},json:{error:'Synthetic throttling'}});});
  await page.clock.fastForward(30001);await expect.poll(()=>polls).toBe(1);
+ try{await page.clock.fastForward(5000);expect(polls).toBe(1);expect(await page.evaluate(()=>window.__retryTimers)).toBe(0);}finally{release();}
+ await expect.poll(()=>page.evaluate(()=>window.__retryTimers)).toBe(1);
  await page.clock.fastForward(119000);expect(polls).toBe(1);
  await page.clock.fastForward(2000);await expect.poll(()=>polls).toBe(2);
+ await expect.poll(()=>page.evaluate(()=>window.__retryTimers)).toBe(2);
+ // Reconnection must also honor a Retry-After deadline that has not expired.
+ await context.setOffline(true);await page.clock.fastForward(10000);
+ await context.setOffline(false);await page.clock.fastForward(1001);expect(polls).toBe(2);
  await context.setOffline(true);await page.clock.fastForward(600000);expect(polls).toBe(2);
  await context.setOffline(false);await page.clock.fastForward(1001);await expect.poll(()=>polls).toBe(3);
  expect(writes).toBe(0);
