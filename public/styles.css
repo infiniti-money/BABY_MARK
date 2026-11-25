@@ -299,3 +299,34 @@ td,th{overflow-wrap:anywhere}
   .scroll-progress{display:none!important}
  }
 }
+
+
+/* RC.9 brand opening and alternating horizontal text reveals.
+   Visible content is the default. Intro is decorative, never intercepts input. */
+.brand-intro{display:none;pointer-events:none}
+@media screen and (prefers-reduced-motion:no-preference){
+ :root{--bm-reveal-distance:18px}
+ .brand-intro:not([hidden]){position:fixed;inset:0;z-index:90;display:grid;place-items:center;pointer-events:none;overflow:hidden;background:radial-gradient(ellipse at 50% 48%,#fff 0%,#fff8fb 38%,#f3e0e8 100%);animation:bm-intro-exit 720ms ease-out both}
+ .brand-intro-lockup{display:grid;justify-items:center;gap:8px;max-width:calc(100vw - 32px);padding:12px;text-align:center}
+ .brand-intro-emblem{position:relative;width:132px;height:132px;display:grid;place-items:center}
+ .brand-intro-emblem img{width:104px;height:104px;object-fit:contain;border-radius:24px;position:relative;z-index:1;animation:bm-brand-arrive 490ms cubic-bezier(.22,.8,.3,1) both}
+ .brand-intro-ring{position:absolute;inset:3px;border:1px solid #d69db9;border-radius:50%;background:conic-gradient(from 45deg,#95234500,#dc97b442,#95234500 68%);animation:bm-brand-ring 620ms ease-out both}
+ .brand-intro-name{display:flex;gap:7px;font-weight:750;letter-spacing:3px;font-size:22px;color:var(--wine);overflow:hidden}
+ .brand-intro-name span:first-child{animation:bm-intro-left 430ms var(--motion-ease) both}
+ .brand-intro-name span:last-child{animation:bm-intro-right 430ms var(--motion-ease) both}
+ .brand-intro-lockup p{font-size:10px;letter-spacing:3px;color:var(--muted);animation:bm-text-in 420ms var(--motion-ease) both}
+ @keyframes bm-brand-arrive{0%{opacity:.5;transform:scale(.78) rotate(-6deg)}65%{opacity:1;transform:scale(1.035) rotate(1deg)}100%{opacity:1;transform:scale(1) rotate(0)}}
+ @keyframes bm-brand-ring{from{opacity:.8;transform:scale(.82) rotate(-70deg)}to{opacity:.22;transform:scale(1.1) rotate(30deg)}}
+ @keyframes bm-intro-left{from{opacity:.35;transform:translateX(-23px)}to{opacity:1;transform:translateX(0)}}
+ @keyframes bm-intro-right{from{opacity:.35;transform:translateX(23px)}to{opacity:1;transform:translateX(0)}}
+ @keyframes bm-intro-exit{0%,40%{opacity:1;visibility:visible}100%{opacity:0;visibility:hidden}}
+ @keyframes bm-reveal-left{from{opacity:.68;transform:translateX(calc(-1 * var(--bm-reveal-distance)))}to{opacity:1;transform:translateX(0)}}
+ @keyframes bm-reveal-right{from{opacity:.68;transform:translateX(var(--bm-reveal-distance))}to{opacity:1;transform:translateX(0)}}
+ .motion-revealed[data-motion-side="left"]{animation:bm-reveal-left 340ms var(--motion-ease) both}
+ .motion-revealed[data-motion-side="right"]{animation:bm-reveal-right 340ms var(--motion-ease) both}
+ @media(max-width:900px){:root{--bm-reveal-distance:8px}.brand-intro-emblem{width:120px;height:120px}.brand-intro-emblem img{width:96px;height:96px}}
+}
+@media screen and (prefers-reduced-motion:reduce){
+ .brand-intro{display:none!important}
+ .motion-revealed[data-motion-side]{animation:none!important;transform:none!important;opacity:1!important}
+}

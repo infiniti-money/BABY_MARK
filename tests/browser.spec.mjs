@@ -572,3 +572,26 @@ test('RC.8 motion follows scroll and accessibility preferences without delaying 
  await expect(page.getByRole('dialog')).toHaveCSS('animation-name','none');
  await expect(page.getByRole('heading',{name:'Migration đến 0020',exact:true})).toBeVisible();
 });
+
+
+test('RC.9 real brand logo opening is decorative, dismisses on interaction, and respects reduced motion',async({page})=>{
+ await page.emulateMedia({reducedMotion:'no-preference'});await page.goto('/');
+ const intro=page.locator('#brand-intro');
+ await expect(intro).toHaveAttribute('aria-hidden','true');
+ await expect(intro.locator('img')).toHaveAttribute('src','/brand/logo.png');
+ await expect(intro.locator('img')).toHaveCSS('animation-name','bm-brand-arrive');
+ await expect(intro).toHaveCSS('pointer-events','none');
+ await page.getByLabel('Tên đăng nhập',{exact:true}).fill('test-staff');
+ await expect(intro).toBeHidden();
+ await page.emulateMedia({reducedMotion:'reduce'});await page.reload();
+ await expect(intro).toBeHidden();
+ await expect(page.getByLabel('Tên đăng nhập',{exact:true})).toBeVisible();
+});
+test('RC.9 viewport reveals alternate left and right without layout overflow',async({page})=>{
+ await page.emulateMedia({reducedMotion:'no-preference'});await page.setViewportSize({width:390,height:844});await login(page);
+ const left=page.locator('#content [data-motion-side="left"]').first(),right=page.locator('#content [data-motion-side="right"]').last();
+ await left.scrollIntoViewIfNeeded();await expect(left).toHaveClass(/motion-revealed/);await expect(left).toHaveCSS('animation-name','bm-reveal-left');
+ await right.scrollIntoViewIfNeeded();await expect(right).toHaveClass(/motion-revealed/);await expect(right).toHaveCSS('animation-name','bm-reveal-right');
+ expect(await page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth)).toBeTruthy();
+ await page.emulateMedia({reducedMotion:'reduce'});await expect(left).toHaveCSS('animation-name','none');await expect(right).toHaveCSS('animation-name','none');
+});

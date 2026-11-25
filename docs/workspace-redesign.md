@@ -14,3 +14,6 @@ Chọn ca và thao tác vào/ra đặt trên cùng. Camera chưa bật chỉ chi
 
 ## RC.8 chuyển động giao diện
 Logo, tiêu đề và nội dung mở trang dùng chuyển động ngắn 140–300 ms, phản hồi nhấn nút nhẹ, đổi màu/đổ bóng khi hover trên thiết bị có chuột, focus rõ, hiệu ứng chữ một lần khi cuộn tới nội dung. Thanh tiến độ cuộn chỉ xuất hiện khi trình duyệt hỗ trợ scroll-driven animations. Không có splash bắt buộc, không trì hoãn request, không animation kích thước layout, không động vào video/GPS/Timemark, không thư viện ngoài. Tự tắt chuyển động nếu hệ điều hành yêu cầu reduced motion; in A4/POS không đổi. Nghiệm thu iOS vật lý vẫn cần thực hiện.
+
+## RC.9 logo mở trang và chữ trượt hai phía
+Dùng logo thật /brand/logo.png, vòng sáng xoay nhẹ, logo scale/rotate và hai chữ BABY/MARK hội tụ, lớp trang trí tự kết thúc sau 720 ms hoặc biến mất ngay khi tương tác. Không trì hoãn boot, không chặn chuột, bàn phím, camera hoặc GPS. Khi cuộn, các nhóm chữ xuất hiện xen kẽ trái/phải (18px desktop, 8px mobile), một lần mỗi phần tử; chữ luôn đọc được, không dịch chuyển layout. Tôn trọng reduced motion, không ảnh hưởng in ấn, không đổi API.
