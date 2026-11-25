@@ -13,9 +13,9 @@ export async function onRequestPost({request,env}){
   const actor=await actorFor(request,env,{admin:true}),db=env.DB,b=await bodyJSON(request);
   if(b?.action==='presets'){
    // Preserve all existing shift templates, including edits and referenced templates.
-   const statements=presets.map(row=>db.prepare('INSERT INTO shifts(id,name,start_time,end_time,grace_period) SELECT ?,?,?,?,? WHERE NOT EXISTS(SELECT 1 FROM shifts WHERE id=? OR (start_time=? AND end_time=?))').bind(...row,row[0],row[2],row[3]));
+   const statements=presets.map(row=>db.prepare('INSERT INTO shifts(id,name,start_time,end_time,grace_period) SELECT ?,?,?,?,? WHERE NOT EXISTS(SELECT 1 FROM shifts WHERE id=? OR (start_time=? AND end_time=?)) RETURNING id').bind(...row,row[0],row[2],row[3]));
    const results=await db.batch([...statements,managementAudit(db,actor,'shifts','BM-PRESETS','ADD_PRESETS',{})]);
-   return reply({created:results.slice(0,3).reduce((n,x)=>n+x.meta.changes,0)});
+   return reply({created:results.slice(0,3).reduce((n,x)=>n+x.results.length,0)});
   }
   if(!(await read(db)).available)throw new ApiError(409,'Cần migration 0011');
   const branch=identifier(b.branch_id);
@@ -72,6 +72,6 @@ export async function generateRoster(db,actor,branch,b){
   const auto=b.action==='auto-generate',skip=b.action==='generate-missing'||auto;
   const sql="INSERT INTO assignments(id,user_id,branch_id,shift_id,work_date,starts_at,ends_at,grace_minutes) SELECT json_extract(j.value,'$.id'),json_extract(j.value,'$.user'),?,json_extract(j.value,'$.shift'),json_extract(j.value,'$.work_date'),json_extract(j.value,'$.starts_at'),json_extract(j.value,'$.ends_at'),json_extract(j.value,'$.grace') FROM json_each(?) j"+(skip?" WHERE NOT EXISTS(SELECT 1 FROM assignments a WHERE a.user_id=json_extract(j.value,'$.user') AND a.branch_id=? AND a.shift_id=json_extract(j.value,'$.shift') AND a.work_date=json_extract(j.value,'$.work_date') AND a.starts_at=json_extract(j.value,'$.starts_at') AND a.ends_at=json_extract(j.value,'$.ends_at') AND a.grace_minutes=json_extract(j.value,'$.grace'))":"");
   const safeSql=sql+(auto?" AND EXISTS(SELECT 1 FROM roster_automation ra JOIN profiles p ON p.id=ra.updated_by AND p.active=1 AND p.role='admin' WHERE ra.branch_id=? AND ra.enabled=1 AND ra.updated_at=? AND EXISTS(SELECT 1 FROM branches b WHERE b.id=ra.branch_id AND b.active=1) AND EXISTS(SELECT 1 FROM branch_rosters r WHERE r.branch_id=ra.branch_id AND r.updated_at=?)) AND NOT EXISTS(SELECT 1 FROM assignments s WHERE s.branch_id=? AND s.work_date=json_extract(j.value,'$.work_date') AND s.shift_id=json_extract(j.value,'$.shift'))":"");
-  const result=await db.batch([db.prepare(safeSql).bind(branch,JSON.stringify(rows),...(skip?[branch]:[]),...(auto?[branch,b.config_updated_at,roster.updated_at,branch]:[])),managementAudit(db,actor,'rosters',branch,auto?'AUTO_GENERATE':skip?'GENERATE_MISSING':'GENERATE',{from:b.from,to:b.to,weekdays:b.weekdays,handover:roster.handover,rotation_anchor:ROTATION_ANCHOR,requested:rows.length})]);
-  return {created:result[0].meta.changes,existing:rows.length-result[0].meta.changes};
+  const result=await db.batch([db.prepare(safeSql+' RETURNING id').bind(branch,JSON.stringify(rows),...(skip?[branch]:[]),...(auto?[branch,b.config_updated_at,roster.updated_at,branch]:[])),managementAudit(db,actor,'rosters',branch,auto?'AUTO_GENERATE':skip?'GENERATE_MISSING':'GENERATE',{from:b.from,to:b.to,weekdays:b.weekdays,handover:roster.handover,rotation_anchor:ROTATION_ANCHOR,requested:rows.length})]);
+  return {created:result[0].results.length,existing:rows.length-result[0].results.length};
 }

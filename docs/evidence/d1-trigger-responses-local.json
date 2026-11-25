@@ -1,0 +1,92 @@
+{
+  "environment": "Local workerd + ephemeral D1; synthetic staff, no production access",
+  "baseline": "dc2c6d6",
+  "observed_at": "2026-11-25",
+  "metadata_contract": {
+    "changes": 2,
+    "rows": 1
+  },
+  "counts": {
+    "bulk_assignments": {
+      "before": {
+        "status": 201,
+        "body": {
+          "created": 4
+        }
+      },
+      "after": {
+        "status": 201,
+        "body": {
+          "created": 2
+        }
+      }
+    },
+    "leave_range": {
+      "before": {
+        "status": 201,
+        "body": {
+          "created": 2
+        }
+      },
+      "after": {
+        "status": 201,
+        "body": {
+          "created": 1
+        }
+      }
+    },
+    "radius_all": {
+      "before": {
+        "status": 200,
+        "body": {
+          "updated": 28
+        }
+      },
+      "after": {
+        "status": 200,
+        "body": {
+          "updated": 14
+        }
+      }
+    },
+    "preset_shifts": {
+      "before": {
+        "status": 200,
+        "body": {
+          "created": 6
+        }
+      },
+      "after": {
+        "status": 200,
+        "body": {
+          "created": 3
+        }
+      }
+    }
+  },
+  "decisions": {
+    "employment_end": {
+      "before_status": 409,
+      "after_status": 200
+    },
+    "review_units": {
+      "before_status": 409,
+      "after_status": 201,
+      "persisted_units_before": 0.5,
+      "persisted_units_after": 0.5
+    },
+    "extra_attendance": {
+      "before_status": 409,
+      "after_status": 200,
+      "persisted_state_before": "REJECTED",
+      "persisted_state_after": "REJECTED"
+    }
+  },
+  "retention": {
+    "removed_before": 2,
+    "removed_after": 1,
+    "actual_fixture_assignments_removed": 1,
+    "policy_changed": false
+  },
+  "regression": "cloudflare/tests/d1-runtime-contract.test.mjs exercises actual handlers inside workerd, checks stored rows, audits, replay and authorization"
+}

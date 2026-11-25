@@ -20,7 +20,7 @@ test('long message text fits mobile viewport and composer remains reachable',asy
   const u=new URL(route.request().url());
   return route.fulfill({json:u.searchParams.has('thread')?{available:true,thread:{id:'mobile-test',kind:'DIRECT'},members:[{id:'peer',full_name:peer}],messages:[{id:1,sender_id:'peer',sender_name:peer,body,created_at:Date.now()}],more:false}:{available:true,threads:[{id:'mobile-test',kind:'DIRECT',peer_name:peer,latest_body:body.slice(0,100)}],contacts:[]}});
  });
- await login(page);await page.getByRole('button',{name:'Tin nhắn nội bộ',exact:true}).click();await expect(page.locator('#chat-stream')).toContainText(body);
+ await login(page);await page.getByRole('button',{name:'Tin nhắn nội bộ',exact:true}).click();await page.locator('#chat-threads [data-action="chat-open"]').click();await expect(page.locator('#chat-stream')).toContainText(body);
  for(const viewport of [{width:320,height:640},{width:390,height:360},{width:844,height:390}]){
   await page.setViewportSize(viewport);const input=page.locator('[data-form="chat-send"] textarea');await input.fill('Tin nhắn nháp');await input.scrollIntoViewIfNeeded();
   expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);const box=await input.boundingBox();expect(box.x).toBeGreaterThanOrEqual(0);expect(box.x+box.width).toBeLessThanOrEqual(viewport.width);

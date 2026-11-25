@@ -1,4 +1,7 @@
 # Không gian làm việc BABY MARK
+
+**Cập nhật hiện tại:** [Rà soát luồng sử dụng và mobile](mobile-workflow-audit.md). Thanh dưới ưu tiên ba thao tác theo vai trò; menu đầy đủ là hộp thoại chia nhóm. Yêu cầu công có bộ lọc trạng thái và ca tương lai; chat điện thoại tách danh sách/nội dung, giữ bản nháp trong phiên. Báo cáo hiện dùng phân trang máy chủ như mô tả tại [tối ưu D1/báo cáo](performance-mobile-d1.md). Các đoạn RC bên dưới ghi lại từng giai đoạn thiết kế; chi tiết mới được mô tả trong hai tài liệu này.
+
 Admin mở Tổng quan (chỉ số tổng hợp), không mở camera. Nhân viên/quản lý mở Chấm công; quản lý có Báo cáo và Thông báo theo phạm vi. Menu nhóm rõ, một mục Yêu cầu công với hai màn hình con Nghỉ phép/điều chỉnh và Ca bổ sung/thay ca. Admin sửa lịch ở Quản trị, không có màn hình lịch cá nhân; báo cáo và lương ở menu Đối soát. Lịch sử là lượt ảnh gốc, báo cáo là tổng hợp theo ca, bảng lương là dự thảo/chốt theo tháng. Thiết bị & thông báo (Push/camera/GPS) khác với cảnh báo đi muộn. Các bộ lọc ngày riêng từng màn hình trong phiên, không lưu dữ liệu cá nhân ở bộ nhớ bền ngoài phiên đăng nhập. Không có SQL mới, không dùng dịch vụ trả phí. Trang tổng quan tính theo ca có lịch hôm nay, chưa đối soát vắng/nghỉ/ngoài vùng; không suy diễn số người hiện diện.
 Lịch cá nhân, lịch sử ảnh và báo cáo theo ca dựng từng trang 30 bản ghi trong trình duyệt; không thay đổi giới hạn/truy vấn API và tổng hợp CSV vẫn đầy đủ. Yêu cầu công chỉ tải ca khi mở đơn mới; Admin không tạo đơn nghỉ cá nhân. Bàn giao Admin không tải lịch cá nhân.
 ## RC.4 giao diện

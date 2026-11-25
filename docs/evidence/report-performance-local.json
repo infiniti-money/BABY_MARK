@@ -9,9 +9,9 @@
     "rejectedRequests": 24000
   },
   "median_ms_7_runs": {
-    "full_without_optional_indexes": 18.54,
-    "full_with_optional_indexes": 12.29,
-    "page_30_with_indexes": 0.79
+    "full_without_optional_indexes": 16.75,
+    "full_with_optional_indexes": 11.76,
+    "page_30_with_indexes": 0.69
   },
   "response_bytes": {
     "full": 1579046,
@@ -76,7 +76,7 @@
       ]
     },
     "current": {
-      "bytes": 223948,
+      "bytes": 234604,
       "files": [
         "app.mjs",
         "motion.mjs",
@@ -84,6 +84,7 @@
         "schedule-calendar.mjs",
         "gps.mjs",
         "polling.mjs",
+        "workspace.mjs",
         "payroll-components.mjs",
         "maps-import.mjs",
         "retail-staff.mjs",

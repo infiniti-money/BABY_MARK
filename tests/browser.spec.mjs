@@ -392,7 +392,7 @@ test('admin settings and branch lifecycle are available after migration 0009',as
 test('responsive admin navigation, readable records and forms at narrow, tablet and desktop widths',async({page})=>{
  await page.setViewportSize({width:320,height:640});
  await login(page);
- const more=page.getByRole('button',{name:'Thêm',exact:true});
+ const more=page.locator('[data-action="mobile-menu"]');
  await expect(more).toBeVisible();
  await expect(more).toHaveAttribute('aria-expanded','false');
  await more.click();
@@ -479,7 +479,7 @@ test('admin overview and role navigation do not duplicate primary modules',async
  await expect(page.getByRole('heading',{name:'Việc cần xử lý'})).toBeVisible();
  await expect(page.getByRole('button',{name:'Bật camera',exact:true})).toHaveCount(0);
  await page.getByRole('button',{name:'Quản trị',exact:true}).click();
- for(const name of ['Báo cáo','Bảng công & lương','Yêu cầu công','Thông báo'])await expect(page.getByRole('button',{name,exact:true})).toHaveCount(1);
+ for(const name of ['Báo cáo','Bảng công & lương','Yêu cầu công','Cảnh báo công'])await expect(page.getByRole('button',{name,exact:true})).toHaveCount(1);
  await page.getByRole('button',{name:'Yêu cầu công',exact:true}).click();
  await expect(page.getByRole('button',{name:'Nghỉ phép / điều chỉnh',exact:true})).toBeVisible();
  await page.getByRole('button',{name:'Ca bổ sung / thay ca',exact:true}).click();await expect(page.getByRole('heading',{name:'Chấm công ngoài lịch / thay ca',exact:true})).toBeVisible();
@@ -603,7 +603,7 @@ test('RC.9 viewport reveals alternate left and right without layout overflow',as
 
 test('RC.10 phone-first employee layout, tablet expansion and desktop navigation',async({page})=>{
  await page.emulateMedia({reducedMotion:'reduce'});await page.setViewportSize({width:390,height:844});await login(page,'staff');
- const more=page.getByRole('button',{name:'Thêm',exact:true}),work=page.locator('.employee-workspace');
+ const more=page.locator('[data-action="mobile-menu"]'),work=page.locator('.employee-workspace');
  const fits=()=>page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth);
  for(const width of [320,360,390,430]){
   await page.setViewportSize({width,height:844});
@@ -616,7 +616,7 @@ test('RC.10 phone-first employee layout, tablet expansion and desktop navigation
   await expect(work.locator('#capture-assignment')).toHaveCSS('font-size','16px');
  }
  await more.click();await expect(more).toHaveAttribute('aria-expanded','true');
- await page.getByRole('heading',{name:'Ghi nhận chấm công',exact:true}).click();
+ await page.mouse.click(2,2);
  await expect(more).toHaveAttribute('aria-expanded','false');
  for(const size of [{width:768,height:1024},{width:820,height:1180}]){
   await page.setViewportSize(size);expect(await fits()).toBeTruthy();

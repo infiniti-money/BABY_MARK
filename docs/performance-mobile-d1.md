@@ -13,6 +13,8 @@ Nhánh tối ưu dựa trên PR #8 (`a47faba`), chưa hợp nhất main hoặc t
 | iPhone/Android | Nút đóng hộp thoại đạt 44 × 44 px; danh sách chat dùng chiều cao động; giới hạn nội dung dài trong cột và cho nhóm nút phân trang xuống dòng. | WebKit cấu hình iPhone và Chromium cấu hình Android; chiều rộng 320/390/844 px, dọc/ngang và chiều cao thu nhỏ. |
 | Dọn bộ nhớ và phục hồi mạng | Hủy GET khi đổi trang, hủy request khi đổi tài khoản, giới hạn thời gian đọc/ghi, bao gồm tải thân ảnh/CSV. Thu hồi URL ảnh, bỏ các phần tử rời DOM khỏi motion observer. Gộp các lần phục hồi phiên trùng nhau khi online. | Mock encoder/observer và phản hồi treo; phục hồi phiên; bộ test mất phản hồi chấm công/idempotency hiện có. |
 
+Rà soát bổ sung tổ chức lại menu theo vai trò, yêu cầu công và chat trên điện thoại; sửa phản hồi ghi D1 bị ảnh hưởng bởi trigger. Chi tiết phát hiện, quy tắc nghiệp vụ giữ nguyên và test runtime nằm trong [mobile-workflow-audit.md](mobile-workflow-audit.md).
+
 ## API phân trang và nghiệp vụ
 
 - API cũ `/api/reports` và `format=csv` tiếp tục xuất đầy đủ theo bộ lọc, giới hạn 5.000 ca và khoảng ngày hiện có. Không đổi phép tính công, lương hoặc bằng chứng điều chỉnh.
@@ -36,10 +38,10 @@ Kết quả và query plan nằm trong [evidence/report-performance-local.json](
 
 | Đo trên fixture local | Trước | Sau |
 | --- | ---: | ---: |
-| Mã nguồn module tải khi khởi động | 263.860 byte | khoảng 224 KB (giảm khoảng 15%) |
+| Mã nguồn module tải khi khởi động | 263.860 byte | 234.604 byte (giảm khoảng 11%) |
 | Phản hồi chi tiết báo cáo | 1.579.046 byte | 39.687 byte/trang 30 ca + 557 byte tổng hợp lần đầu |
-| Median truy vấn đầy đủ | 18,54 ms khi bỏ hai index | 12,29 ms khi có index |
-| Median truy vấn trang 30 ca | — | 0,79 ms khi có index |
+| Median truy vấn đầy đủ | 16,75 ms khi bỏ hai index | 11,76 ms khi có index |
+| Median truy vấn trang 30 ca | — | 0,69 ms khi có index |
 
 Query plan sau index dùng `SEARCH a USING INDEX assignment_report_date` và `request_report_choice`. Vẫn có thể sắp xếp tạm ở mức ngoài do thứ tự mã nhân viên nằm trong bảng profiles; không tuyên bố đã loại bỏ toàn bộ sort hoặc tối ưu mọi phạm vi quản lý.
 

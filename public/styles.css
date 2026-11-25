@@ -677,3 +677,47 @@ td,th{overflow-wrap:anywhere}
  dialog .modal-body{overflow-wrap:anywhere}
  .admin-pager>div{flex-wrap:wrap}
 }
+
+/* Daily work stays one tap away; the complete menu uses native dialog focus. */
+.navigation-sheet{position:fixed;inset:auto 0 0;margin:0 auto;width:min(620px,100vw);max-width:100vw;max-height:calc(100dvh - 12px - env(safe-area-inset-top));border-radius:24px 24px 0 0;background:#fff9fb;padding-bottom:env(safe-area-inset-bottom)}
+.navigation-sheet .modal-body{display:grid;gap:18px}
+.navigation-group h3{font-size:12px;color:#785364;margin:0 0 8px}
+.navigation-group>div{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+.navigation-link{display:flex;align-items:center;gap:10px;text-align:left;min-width:0;min-height:52px;padding:10px;border:1px solid #eadce3;border-radius:12px;background:#fff;color:#4c3040;font:inherit;font-size:13px;overflow-wrap:anywhere}
+.navigation-link .icon{width:22px;height:22px;flex:0 0 22px}
+.navigation-link.active{background:#fbe6e9;border-color:#c37995;color:#792639;font-weight:700}
+.navigation-sheet .modal-head{align-items:flex-start;background:#fff9fb}
+.request-statuses{display:flex;flex-wrap:wrap;gap:8px;padding:14px 16px;border-bottom:1px solid var(--line)}
+.request-statuses button{min-height:44px;padding:8px 12px;border:1px solid #dfc5d0;background:#fff;color:#664253;border-radius:10px;font:inherit;font-size:12px}
+.request-statuses button[aria-pressed=true]{background:#fbe6e9;border-color:#ad5378;font-weight:700}
+.request-statuses span{margin-left:4px;font-variant-numeric:tabular-nums}
+.chat-back{display:none}.capture-guidance{margin:0;padding:9px 10px;background:#faf1f5;border-radius:9px;color:#684455}
+@media screen and (max-width:900px){
+ .btn{min-width:44px}
+ .nav .primary-nav[data-nav-order="0"]{order:0}
+ .nav .primary-nav[data-nav-order="1"]{order:1}
+ .nav .primary-nav[data-nav-order="2"]{order:2}
+ .nav .mobile-more,.sidebar.menu-open .mobile-more{order:3}
+ .sidebar.menu-open .nav .extra-nav,.sidebar.menu-open .sidebar-bottom{display:none}
+ .sidebar.menu-open{max-height:none}
+ .sidebar.menu-open .nav button{background:transparent}
+ .sidebar.menu-open .nav button.active{background:#fbe6e9}
+ .chat-layout{grid-template-columns:minmax(0,1fr)}
+ .chat-layout[data-pane=list] .chat-room,.chat-layout[data-pane=room] .chat-list{display:none}
+ .chat-layout #chat-threads{max-height:none}
+ .chat-back{display:inline-flex;align-self:flex-start}
+ .chat-back .icon{transform:rotate(180deg)}
+ .chat-room .card-head{align-items:flex-start}
+ .chat-room .card-head>div{flex:1 1 150px}
+ .chat-layout .chat-stream{max-height:40dvh;scroll-padding-block:8px}
+ .chat-room form{margin-top:10px}
+ .chat-room [type=submit]{min-height:48px}
+ .admin-search button{min-width:44px;flex-shrink:0}
+}
+@media screen and (max-width:620px){
+ .request-statuses{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));padding:12px}
+ .request-table.responsive-table td[data-field=person],.request-table.responsive-table td[data-field=reason],.request-table.responsive-table td[data-field=actions]{padding-left:0}
+ .request-table.responsive-table td[data-field=person]::before,.request-table.responsive-table td[data-field=reason]::before,.request-table.responsive-table td[data-field=actions]::before{display:none}
+ .request-table.responsive-table td[data-field=person] strong{font-size:15px}
+ .request-table.responsive-table td[data-field=reason]{line-height:1.6}
+}

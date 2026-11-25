@@ -41,8 +41,8 @@ export async function onRequestPost({request,env,params}){
    if(b.action==='set-radius-all'){
     if(!(await policy(env)).available)throw new ApiError(409,'Cần migration 0009');
     const radius=b.allowed_radius;if(!Number.isInteger(radius)||radius<20||radius>1000)invalid('Bán kính phải là số nguyên từ 20 đến 1.000 m');
-    const result=await db.batch([db.prepare("UPDATE branches SET allowed_radius=? WHERE active=1 AND allowed_radius<>?").bind(radius,radius),managementAudit(db,actor,'branches','ALL_ACTIVE','SET_RADIUS_ALL',{allowed_radius:radius})]);
-    return reply({updated:result[0].meta.changes});
+    const result=await db.batch([db.prepare("UPDATE branches SET allowed_radius=? WHERE active=1 AND allowed_radius<>? RETURNING id").bind(radius,radius),managementAudit(db,actor,'branches','ALL_ACTIVE','SET_RADIUS_ALL',{allowed_radius:radius})]);
+    return reply({updated:result[0].results.length});
    }
    if(b.action==='set-active'){
     if(!b.id||typeof b.active!=='boolean')invalid('Trạng thái cửa hàng không hợp lệ');
@@ -82,7 +82,7 @@ export async function onRequestPost({request,env,params}){
    await db.batch(statements);return reply({id});
   }
   if(resource==='shifts'){
-   if(b.action==='all-day-preset'){const result=await db.batch([db.prepare("INSERT INTO shifts(id,name,start_time,end_time,grace_period) VALUES('BM-ALLDAY','Làm cả ngày (2 công)','07:00','21:30',5) ON CONFLICT(id) DO NOTHING"),managementAudit(db,actor,'shifts','BM-ALLDAY','ADD_ALL_DAY',{})]);return reply({id:'BM-ALLDAY',created:result[0].meta.changes});}
+   if(b.action==='all-day-preset'){const result=await db.batch([db.prepare("INSERT INTO shifts(id,name,start_time,end_time,grace_period) VALUES('BM-ALLDAY','Làm cả ngày (2 công)','07:00','21:30',5) ON CONFLICT(id) DO NOTHING RETURNING id"),managementAudit(db,actor,'shifts','BM-ALLDAY','ADD_ALL_DAY',{})]);return reply({id:'BM-ALLDAY',created:result[0].results.length});}
    if(b.action==='delete-unused'){
     if(!b.id)invalid('Cần mã mẫu ca');
     const guard='id=? AND NOT EXISTS(SELECT 1 FROM assignments WHERE shift_id=shifts.id)';
@@ -128,8 +128,8 @@ export async function onRequestPost({request,env,params}){
     }
     if(!rows.length||rows.length>100)invalid('Mỗi lần phân tối đa 100 ca; chia thành nhiều đợt');
     const payload=JSON.stringify(rows);
-    const result=await db.batch([...(event?[db.prepare("INSERT INTO shifts(id,name,start_time,end_time,grace_period) VALUES('BM-ALLDAY','Làm cả ngày (2 công)','07:00','21:30',5) ON CONFLICT(id) DO NOTHING")]:[]),db.prepare("INSERT INTO assignments(id,user_id,branch_id,shift_id,work_date,starts_at,ends_at,grace_minutes) SELECT json_extract(value,'$.id'),json_extract(value,'$.user_id'),?,?,json_extract(value,'$.work_date'),json_extract(value,'$.starts_at'),json_extract(value,'$.ends_at'),? FROM json_each(?)").bind(branch,shiftId,shift.grace_period,payload),managementAudit(db,actor,'assignments',crypto.randomUUID(),event?'EVENT_CREATE':'BULK_CREATE',{branch_id:branch,shift_id:shiftId,user_ids:users,from:b.from,to:b.to,weekdays:b.weekdays,count:rows.length,...(event?{event_name:eventName}:{})})]);
-    return reply({created:result[event?1:0].meta.changes},201);
+    const result=await db.batch([...(event?[db.prepare("INSERT INTO shifts(id,name,start_time,end_time,grace_period) VALUES('BM-ALLDAY','Làm cả ngày (2 công)','07:00','21:30',5) ON CONFLICT(id) DO NOTHING")]:[]),db.prepare("INSERT INTO assignments(id,user_id,branch_id,shift_id,work_date,starts_at,ends_at,grace_minutes) SELECT json_extract(value,'$.id'),json_extract(value,'$.user_id'),?,?,json_extract(value,'$.work_date'),json_extract(value,'$.starts_at'),json_extract(value,'$.ends_at'),? FROM json_each(?) RETURNING id").bind(branch,shiftId,shift.grace_period,payload),managementAudit(db,actor,'assignments',crypto.randomUUID(),event?'EVENT_CREATE':'BULK_CREATE',{branch_id:branch,shift_id:shiftId,user_ids:users,from:b.from,to:b.to,weekdays:b.weekdays,count:rows.length,...(event?{event_name:eventName}:{})})]);
+    return reply({created:result[event?1:0].results.length},201);
    }
    const user=identifier(b.user_id),branch=identifier(b.branch_id),shiftId=identifier(b.shift_id);
    const profile=await db.prepare('SELECT id FROM profiles WHERE id=? AND active=1').bind(user).first();

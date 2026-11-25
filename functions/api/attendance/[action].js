@@ -83,11 +83,11 @@ async function submit(request,env,user){
    JOIN credentials cr ON cr.user_id=p.id
    JOIN sessions ss ON ss.user_id=p.id AND ss.token_hash=? AND ss.credential_version=cr.version AND ss.expires_at>?
    WHERE c.id=? AND c.state='PROCESSING' AND c.attendance_id=?
-   AND (c.type='IN' OR EXISTS(SELECT 1 FROM attendances ti WHERE ti.assignment_id=c.assignment_id AND ti.type='IN' AND ti.server_timestamp<=?))`)
+   AND (c.type='IN' OR EXISTS(SELECT 1 FROM attendances ti WHERE ti.assignment_id=c.assignment_id AND ti.type='IN' AND ti.server_timestamp<=?)) RETURNING id`)
    .bind(id,c.assignment_id,user.id,c.type,receivedAt,m.lat,m.lng,m.accuracy,m.distance,m.address,key,status,c.type==='IN'?timing.minutes:0,c.type==='OUT'?timing.minutes:0,sha,receivedAt,c.created_at,c.metadata_json,sessionHash,Date.now(),c.id,id,receivedAt),
    env.DB.prepare("UPDATE attendance_challenges SET state='COMPLETED' WHERE id=? AND state='PROCESSING' AND EXISTS(SELECT 1 FROM attendances WHERE id=?)").bind(c.id,id)];
   const results=await env.DB.batch(statements);
-  if(results[0].meta.changes!==1)fail(409,'Phiên hoặc trạng thái công đã thay đổi; kiểm tra lịch sử','FINALIZE_FAILED');
+  if(results[0].results?.length!==1)fail(409,'Phiên hoặc trạng thái công đã thay đổi; kiểm tra lịch sử','FINALIZE_FAILED');
   return reply({attendance:await env.DB.prepare('SELECT * FROM attendances WHERE id=?').bind(id).first()},201);
  }catch(e){
   // KV and D1 are not one transaction. Keep counted inventory on every uncertain

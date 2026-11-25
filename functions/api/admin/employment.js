@@ -18,8 +18,8 @@ export async function onRequestPost({request,env}){try{
  }
  if(b.action==='end'){
   const id=identifier(b.id);if(!validDay(b.end_date))invalid('Ngày kết thúc không hợp lệ');
-  const r=await db.batch([db.prepare('UPDATE employment_periods SET end_date=? WHERE id=? AND user_id=? AND end_date IS NULL AND start_date<=?').bind(b.end_date,id,user,b.end_date),db.prepare("INSERT INTO management_audit(id,actor_id,resource,resource_id,action,details_json,created_at) SELECT ?,?,'employment',?,'END',?,? WHERE changes()=1").bind(crypto.randomUUID(),actor.id,id,JSON.stringify({user_id:user,end_date:b.end_date}),Date.now())]);
-  if(r[0].meta.changes!==1)throw new ApiError(409,'Giai đoạn đã kết thúc hoặc ngày không hợp lệ');return reply({ok:true});
+  const r=await db.batch([db.prepare('UPDATE employment_periods SET end_date=? WHERE id=? AND user_id=? AND end_date IS NULL AND start_date<=? RETURNING id').bind(b.end_date,id,user,b.end_date),db.prepare("INSERT INTO management_audit(id,actor_id,resource,resource_id,action,details_json,created_at) SELECT ?,?,'employment',?,'END',?,? WHERE changes()=1").bind(crypto.randomUUID(),actor.id,id,JSON.stringify({user_id:user,end_date:b.end_date}),Date.now())]);
+  if(r[0].results?.length!==1)throw new ApiError(409,'Giai đoạn đã kết thúc hoặc ngày không hợp lệ');return reply({ok:true});
  }
  invalid();
  }catch(e){return apiFailure(e)}}
