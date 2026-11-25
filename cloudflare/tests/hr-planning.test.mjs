@@ -37,7 +37,7 @@ test('payroll uses explicit rate, regular time and immutable revisions',async()=
   const id=crypto.randomUUID();await f.db.prepare("INSERT INTO attendances(id,assignment_id,user_id,type,server_timestamp,gps_lat,gps_lng,accuracy_m,distance_m,photo_path,status) VALUES(?,?,?,?,?,20,106,5,0,?,'ON_TIME')").bind(id,assignment,f.ids.staff,type,stamp,'timemark/'+id+'.jpg').run();
  }
  const get=(who='admin',q='')=>f.call(payroll,who,{method:'GET',query:'?month='+month+q});
- const post=body=>f.call(payroll,'admin',{body:{month,...body}});
+ const post=async body=>f.call(payroll,'admin',{body:{month,...(body.action==='close'?{expected_source_version:(await (await get()).json()).data.source_version}:{}),...body}});
  assert.equal((await get('staff')).status,403);
  assert.equal((await get('manager')).status,403);
  assert.equal((await post({action:'close',expected_revision:0,reviewed:true,reason:'Đối soát tháng'})).status,409);

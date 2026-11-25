@@ -44,6 +44,9 @@ export async function onRequestPost({request,env}){
   const reason=textField(b.reason,500);if(reason.length<5||b.reviewed!==true)invalid('Cần lý do và xác nhận đối soát');
   const draft=await payrollDraft(db,actor,month);
   if(!draft.month_ended||draft.pending||draft.missing_rates||!draft.rows.length)throw new ApiError(409,'Chỉ chốt tháng đã kết thúc, đủ đơn giá và không có yêu cầu chờ duyệt');
+  if(draft.source_version===null)throw new ApiError(409,'Cần migration 0017 để chốt lương an toàn');
+  if(b.expected_source_version!==draft.source_version)throw new ApiError(409,'Dữ liệu đã đổi sau khi xem bảng lương; tải lại và đối soát');
+  if(draft.issues)throw new ApiError(409,'Còn ca bất thường chưa được xử lý; không thể chốt lương');
   if(draft.overtime_review_count)throw new ApiError(409,'Thời gian làm thêm đã thay đổi, cần đối soát lại số phút duyệt');
   if(draft.rows.some(r=>r.estimated_total<0))throw new ApiError(409,'Có tổng âm, kiểm tra khoản điều chỉnh');
   const latest=(await snapshots(db,month)).results[0]?.revision??0;
@@ -51,7 +54,8 @@ export async function onRequestPost({request,env}){
   const revision=latest+1,snapshot=JSON.stringify(draft);
   // Stay below D1's single-value limit; never truncate a closing silently.
   if(new TextEncoder().encode(snapshot).length>1800000)throw new ApiError(413,'Bản chốt vượt dung lượng lưu an toàn. Cần kiểm tra số ca và cấu hình trước khi chốt.');
-  await db.batch([db.prepare('INSERT INTO payroll_closings(month,revision,snapshot_json,created_by,created_at,reason) VALUES(?,?,?,?,?,?)').bind(month,revision,snapshot,actor.id,Date.now(),reason),managementAudit(db,actor,'payroll',month,'CLOSE',{revision})]);
+  const result=await db.batch([db.prepare('INSERT INTO payroll_closings(month,revision,snapshot_json,created_by,created_at,reason) SELECT ?,?,?,?,?,? WHERE EXISTS(SELECT 1 FROM payroll_epoch WHERE id=1 AND version=?) AND COALESCE((SELECT MAX(revision) FROM payroll_closings WHERE month=?),0)=?').bind(month,revision,snapshot,actor.id,Date.now(),reason,draft.source_version,month,latest),db.prepare("INSERT INTO management_audit(id,actor_id,resource,resource_id,action,details_json,created_at) SELECT ?,?,'payroll',?,'CLOSE',?,? WHERE changes()=1").bind(crypto.randomUUID(),actor.id,month,JSON.stringify({revision,source_version:draft.source_version}),Date.now())]);
+  if(result[0].meta.changes!==1)throw new ApiError(409,'Bảng công hoặc phiên bản chốt đã thay đổi; tải lại');
   return reply({ok:true,revision},201);
  }
  invalid('Thao tác không hợp lệ');

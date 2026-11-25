@@ -6,7 +6,7 @@ import * as health from '../../functions/api/cloudflare/health.js';
 import {schemaReadiness} from '../lib/schema-readiness.mjs';
 test('v1.2 schema and diagnostics are read-only, admin-scoped, and detect 0016',async()=>{
  const f=await appFixture();try{
-  const before=await schemaReadiness(f.db);assert.equal(before.ready,true);assert.equal(before.migrations.length,16);assert.equal(before.migrations[1].status,'manual');
+  const before=await schemaReadiness(f.db);assert.equal(before.ready,true);assert.equal(before.migrations.length,17);assert.equal(before.migrations[1].status,'manual');
   assert.equal((await f.call(diagnostic,'staff',{method:'GET'})).status,403);
   assert.equal((await f.call(diagnostic,null,{method:'GET'})).status,401);
   const response=await f.call(diagnostic,'admin',{method:'GET'});assert.equal(response.status,200);const d=await response.json();assert.equal(d.schema.ready,true);assert.equal(d.kv_read_ready,true);

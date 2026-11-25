@@ -33,7 +33,9 @@ export function summarizeAssignment(row,now=Date.now()){
  const complete=entry!=null&&exit!=null&&exit>entry;
  let status=outside?'Ngoài vùng':entry==null&&exit!=null?'Cần kiểm tra':entry==null?(now>row.ends_at?'Vắng':now>row.starts_at+row.grace_minutes*60000?'Chưa vào / muộn':'Chưa vào ca'):exit==null?(now>row.ends_at?'Thiếu chấm ra':'Đang làm'):!complete?'Cần kiểm tra':late&&early?'Muộn / về sớm':late?'Đi muộn':early?'Về sớm':'Đủ công';
  if(adjusted)status='Điều chỉnh đã duyệt'+(outside?' / ngoài vùng':'');
- return {status,minutes:complete&&!outside?Math.floor((exit-entry)/60000):0,late,early,days:complete&&!outside?1:0,work_units:complete&&!outside&&exit>entry&&row.request_state!=='PENDING'?(row.shift_id==='BM-ALLDAY'?2:1):0,overtime_minutes:complete&&!outside&&row.request_state!=='PENDING'?Math.max(0,Math.floor((exit-Math.max(entry,row.ends_at))/60000)):0,leave:0,adjusted,outside};
+ const fullDay=row.shift_id==='BM-ALLDAY',shortFullDay=fullDay&&complete&&!outside&&(entry>row.starts_at+row.grace_minutes*60000||exit<row.ends_at);
+ if(shortFullDay)status='Ca cả ngày cần đối soát';
+ return {status,work_unit_review:shortFullDay,minutes:complete&&!outside?Math.floor((exit-entry)/60000):0,late,early,days:complete&&!outside?1:0,work_units:complete&&!outside&&exit>entry&&row.request_state!=='PENDING'&&!shortFullDay?(fullDay?2:1):0,overtime_minutes:complete&&!outside&&row.request_state!=='PENDING'?Math.max(0,Math.floor((exit-Math.max(entry,row.ends_at))/60000)):0,leave:0,adjusted,outside};
 }
 
 export function summarizeReport(rows){
