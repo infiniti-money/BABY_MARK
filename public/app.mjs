@@ -12,8 +12,21 @@ import {pushRegistration,publicKeyBytes,disableDevicePush} from './push.mjs';
 import {permissionState,checkCameraPermission,checkLocationPermission} from './device-permissions.mjs';
 let pushReg=null,pushConfig=null,pushSub=null;
 let documentPreview=null;
-let chatSelection='',chatTimer=null,chatBusy=false,chatPage=null;
-function stopChat(){clearInterval(chatTimer);chatTimer=null;chatBusy=false;chatPage=null;}
+let chatSelection='',chatTimer=null,chatBusy=null,chatPage=null,chatIdle=0;
+function stopChat(){clearTimeout(chatTimer);chatTimer=null;chatBusy=null;chatPage=null;chatIdle=0;}
+const chatDelay=()=>Math.min(120000,30000*2**Math.min(chatIdle,2));
+function scheduleChat(id,delay=chatDelay()){
+ clearTimeout(chatTimer);chatTimer=null;
+ if(id!==state.renderId||state.view!=='messages'||document.hidden)return;
+ chatTimer=setTimeout(async()=>{
+  chatTimer=null;
+  if(id!==state.renderId||state.view!=='messages'||document.hidden)return;
+  if(!chatBusy&&!modal.open&&!$('#chat-before')?.dataset.expanded){
+   try{chatIdle=(await refreshChat(id,true))?0:Math.min(2,chatIdle+1);}catch{chatIdle=Math.min(2,chatIdle+1);}
+  }
+  if(id===state.renderId)scheduleChat(id);
+ },delay);
+}
 function resetChat(){stopChat();chatSelection='';}
 const documents=()=>import('./report-documents.mjs');
 function clearPrint(){documentPreview=null;document.body.classList.remove('printing-document');const root=document.querySelector('#print-document');if(root)root.innerHTML='';}
@@ -47,13 +60,18 @@ const state = {token:saved?.expires_at>Date.now()?saved.token:null,user:null,vie
 const defaultFilters=()=>({from:monthStart(),to:today(),branch_id:'',user_id:''});
 let viewFilters={},listState=null;
 let noticeTimer, photoURLs = [],modalTicket=0,cameraTicket=0;
+let recentApiErrors=[];
+function recordApiError(status,requestId,code){
+ recentApiErrors.push({status,requestId:/^[0-9a-f-]{36}$/i.test(requestId||'')?requestId:null,code:typeof code==='string'&&/^[A-Z0-9_]{1,64}$/.test(code)?code:null,at:Date.now()});
+ if(recentApiErrors.length>20)recentApiErrors.shift();
+}
 
 function notify(message,error=false) {
   const el = $('#notice'); el.textContent=message; el.hidden=false; el.classList.toggle('error',error);
   clearTimeout(noticeTimer); noticeTimer=setTimeout(()=>el.hidden=true,error?10000:5500);
 }
 function setSession(session) {
-  stopCamera();closeModal();resetChat();recoveryBusy=null;
+  stopCamera();closeModal();resetChat();recoveryBusy=null;recentApiErrors=[];
   state.sessionEpoch++;state.renderId++;
   state.token=session?.token||null;cameraFacing='user';adminList={tab:'',search:'',page:1};viewFilters={};listState=null;state.filters=defaultFilters();state.view='today';state.adminTab='employees';
   overviewDay='';overviewBranch='';overviewStatus='';state.overview=null;state.assignments=[];state.attendances=[];state.admin={};state.reports=[];state.reportData=null;state.requests=[];state.handover=null;state.extra=null;state.payrollData=null;state.payrollMonth=null;state.payrollRevision=null;
@@ -76,7 +94,10 @@ async function api(path,{body,method='GET',raw=false,timeout=0}={}) {
     const result=await response.json().catch(()=>({}));
     if(epoch!==state.sessionEpoch)throw new Error('Tài khoản đã thay đổi. Vui lòng thử lại trong phiên hiện tại.');
     if(response.status===401&&state.user){stopCamera();state.user=null;setSession(null);renderLogin('Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.');}
-    throw Object.assign(new Error(typeof result?.error==='string'?result.error:`Không thể xử lý yêu cầu (${response.status}).`),{status:response.status,code:result?.code});
+    const requestId=response.headers.get('X-Request-ID');
+    if(response.status>=500||response.status===429)recordApiError(response.status,requestId,result?.code);
+    const message=typeof result?.error==='string'?result.error:`Không thể xử lý yêu cầu (${response.status}).`;
+    throw Object.assign(new Error(message+(response.status>=500&&requestId?' · Mã tra cứu: '+requestId:'')),{status:response.status,code:result?.code,requestId});
    }
    if(raw)return response;
    let data;try{data=await response.json();}catch{throw networkError();}
@@ -207,21 +228,38 @@ async function renderMessages(id){
  chatPage={data,id};
  $('#content').innerHTML=`<div class="chat-layout"><section class="card"><div class="card-head"><h2>Cuộc trò chuyện</h2><button class="btn secondary small" data-action="chat-refresh">Làm mới</button></div><div class="card-body form-stack"><div class="modal-actions"><button class="btn secondary small" data-action="chat-new-direct">Tin nhắn riêng</button><button class="btn secondary small" data-action="chat-new-group">Tạo nhóm</button></div><div id="chat-threads">${chatThreadList(data)}</div>${data.truncated?'<p class="hint">Hiển thị 200 cuộc trò chuyện gần nhất.</p>':''}</div></section><section class="card chat-room" id="chat-room">${loading()}</section></div>`;
  await loadChatRoom(id,true);
- if(id===state.renderId)chatTimer=setInterval(()=>{if(!document.hidden&&!chatBusy&&!modal.open&&state.view==='messages'&&!$('#chat-before')?.dataset.expanded)refreshChat(id).catch(()=>{});},30000);
+ if(id===state.renderId)scheduleChat(id,30000);
 }
-async function refreshChat(id=state.renderId){
- if(chatBusy||state.view!=='messages'||id!==state.renderId)return;chatBusy=true;
- try{await loadChatRoom(id,false);if(id!==state.renderId)return;const data=await api('/api/messages');if(id!==state.renderId)return;chatPage.data=data;$('#chat-threads').innerHTML=chatThreadList(data);}finally{chatBusy=false;}
+async function refreshChat(id=state.renderId,poll=false){
+ if(chatBusy||state.view!=='messages'||id!==state.renderId||!chatPage)return false;
+ const run={};chatBusy=run;
+ try{
+  const changed=await loadChatRoom(id,false,poll);if(id!==state.renderId||!chatPage)return false;
+  const data=await api('/api/messages'+(poll?'?compact=1':''),{timeout:15000});if(id!==state.renderId||!chatPage)return false;
+  const listChanged=JSON.stringify(chatPage.data.threads)!==JSON.stringify(data.threads);
+  chatPage.data={...chatPage.data,...data};
+  if(listChanged)$('#chat-threads').innerHTML=chatThreadList(data);
+  if(!poll){chatIdle=0;scheduleChat(id,30000);}
+  return !!changed||listChanged;
+ }finally{if(chatBusy===run)chatBusy=null;}
 }
-async function loadChatRoom(id,rebuild){
- const selected=chatSelection;if(!selected){$('#chat-room').innerHTML=empty('Chọn cuộc trò chuyện.');return;}
- const data=await api('/api/messages?'+query({thread:selected}));if(id!==state.renderId||selected!==chatSelection)return;
+async function loadChatRoom(id,rebuild,poll=false){
+ const selected=chatSelection;if(!selected){$('#chat-room').innerHTML=empty('Chọn cuộc trò chuyện.');return false;}
+ const known=poll&&chatPage?.latest!==undefined?chatPage.latest:null;
+ const data=await api('/api/messages?'+query({thread:selected,known}),{timeout:15000});if(id!==state.renderId||selected!==chatSelection||!chatPage)return false;
+ if(data.unchanged)return false;
+ const latest=data.messages.at(-1)?.id||0,changed=rebuild||chatPage.latest!==latest;
+ chatPage.latest=latest;
  const title=chatTitle({...data.thread,peer_name:data.members.find(x=>x.id!==state.user.id)?.full_name}),canSend=data.thread.kind!=='SYSTEM'||state.user.role==='admin';
  if(rebuild||!$('#chat-stream')){
  $('#chat-room').innerHTML=`<div class="card-head"><div><h2>${esc(title)}</h2><p class="hint">${data.thread.kind==='SYSTEM'?'Thông báo do Admin gửi cho toàn hệ thống':data.members.length+' thành viên'}</p></div></div><div class="card-body"><button id="chat-before" class="btn secondary small" data-action="chat-older" ${data.more?'':'hidden'}>Tin nhắn cũ hơn</button><div id="chat-stream" class="chat-stream">${chatMessagesHTML(data)}</div>${canSend?`<form data-form="chat-send" class="form-stack"><label>Nội dung<textarea name="body" required maxlength="2000" rows="2" placeholder="Nhập tin nhắn…"></textarea></label><p class="error-text" data-form-error hidden></p><button class="btn" type="submit">${data.thread.kind==='SYSTEM'?'Gửi toàn hệ thống':'Gửi tin nhắn'}</button></form>`:'<p class="hint">Chỉ Admin được gửi thông báo hệ thống.</p>'}</div>`;
- }else{const host=$('#chat-stream');if(!$('#chat-before').dataset.expanded)host.innerHTML=chatMessagesHTML(data);$('#chat-before').hidden=!data.more;}
- if(!$('#chat-before').dataset.expanded){const host=$('#chat-stream');host.scrollTop=host.scrollHeight;$('#chat-before').dataset.first=String(data.messages[0]?.id||'');}
- if(data.messages.length&&!document.hidden){const latest=data.messages.at(-1);await api('/api/messages',{method:'POST',body:{action:'read',thread_id:selected,message_id:latest.id}});}
+ }else{const host=$('#chat-stream');if(changed&&!$('#chat-before').dataset.expanded){const nearBottom=host.scrollHeight-host.scrollTop-host.clientHeight<48;const scroll=host.scrollTop;host.innerHTML=chatMessagesHTML(data);host.scrollTop=nearBottom?host.scrollHeight:scroll;}$('#chat-before').hidden=!data.more;}
+ if(!$('#chat-before').dataset.expanded){const host=$('#chat-stream');if(rebuild)host.scrollTop=host.scrollHeight;$('#chat-before').dataset.first=String(data.messages[0]?.id||'');}
+ if(latest&&!document.hidden&&chatPage.read!==latest){
+  await api('/api/messages',{method:'POST',body:{action:'read',thread_id:selected,message_id:latest},timeout:15000});
+  if(id===state.renderId&&selected===chatSelection&&chatPage)chatPage.read=latest;
+ }
+ return changed;
 }
 function newChat(group){
  const contacts=chatPage?.data?.contacts||[];
@@ -678,9 +716,9 @@ document.addEventListener('click',async event=>{
   const action=button.dataset.action;if(!action)return;
   try {
     if(action==='chat-open'){chatSelection=button.dataset.id;return await navigate('messages');}
-    if(action==='chat-refresh'){return await refreshChat();}
+    if(action==='chat-refresh'){if($('#chat-before')?.dataset.expanded)return await navigate('messages');return await refreshChat();}
     if(action==='chat-new-direct'||action==='chat-new-group'){newChat(action==='chat-new-group');return;}
-    if(action==='chat-older'){const id=state.renderId,thread=chatSelection,before=button.dataset.first;if(!before)return;button.disabled=true;try{const d=await api('/api/messages?'+query({thread,before}));if(id!==state.renderId||thread!==chatSelection)return;$('#chat-stream').insertAdjacentHTML('afterbegin',chatMessagesHTML(d));button.dataset.expanded='1';button.dataset.first=String(d.messages[0]?.id||before);button.hidden=!d.more;}finally{button.disabled=false;}return;}
+    if(action==='chat-older'){const id=state.renderId,thread=chatSelection,before=button.dataset.first;if(!before)return;button.disabled=true;try{const d=await api('/api/messages?'+query({thread,before}),{timeout:15000});if(id!==state.renderId||thread!==chatSelection)return;const host=$('#chat-stream'),height=host.scrollHeight;host.insertAdjacentHTML('afterbegin',chatMessagesHTML(d));host.scrollTop+=host.scrollHeight-height;button.dataset.expanded='1';button.dataset.first=String(d.messages[0]?.id||before);const capped=host.querySelectorAll('.chat-message').length>=250;button.hidden=!d.more||capped;if(capped)notify('Đã mở tối đa 250 tin. Chọn Làm mới để quay về tin gần nhất.');}finally{button.disabled=false;}return;}
     if(action==='list-prev'||action==='list-next'){if(listState){listState.page+=action==='list-next'?1:-1;drawList();}return;}
     if(action==='admin-prev'||action==='admin-next'){adminList.page+=action==='admin-next'?1:-1;renderAdminList();return;}
     if(action==='mobile-menu'){mobileMenu(button.getAttribute('aria-expanded')!=='true');return;}
@@ -698,7 +736,7 @@ document.addEventListener('click',async event=>{
       if(state.user?.role!=='admin')return;const render=state.renderId;button.disabled=true;
       try{const d=await api('/api/admin/diagnostics');if(render!==state.renderId)return;
        const labels={OLD_PHOTO_LOCK:'Khóa kho ảnh lâu bất thường',OLD_PROCESSING:'Chấm công xử lý lâu',UNCERTAIN_PHOTOS:'Ảnh cần đối soát',ROSTER_REVIEW:'Lịch tự động cần kiểm tra',ROSTER_SECRET_MISSING:'Thiếu Secret lịch',PUSH_CONFIGURATION:'Push cần cấu hình',PUSH_DELIVERY_REVIEW:'Push lỗi hoặc chưa rõ kết quả',ROSTER_INELIGIBLE:'Cửa hàng bật lịch nhưng thiếu cấu hình'};
-       showModal('Sức khỏe hệ thống · v1.2.0 RC',`<div class="form-stack"><p>Chỉ đọc · ${esc(dt(d.generated_at))} · KV: ${d.kv_read_ready?'Đọc được':'Cần kiểm tra'}</p><h3>Migration đến ${esc(d.schema.target)}</h3>${d.schema.migrations.map(m=>`<div><strong>${esc(m.id)} · ${m.status==='present'?'Có dấu hiệu schema':m.status==='manual'?'Kiểm tra dữ liệu thủ công':'Thiếu đối tượng'}</strong><p class="hint">${esc(m.missing.join(', '))}</p></div>`).join('')}<p class="hint">Không thay thế sổ migration hoặc kiểm tra toàn bộ constraint.</p><h3>Lỗi và phục hồi</h3>${d.issues.map(x=>`<p>${esc(labels[x.code]||x.code)} · ${esc(x.severity)}${x.count==null?'':' · '+x.count}</p>`).join('')||'<p>Không phát hiện lỗi trong phạm vi kiểm tra.</p>'}<p>Không tự mở khóa, xóa ảnh, chạy migration hoặc ghi đè dữ liệu. Xác minh bản sao D1/KV và diễn tập phục hồi môi trường riêng trước thao tác thật.</p><h3>Ca chấm công cần đối soát (tối đa 20)</h3>${(d.recovery?.candidates||[]).map(c=>`<article class="operation-row"><div><strong>${esc(c.id)}</strong><p class="hint">${esc(c.type)} · ${esc(dt(c.expires_at))} · ${c.attendance_exists?'Có bản ghi công':'Chưa thấy bản ghi theo mã'} · Kho ảnh: ${esc(c.inventory_state||'Chưa thấy')}</p></div></article>`).join('')||'<p>Không có mục cũ trong phạm vi kiểm tra hoặc dữ liệu chưa khả dụng.</p>'}<h3>Lịch và thông báo</h3><p>Lịch: ${d.roster?.stale?'Quá 36 giờ / chưa chạy':d.roster?.enabled?'Có lần chạy gần đây':'Chưa bật hoặc chưa rõ'} · Push: ${d.push?.vapid_ready?'Có VAPID':'Cần xác minh VAPID'}.</p>${(d.roster?.branches||[]).map(b=>`<p>${esc(b.branch_id)} · ${!b.eligible?'Thiếu cấu hình':b.error?'Lỗi lần chạy':b.stale?'Chưa chạy / quá 36 giờ':'Có lần chạy gần đây'} · ${b.last_run_at?esc(dt(b.last_run_at)):'—'}</p>`).join('')}<p>Push mẫu tối đa 100 bản ghi: ${d.push?.recent_receipts??'—'} trong 24 giờ · lỗi ${d.push?.failed??'—'} · chưa rõ ${d.push?.uncertain??'—'}. Máy chủ tiếp nhận không bảo đảm thiết bị đã nhận.</p><h3>Sao lưu và phục hồi</h3><p>Công cụ ngoại tuyến: npm run backup:local. Không bao gồm ảnh KV; chưa xác nhận bản sao production.</p><button class="btn quiet" type="button" data-action="close-modal">Đóng</button></div>`);
+       showModal('Sức khỏe hệ thống · v1.2.0 RC',`<div class="form-stack"><p>Chỉ đọc · ${esc(dt(d.generated_at))} · KV: ${d.kv_read_ready?'Đọc được':'Cần kiểm tra'}</p><h3>Migration đến ${esc(d.schema.target)}</h3>${d.schema.migrations.map(m=>`<div><strong>${esc(m.id)} · ${m.status==='present'?'Có dấu hiệu schema':m.status==='manual'?'Kiểm tra dữ liệu thủ công':'Thiếu đối tượng'}</strong><p class="hint">${esc(m.missing.join(', '))}</p></div>`).join('')}<p class="hint">Không thay thế sổ migration hoặc kiểm tra toàn bộ constraint.</p><h3>Lỗi và phục hồi</h3>${d.issues.map(x=>`<p>${esc(labels[x.code]||x.code)} · ${esc(x.severity)}${x.count==null?'':' · '+x.count}</p>`).join('')||'<p>Không phát hiện lỗi trong phạm vi kiểm tra.</p>'}<p>Không tự mở khóa, xóa ảnh, chạy migration hoặc ghi đè dữ liệu. Xác minh bản sao D1/KV và diễn tập phục hồi môi trường riêng trước thao tác thật.</p><h3>Ca chấm công cần đối soát (tối đa 20)</h3>${(d.recovery?.candidates||[]).map(c=>`<article class="operation-row"><div><strong>${esc(c.id)}</strong><p class="hint">${esc(c.type)} · ${esc(dt(c.expires_at))} · ${c.attendance_exists?'Có bản ghi công':'Chưa thấy bản ghi theo mã'} · Kho ảnh: ${esc(c.inventory_state||'Chưa thấy')}</p></div></article>`).join('')||'<p>Không có mục cũ trong phạm vi kiểm tra hoặc dữ liệu chưa khả dụng.</p>'}<h3>Lịch và thông báo</h3><p>Lịch: ${d.roster?.stale?'Quá 36 giờ / chưa chạy':d.roster?.enabled?'Có lần chạy gần đây':'Chưa bật hoặc chưa rõ'} · Push: ${d.push?.vapid_ready?'Có VAPID':'Cần xác minh VAPID'}.</p>${(d.roster?.branches||[]).map(b=>`<p>${esc(b.branch_id)} · ${!b.eligible?'Thiếu cấu hình':b.error?'Lỗi lần chạy':b.stale?'Chưa chạy / quá 36 giờ':'Có lần chạy gần đây'} · ${b.last_run_at?esc(dt(b.last_run_at)):'—'}</p>`).join('')}<p>Push mẫu tối đa 100 bản ghi: ${d.push?.recent_receipts??'—'} trong 24 giờ · lỗi ${d.push?.failed??'—'} · chưa rõ ${d.push?.uncertain??'—'}. Máy chủ tiếp nhận không bảo đảm thiết bị đã nhận.</p><h3>Giám sát vận hành</h3><p>Thời gian chạy chẩn đoán: ${esc(d.diagnostic_ms??'—')} ms (không phải CPU hay p95 production).</p>${Object.entries(d.probes||{}).map(([code,p])=>'<p>'+esc(code)+' · '+(p.ok?'Đạt':'Cần kiểm tra')+' · '+esc(p.ms)+' ms</p>').join('')}<p>Hàng đợi Push: ${esc((d.push?.queue||[]).map(x=>x.state+': '+(x.capped?'≥101':x.n)).join(' · ')||'Chưa có dữ liệu')}</p><h3>Lỗi gần đây trên thiết bị này</h3><p class="hint">Tối đa 20 lỗi HTTP 429/5xx trong phiên; không lưu nội dung yêu cầu, token hoặc hồ sơ. Không phải thống kê toàn hệ thống.</p>${recentApiErrors.slice().reverse().map(e=>'<p>'+esc(dt(e.at))+' · HTTP '+esc(e.status)+' · '+esc(e.code||'')+' · '+esc(e.requestId||'Không có mã')+'</p>').join('')||'<p>Chưa ghi nhận lỗi trong phiên.</p>'}<h3>Sao lưu và phục hồi</h3><p>Công cụ ngoại tuyến: npm run backup:local. Không bao gồm ảnh KV; chưa xác nhận bản sao production.</p><button class="btn quiet" type="button" data-action="close-modal">Đóng</button></div>`);
       }finally{button.disabled=false;}return;
     }
     if(action==='revoke-device'){
@@ -1071,13 +1109,17 @@ document.addEventListener('submit',async event=>{
   finally{if(button.isConnected){button.disabled=false;button.innerHTML=old;}}
 });
 modal.addEventListener('cancel',event=>{event.preventDefault();if(!pendingCapture?.sending&&!pendingCapture?.checking){closeModal();drawRecovery();}});
-window.addEventListener('pagehide',()=>{stopCamera();if(pendingCapture&&!pendingCapture.sending)closeModal();clearPhotos();});
-document.addEventListener('visibilitychange',()=>{if(document.hidden)stopCamera();});
+window.addEventListener('pagehide',()=>{stopCamera();clearTimeout(chatTimer);chatTimer=null;if(pendingCapture&&!pendingCapture.sending)closeModal();clearPhotos();});
+window.addEventListener('pageshow',e=>{if(e.persisted&&state.user&&state.view==='messages'&&chatPage)scheduleChat(state.renderId,1000);});
+document.addEventListener('visibilitychange',()=>{
+ if(document.hidden){stopCamera();clearTimeout(chatTimer);chatTimer=null;}
+ else if(state.user&&state.view==='messages'&&chatPage){chatIdle=0;scheduleChat(state.renderId,1000);}
+});
 
 async function boot(){
   if(!state.token)return renderLogin();
   try{state.user=(await api('/api/auth/me')).user;await navigate(landing());}
   catch(e){if(e.status===401||e.status===403){setSession(null);renderLogin(e.message);}else{app.innerHTML='<main class="login-panel"><section class="login-box"><h2>Chưa thể kết nối BABY MARK</h2><p class="muted">Phiên đã lưu chưa bị xóa. Kiểm tra mạng và thử lại.</p><button class="btn" data-action="session-retry">Thử lại</button><button class="btn secondary" data-action="logout">Đăng xuất</button></section></main>';}}
 }
-window.addEventListener('storage',event=>{if(event.key!==SESSION_KEY&&event.key!==null)return;if(!state.token)return;let old=null;try{old=JSON.parse(event.oldValue||'null');}catch{}if(event.key!==null&&old?.token!==state.token)return;state.user=null;stopCamera();closeModal();resetChat();recoveryBusy=null;state.sessionEpoch++;state.renderId++;state.token=null;overviewDay='';overviewBranch='';overviewStatus='';state.overview=null;state.assignments=[];state.attendances=[];state.admin={};state.reports=[];state.reportData=null;state.requests=[];state.handover=null;state.extra=null;state.payrollData=null;state.payrollMonth=null;state.payrollRevision=null;viewFilters={};state.filters=defaultFilters();state.adminTab='employees';try{sessionStorage.removeItem(SESSION_KEY)}catch{}renderLogin('Phiên trên thiết bị đã thay đổi. Vui lòng mở lại ứng dụng hoặc đăng nhập.');});
+window.addEventListener('storage',event=>{if(event.key!==SESSION_KEY&&event.key!==null)return;if(!state.token)return;let old=null;try{old=JSON.parse(event.oldValue||'null');}catch{}if(event.key!==null&&old?.token!==state.token)return;recentApiErrors=[];state.user=null;stopCamera();closeModal();resetChat();recoveryBusy=null;state.sessionEpoch++;state.renderId++;state.token=null;overviewDay='';overviewBranch='';overviewStatus='';state.overview=null;state.assignments=[];state.attendances=[];state.admin={};state.reports=[];state.reportData=null;state.requests=[];state.handover=null;state.extra=null;state.payrollData=null;state.payrollMonth=null;state.payrollRevision=null;viewFilters={};state.filters=defaultFilters();state.adminTab='employees';try{sessionStorage.removeItem(SESSION_KEY)}catch{}renderLogin('Phiên trên thiết bị đã thay đổi. Vui lòng mở lại ứng dụng hoặc đăng nhập.');});
 await boot();

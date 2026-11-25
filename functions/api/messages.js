@@ -10,14 +10,20 @@ export async function onRequestGet({request,env}){
  if(u.searchParams.has('thread')){
  const id=identifier(u.searchParams.get('thread')),t=await thread(db,actor,id);
  const before=u.searchParams.get('before');if(before!==null&&(!/^\d{1,15}$/.test(before)||Number(before)<1))invalid('Mốc tin nhắn không hợp lệ');
+ const known=u.searchParams.get('known');
+ if(known!==null){
+  if(before!==null||!/^\d{1,15}$/.test(known)||!Number.isSafeInteger(Number(known)))invalid('Mốc đồng bộ không hợp lệ');
+  const latest=await db.prepare('SELECT COALESCE(MAX(id),0) AS n FROM chat_messages WHERE thread_id=?').bind(id).first();
+  if(latest.n===Number(known))return reply({available:true,unchanged:true,latest_id:latest.n});
+ }
  const rows=(await db.prepare("SELECT m.id,m.sender_id,p.full_name AS sender_name,m.body,m.created_at FROM chat_messages m JOIN profiles p ON p.id=m.sender_id WHERE m.thread_id=? "+(before?"AND m.id<? ":"")+"ORDER BY m.id DESC LIMIT 51").bind(id,...(before?[Number(before)]:[])).all()).results;
  const more=rows.length>50,messages=rows.slice(0,50).reverse();
  const members=t.kind==='SYSTEM'?[]:(await db.prepare("SELECT p.id,p.employee_code,p.full_name,p.active FROM chat_members cm JOIN profiles p ON p.id=cm.user_id WHERE cm.thread_id=? ORDER BY p.employee_code").bind(id).all()).results;
  return reply({available:true,thread:{id:t.id,kind:t.kind,title:t.title},members,messages,more});
  }
- const threads=(await db.prepare("SELECT t.id,t.kind,t.title,t.created_at,(SELECT p.full_name FROM chat_members cm JOIN profiles p ON p.id=cm.user_id WHERE cm.thread_id=t.id AND p.id<>? LIMIT 1) AS peer_name,m.body AS latest_body,m.created_at AS latest_at,CASE WHEN EXISTS(SELECT 1 FROM chat_messages x WHERE x.thread_id=t.id AND x.id>COALESCE(rd.last_read_id,0) AND x.sender_id<>?) THEN 1 ELSE 0 END AS unread FROM chat_threads t LEFT JOIN chat_messages m ON m.id=(SELECT MAX(id) FROM chat_messages WHERE thread_id=t.id) LEFT JOIN chat_reads rd ON rd.thread_id=t.id AND rd.user_id=? WHERE "+access+" ORDER BY CASE WHEN t.kind='SYSTEM' THEN 0 ELSE 1 END,COALESCE(m.id,0) DESC,t.created_at DESC LIMIT 201").bind(actor.id,actor.id,actor.id,actor.id).all()).results;
- const contacts=(await db.prepare("SELECT id,employee_code,full_name,department,role FROM profiles WHERE active=1 AND id<>? ORDER BY employee_code LIMIT 100").bind(actor.id).all()).results;
- return reply({available:true,threads:threads.slice(0,200),truncated:threads.length>200,contacts});
+ const threads=(await db.prepare("SELECT t.id,t.kind,t.title,t.created_at,(SELECT p.full_name FROM chat_members cm JOIN profiles p ON p.id=cm.user_id WHERE cm.thread_id=t.id AND p.id<>? LIMIT 1) AS peer_name,substr(m.body,1,100) AS latest_body,m.created_at AS latest_at,CASE WHEN EXISTS(SELECT 1 FROM chat_messages x WHERE x.thread_id=t.id AND x.id>COALESCE(rd.last_read_id,0) AND x.sender_id<>?) THEN 1 ELSE 0 END AS unread FROM chat_threads t LEFT JOIN chat_messages m ON m.id=(SELECT MAX(id) FROM chat_messages WHERE thread_id=t.id) LEFT JOIN chat_reads rd ON rd.thread_id=t.id AND rd.user_id=? WHERE "+access+" ORDER BY CASE WHEN t.kind='SYSTEM' THEN 0 ELSE 1 END,COALESCE(m.id,0) DESC,t.created_at DESC LIMIT 201").bind(actor.id,actor.id,actor.id,actor.id).all()).results;
+ const contacts=u.searchParams.get('compact')==='1'?null:(await db.prepare("SELECT id,employee_code,full_name,department,role FROM profiles WHERE active=1 AND id<>? ORDER BY employee_code LIMIT 100").bind(actor.id).all()).results;
+ return reply({available:true,threads:threads.slice(0,200),truncated:threads.length>200,...(contacts?{contacts}:{})});
  }catch(e){return apiFailure(e)}
 }
 export async function onRequestPost({request,env}){
@@ -48,7 +54,7 @@ export async function onRequestPost({request,env}){
  const id=identifier(b.thread_id);await thread(db,actor,id);
  if(!Number.isSafeInteger(b.message_id)||b.message_id<1)invalid('Mốc đọc không hợp lệ');
  const row=await db.prepare('SELECT id FROM chat_messages WHERE thread_id=? AND id=?').bind(id,b.message_id).first();if(!row)invalid('Tin nhắn không tồn tại');
- await db.prepare('INSERT INTO chat_reads(thread_id,user_id,last_read_id) VALUES(?,?,?) ON CONFLICT(thread_id,user_id) DO UPDATE SET last_read_id=MAX(chat_reads.last_read_id,excluded.last_read_id)').bind(id,actor.id,row.id).run();
+ await db.prepare('INSERT INTO chat_reads(thread_id,user_id,last_read_id) VALUES(?,?,?) ON CONFLICT(thread_id,user_id) DO UPDATE SET last_read_id=excluded.last_read_id WHERE excluded.last_read_id>chat_reads.last_read_id').bind(id,actor.id,row.id).run();
  return reply({ok:true});
  }
  invalid('Thao tác tin nhắn không hợp lệ');

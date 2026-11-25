@@ -104,15 +104,21 @@ export async function dispatchPush(env,now=Date.now(),fetcher=fetch){
  const selection=queued?'SELECT c.event_key,c.endpoint,c.user_id FROM ('+candidates+') c JOIN push_queue q ON q.event_key=c.event_key AND q.endpoint=c.endpoint AND q.user_id=c.user_id WHERE q.state=\'pending\' AND q.expires_at>? ORDER BY q.expires_at,q.created_at,q.event_key,q.endpoint LIMIT 12':candidates+' ORDER BY deadline,event_key,endpoint LIMIT 12';
  const {results}=await db.prepare(selection).bind(...args,...(queued?[now]:[])).all();
  let accepted=0,failed=0,claimed=0;
- for(const row of results){
+ const deliver=async row=>{
   const claim=await db.prepare("INSERT INTO web_push_receipts(event_key,endpoint,claimed_at,state) SELECT ?,?,?,'claimed' WHERE EXISTS(SELECT 1 FROM web_push_subscriptions s JOIN profiles p ON p.id=s.user_id AND p.active=1 WHERE s.endpoint=? AND s.user_id=?) ON CONFLICT DO NOTHING RETURNING event_key").bind(row.event_key,row.endpoint,now,row.endpoint,row.user_id).first();
-  if(!claim)continue;claimed++;
+  if(!claim)return;claimed++;
   if(queued)await db.prepare("UPDATE push_queue SET state='claimed' WHERE event_key=? AND endpoint=? AND state='pending'").bind(row.event_key,row.endpoint).run();
   let status=0;try{status=await sendEmptyPush(config,row.endpoint,fetcher)}catch{}
   const ok=status>=200&&status<300;ok?accepted++:failed++;
   await db.prepare("UPDATE web_push_receipts SET state=? WHERE event_key=? AND endpoint=?").bind(ok?'accepted':'failed',row.event_key,row.endpoint).run();
   if(queued)await db.prepare('UPDATE push_queue SET state=? WHERE event_key=? AND endpoint=?').bind(ok?'accepted':'failed',row.event_key,row.endpoint).run();
   if(status===404||status===410)await db.prepare('DELETE FROM web_push_subscriptions WHERE endpoint=? AND user_id=?').bind(row.endpoint,row.user_id).run();
+ };
+ // Three independent sends at most; wait for all settled before leaving the batch.
+ // An uncertain claimed send is not retried. Preserve original per-run cap.
+ for(let i=0;i<results.length;i+=3){
+  const group=await Promise.allSettled(results.slice(i,i+3).map(deliver));
+  if(group.some(x=>x.status==='rejected'))throw Error('PUSH_BATCH_UNCERTAIN');
  }
  // Bound cleanup and keep event receipts longer than the scheduling lookback.
  await db.prepare('DELETE FROM web_push_receipts WHERE rowid IN (SELECT rowid FROM web_push_receipts WHERE claimed_at<? LIMIT 100)').bind(now-7*86400000).run();

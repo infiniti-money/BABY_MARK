@@ -644,3 +644,10 @@ td,th{overflow-wrap:anywhere}
 
 /* Private CV detail panel. */
 .cv-header{display:flex;gap:14px;align-items:center;margin-bottom:14px}.cv-header .avatar{flex:0 0 48px;width:48px;height:48px}.cv-fields{margin:14px 0}.cv-read-field{min-width:0;overflow-wrap:anywhere}.cv-read-field small{display:block;font-weight:600;color:var(--muted)}.cv-read-field p{white-space:pre-wrap;margin:4px 0 12px}.cv-fields textarea{resize:vertical;min-height:80px}
+
+/* RC.18: preserve glass tint but reduce compositor cost on touch devices.
+   Browser still renders original brand and stationary navigation. */
+@media screen and (pointer:coarse) and (max-width:900px){
+ .topbar,.sidebar,.login-box,dialog{-webkit-backdrop-filter:none;backdrop-filter:none;background:var(--glass-solid)}
+ .card,.stat{box-shadow:0 4px 12px rgba(112,37,53,.06)}
+}

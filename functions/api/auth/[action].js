@@ -141,11 +141,11 @@ export async function onRequestPost({request,env,params}){
  const id=crypto.randomUUID(),c=await issuedCredential(b);if(!c)return reply({error:'Thông tin mật khẩu không hợp lệ'},400);
  const current=await digest('babymark-session-v1:'+request.headers.get('authorization').slice(7));
  const result=await db.batch([
-  db.prepare('INSERT INTO profiles(id,employee_code,full_name,role,department,active) SELECT ?,?,?,?,?,1 WHERE '+liveAdmin).bind(id,b.employee_code.trim(),b.full_name.trim(),b.role,b.department.trim(),current,actor.id,Date.now()),
-  db.prepare('INSERT INTO credentials(user_id,username,salt,secret_hash,created_at,updated_at) SELECT ?,?,?,?,?,? WHERE EXISTS(SELECT 1 FROM profiles WHERE id=?)').bind(id,username,c.salt,c.hash,now,now,id),
+  db.prepare('INSERT INTO profiles(id,employee_code,full_name,role,department,active) SELECT ?,?,?,?,?,1 WHERE '+liveAdmin+' RETURNING id').bind(id,b.employee_code.trim(),b.full_name.trim(),b.role,b.department.trim(),current,actor.id,Date.now()),
+  db.prepare('INSERT INTO credentials(user_id,username,salt,secret_hash,created_at,updated_at) SELECT ?,?,?,?,?,? WHERE EXISTS(SELECT 1 FROM profiles WHERE id=?) RETURNING user_id').bind(id,username,c.salt,c.hash,now,now,id),
   auditWhen(id,'CREATE','EXISTS(SELECT 1 FROM credentials WHERE user_id=?)',[id])
  ]);
- if(result[0].meta.changes!==1||result[1].meta.changes!==1)return reply({error:'Phiên quản trị đã thay đổi; đăng nhập lại'},409);
+ if(result[0].results?.[0]?.id!==id||result[1].results?.[0]?.user_id!==id)return reply({error:'Phiên quản trị đã thay đổi; đăng nhập lại'},409);
  return reply({id,username,...issuedResponse(c)},201);
  }
  if(!['reset','set-active'].includes(action)||!uuid(b.user_id))return reply({error:'Yêu cầu không hợp lệ'},400);
@@ -174,10 +174,10 @@ export async function onRequestPost({request,env,params}){
  const at=Date.now(),args=[target.id,current,actor.id,at],guard="EXISTS(SELECT 1 FROM profiles WHERE id=? AND role<>'admin') AND "+liveAdmin;
  const result=await db.batch([
   auditWhen(target.id,b.active?'ENABLE':'DISABLE',guard,args),
-  db.prepare("UPDATE profiles SET active=? WHERE id=? AND role<>'admin' AND "+liveAdmin).bind(b.active?1:0,...args),
+  db.prepare("UPDATE profiles SET active=? WHERE id=? AND role<>'admin' AND "+liveAdmin+" RETURNING id").bind(b.active?1:0,...args),
   db.prepare('DELETE FROM sessions WHERE user_id=? AND '+guard).bind(target.id,...args)
  ]);
- if(result[1].meta.changes!==1)return reply({error:'Phiên hoặc tài khoản đã thay đổi'},409);
+ if(result[1].results?.[0]?.id!==target.id)return reply({error:'Phiên hoặc tài khoản đã thay đổi'},409);
  return reply({ok:true});
  }catch(e){if(e instanceof HttpError)return reply({error:e.message},e.status);return reply({error:'Không thể xử lý; kiểm tra mã trùng hoặc giới hạn 50 tài khoản hoạt động'},409)}
 }
