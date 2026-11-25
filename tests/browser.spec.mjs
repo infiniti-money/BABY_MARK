@@ -492,3 +492,15 @@ test('v1.2 admin opens diagnostics from overview; staff is denied',async({page,r
  const staff=await apiToken(request,'staff');
  expect((await request.get('/api/admin/diagnostics',{headers:auth(staff)})).status()).toBe(403);
 });
+
+test('v1.2 calendar and audit log are accessible from admin navigation',async({page})=>{
+ await login(page);
+ await page.getByRole('button',{name:'Nhật ký quản trị',exact:true}).click();
+ await expect(page.getByRole('heading',{name:'Nhật ký quản trị',exact:true})).toBeVisible();
+ await expect(page.getByRole('button',{name:'Lọc nhật ký',exact:true})).toBeVisible();
+ await page.getByRole('button',{name:'Đóng',exact:true}).last().click();
+ await page.getByRole('button',{name:'Lịch làm việc',exact:true}).click();
+ await page.getByRole('button',{name:'Xem lịch trực quan',exact:true}).click();
+ await expect(page.getByRole('heading',{name:'Lịch tuần',exact:true})).toBeVisible();
+ await expect(page.locator('.calendar-day')).toHaveCount(7);
+});
