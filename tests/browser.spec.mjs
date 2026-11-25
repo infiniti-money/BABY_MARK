@@ -578,8 +578,9 @@ test('RC.9 real brand logo opening is decorative, dismisses on interaction, and 
  await page.emulateMedia({reducedMotion:'no-preference'});await page.goto('/');
  const intro=page.locator('#brand-intro');
  await expect(intro).toHaveAttribute('aria-hidden','true');
- await expect(intro.locator('img')).toHaveAttribute('src','/brand/logo.png');
- await expect(intro.locator('img')).toHaveCSS('animation-name','bm-brand-arrive');
+ await expect(intro.locator('.brand-logo-complete')).toHaveAttribute('src','/brand/logo.png');
+ await expect(intro.locator('.brand-piece')).toHaveCount(4);
+ await expect(intro.locator('.brand-piece-tl')).toHaveCSS('animation-name','bm-piece-tl');
  await expect(intro).toHaveCSS('pointer-events','none');
  await page.getByLabel('Tên đăng nhập',{exact:true}).fill('test-staff');
  await expect(intro).toBeHidden();
@@ -624,4 +625,32 @@ test('RC.10 phone-first employee layout, tablet expansion and desktop navigation
  }
  await page.setViewportSize({width:844,height:390});await expect(more).toBeVisible();expect(await fits()).toBeTruthy();
  await expect(page.locator('.employee-checkin')).toBeVisible();
+});
+
+
+test('RC.11 assembled logo and exact welcome copy work on phone, tablet and desktop',async({page})=>{
+ await page.emulateMedia({reducedMotion:'no-preference'});await page.setViewportSize({width:390,height:844});
+ await page.goto('/');
+ const intro=page.locator('#brand-intro');
+ await expect(intro.locator('.brand-piece')).toHaveCount(4);
+ await expect(intro.locator('.brand-piece-br')).toHaveCSS('animation-name','bm-piece-br');
+ await expect(intro.locator('.brand-intro-slogan')).toHaveText('Thấu hiểu điều mẹ muốn');
+ await expect(intro.locator('.brand-intro-slogan')).toHaveCSS('animation-delay','0.7s');
+ await expect(intro).toHaveCSS('pointer-events','none');
+ await expect(intro).toBeHidden({timeout:4000});
+ const welcome=page.getByRole('heading',{name:'Chào mừng bạn đến với ngôi nhà BABY MARK',exact:true});
+ for(const size of [{width:320,height:640},{width:390,height:844},{width:768,height:1024},{width:844,height:390},{width:1440,height:900}]){
+  await page.setViewportSize(size);
+  await expect(welcome).toBeVisible();
+  await expect(page.getByText('Đăng nhập để bắt đầu làm việc cùng BabyMark',{exact:true})).toBeVisible();
+  await expect(page.getByLabel('Tên đăng nhập',{exact:true})).toBeVisible();
+  await expect(page.getByLabel('Mật khẩu hoặc mã truy cập',{exact:true})).toBeVisible();
+  expect(await page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth)).toBeTruthy();
+ }
+ await page.emulateMedia({reducedMotion:'reduce'});await page.reload();
+ await expect(intro).toBeHidden();await expect(welcome).toHaveCSS('animation-name','none');
+ await page.getByLabel('Tên đăng nhập',{exact:true}).fill(username.staff);
+ await page.getByLabel('Mật khẩu hoặc mã truy cập',{exact:true}).fill(secret);
+ await page.getByTestId('login-submit').click();
+ await expect(page.getByRole('heading',{name:'Chấm công hôm nay',exact:true})).toBeVisible();
 });
