@@ -3,3 +3,8 @@ Admin mở Tổng quan (chỉ số tổng hợp), không mở camera. Nhân viê
 Lịch cá nhân, lịch sử ảnh và báo cáo theo ca dựng từng trang 30 bản ghi trong trình duyệt; không thay đổi giới hạn/truy vấn API và tổng hợp CSV vẫn đầy đủ. Yêu cầu công chỉ tải ca khi mở đơn mới; Admin không tạo đơn nghỉ cá nhân. Bàn giao Admin không tải lịch cá nhân.
 ## RC.4 giao diện
 Giao diện dùng logo và sắc hồng rượu vang BABY MARK, bảng điều khiển chỉ số rõ hơn, lưới thao tác nhanh, biểu đồ phân bố trạng thái ca có nhãn số liệu từ máy chủ và phạm vi bộ lọc. Không thêm số liệu giả hoặc coi số ca là số người. Lịch tuần/tháng mở rộng trên desktop, thẻ ngày trên mobile; nâng độ tương phản, khoảng cách, vùng chạm và focus bàn phím. Giữ điều hướng hiện có, luồng camera/GPS, biểu mẫu, phân quyền và tài liệu in A4/POS. Không thư viện giao diện, font bên ngoài hoặc migration mới. Cần nghiệm thu thiết bị vật lý riêng.
+
+## RC.5 bố cục gọn
+- Tổng quan dùng vùng lưới có chủ đích: điều hành và KPI toàn chiều ngang, phân bố ca và việc cần xử lý cạnh nhau trên desktop đủ rộng, bảng chấm công trước danh sách cửa hàng. Không kéo giãn thẻ theo chiều cao của khối dài.
+- Tận dụng chiều rộng làm việc; giảm đệm header, form, thẻ, menu; lưới KPI và cửa hàng thích ứng kích thước màn hình. Danh sách chờ duyệt dài thu gọn bằng details có số mục, có vùng cuộn khi mở; nút mở danh sách đầy đủ luôn hiện.
+- Giữ vùng chạm 44px cho thao tác cảm ứng, cột bảng responsive và in A4/POS. Kiểm thử năm chiều rộng, xác minh không có hàng nửa trống ở các vùng bắt buộc toàn chiều ngang. Không thay đổi API/schema.

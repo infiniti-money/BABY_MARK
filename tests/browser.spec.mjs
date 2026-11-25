@@ -514,3 +514,20 @@ test('RC.4 overview distribution and quick actions fit narrow and desktop screen
   await page.setViewportSize(size);expect(await page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth)).toBeTruthy();
  }
 });
+
+test('RC.5 compact overview uses full rows and keeps all quick actions accessible',async({page})=>{
+ await page.setViewportSize({width:1440,height:900});await login(page);
+ const grid=page.locator('.overview-grid');
+ await expect(grid.locator('.overview-command')).toBeVisible();
+ await expect(grid.locator('.quick-actions .btn')).toHaveCount(8);
+ for(const width of [1440,1024,768,390,320]){
+  await page.setViewportSize({width,height:900});
+  const bounds=await grid.evaluate(el=>{
+   const r=el.getBoundingClientRect();
+   const full=['.overview-command','.overview-kpis','.overview-attendance','.overview-branches'].map(s=>el.querySelector(s).getBoundingClientRect());
+   return {fits:full.every(x=>Math.abs(x.left-r.left)<2&&Math.abs(x.width-r.width)<2),ordered:full[0].bottom<=full[1].top&&full[1].bottom<=full[2].top&&full[2].bottom<=full[3].top,overflow:document.documentElement.scrollWidth>window.innerWidth};
+  });
+  expect(bounds.fits).toBeTruthy();expect(bounds.ordered).toBeTruthy();expect(bounds.overflow).toBeFalsy();
+ }
+ await expect(grid.getByRole('button',{name:'Mở danh sách yêu cầu',exact:true})).toBeVisible();
+});
