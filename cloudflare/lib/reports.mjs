@@ -30,8 +30,8 @@ export function summarizeAssignment(row,now=Date.now()){
  const entry=adjusted?row.proposed_in:row.in_at,exit=adjusted?row.proposed_out:row.out_at;
  const late=entry!=null&&entry>row.starts_at+row.grace_minutes*60000?Math.ceil((entry-row.starts_at)/60000):0;
  const early=exit!=null?Math.max(0,Math.ceil((row.ends_at-exit)/60000)):0;
- const complete=entry!=null&&exit!=null&&exit>=entry;
- let status=outside?'Ngoài vùng':entry==null?(now>row.ends_at?'Vắng':now>row.starts_at+row.grace_minutes*60000?'Chưa vào / muộn':'Chưa vào ca'):exit==null?(now>row.ends_at?'Thiếu chấm ra':'Đang làm'):!complete?'Cần kiểm tra':late&&early?'Muộn / về sớm':late?'Đi muộn':early?'Về sớm':'Đủ công';
+ const complete=entry!=null&&exit!=null&&exit>entry;
+ let status=outside?'Ngoài vùng':entry==null&&exit!=null?'Cần kiểm tra':entry==null?(now>row.ends_at?'Vắng':now>row.starts_at+row.grace_minutes*60000?'Chưa vào / muộn':'Chưa vào ca'):exit==null?(now>row.ends_at?'Thiếu chấm ra':'Đang làm'):!complete?'Cần kiểm tra':late&&early?'Muộn / về sớm':late?'Đi muộn':early?'Về sớm':'Đủ công';
  if(adjusted)status='Điều chỉnh đã duyệt'+(outside?' / ngoài vùng':'');
  return {status,minutes:complete&&!outside?Math.floor((exit-entry)/60000):0,late,early,days:complete&&!outside?1:0,work_units:complete&&!outside&&exit>entry&&row.request_state!=='PENDING'?(row.shift_id==='BM-ALLDAY'?2:1):0,overtime_minutes:complete&&!outside&&row.request_state!=='PENDING'?Math.max(0,Math.floor((exit-Math.max(entry,row.ends_at))/60000)):0,leave:0,adjusted,outside};
 }

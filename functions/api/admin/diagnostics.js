@@ -25,7 +25,7 @@ export async function onRequestGet({request,env}){
    return {candidates,lock_held:!!lock?.held,lock_acquired_at:lock?.acquired_at??null,old_processing:processing.n,uncertain_photos:pending.n,count_cap:101};
   });
   const roster=await check('ROSTER_UNAVAILABLE',async()=>{const hr=await hrReadiness(db),r=await rosterReadiness(env,hr);
-   const branches=hr.automation_ready?(await db.prepare("SELECT ra.branch_id,ra.last_run_at,CASE WHEN p.id IS NULL OR p.active<>1 OR p.role<>'admin' OR br.branch_id IS NULL THEN 0 ELSE 1 END AS eligible,CASE WHEN ra.last_status LIKE 'Cần kiểm tra:%' THEN 1 ELSE 0 END AS error FROM roster_automation ra JOIN branches b ON b.id=ra.branch_id AND b.active=1 LEFT JOIN profiles p ON p.id=ra.updated_by LEFT JOIN branch_rosters br ON br.branch_id=ra.branch_id WHERE ra.enabled=1 ORDER BY ra.branch_id LIMIT 14").all()).results:[];
+   const branches=hr.automation_ready?(await db.prepare("SELECT ra.branch_id,ra.last_run_at,CASE WHEN p.id IS NULL OR p.active<>1 OR p.role<>'admin' OR br.branch_id IS NULL THEN 0 ELSE 1 END AS eligible,CASE WHEN ra.last_status LIKE 'Cần kiểm tra:%' THEN 1 ELSE 0 END AS error FROM roster_automation ra JOIN branches b ON b.id=ra.branch_id AND b.active=1 LEFT JOIN profiles p ON p.id=ra.updated_by LEFT JOIN branch_rosters br ON br.branch_id=ra.branch_id WHERE ra.enabled=1 ORDER BY ra.branch_id LIMIT 50").all()).results:[];
    const detail=branches.map(b=>({...b,stale:!b.last_run_at||b.last_run_at<now-36*3600000}));
    const stale=detail.some(b=>b.stale),ineligible=detail.filter(b=>!b.eligible).length;
    if(ineligible)add('ROSTER_INELIGIBLE','review',ineligible);
@@ -33,7 +33,7 @@ export async function onRequestGet({request,env}){
    if(r.errors||r.never_run||stale)add('ROSTER_REVIEW','review');
    return {...r,stale,branches:detail,ineligible};
   });
-  const push=await check('PUSH_UNAVAILABLE',async()=>{const s=await pushSettings(env),v=await vapidDiagnosis(env),cron=typeof env.PUSH_CRON_SECRET==='string'&&env.PUSH_CRON_SECRET.length>=32;
+  const push=await check('PUSH_UNAVAILABLE',async()=>{const s=await pushSettings(env),v=await vapidDiagnosis(env),cron=typeof env.PUSH_CRON_SECRET==='string'&&env.PUSH_CRON_SECRET.length>=32&&env.PUSH_CRON_SECRET.length<=256;
    if(s.enabled&&(!v.ready||!cron))add('PUSH_CONFIGURATION','review');
    const receipts=s.available?(await db.prepare("SELECT state,claimed_at FROM web_push_receipts ORDER BY claimed_at DESC LIMIT 100").all()).results:[];
    const recent=receipts.filter(x=>x.claimed_at>=now-24*3600000);

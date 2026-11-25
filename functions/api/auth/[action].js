@@ -63,7 +63,13 @@ export async function onRequestPost({request,env,params}){
  if(!equalHash(await (passwordMode?passwordKeyHash(c.salt,key):credentialHash(c.salt,secret)),c.secret_hash))return reply({error:'Thông tin đăng nhập không đúng'},401);
  const remember=b.remember===true, hours=remember&&c.role!=='admin'?REMEMBER_HOURS:HOURS;
  const token=randomHex(32),hash=await digest('babymark-session-v1:'+token),expires=now+hours*3600000;
- await db.batch([db.prepare('DELETE FROM sessions WHERE user_id=? AND expires_at<=?').bind(c.user_id,now),db.prepare('INSERT INTO sessions(token_hash,user_id,credential_version,created_at,expires_at) VALUES(?,?,?,?,?)').bind(hash,c.user_id,c.version,now,expires),db.prepare('DELETE FROM login_attempts WHERE user_id=?').bind(c.user_id)]);
+ // Revalidate the authenticated credential and role at the session write boundary.
+ const issued=await db.batch([
+  db.prepare("INSERT INTO sessions(token_hash,user_id,credential_version,created_at,expires_at) SELECT ?,c.user_id,c.version,?,? FROM credentials c JOIN profiles p ON p.id=c.user_id WHERE c.user_id=? AND c.username=? AND c.version=? AND c.salt=? AND c.secret_hash=? AND p.active=1 AND p.role=?").bind(hash,now,expires,c.user_id,username,c.version,c.salt,c.secret_hash,c.role),
+  db.prepare('DELETE FROM sessions WHERE user_id=? AND expires_at<=? AND EXISTS(SELECT 1 FROM sessions WHERE token_hash=?)').bind(c.user_id,now,hash),
+  db.prepare('DELETE FROM login_attempts WHERE user_id=? AND EXISTS(SELECT 1 FROM sessions WHERE token_hash=?)').bind(c.user_id,hash)
+ ]);
+ if(issued[0].meta.changes!==1)return reply({error:'Thông tin đăng nhập đã thay đổi, vui lòng thử lại'},401);
  return reply({token,expires_at:expires,remember});
  }
  const actor=await sessionUser(request,db);if(!actor)return reply({error:'Chưa đăng nhập'},401);

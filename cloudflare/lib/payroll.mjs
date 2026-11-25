@@ -16,8 +16,8 @@ export async function payrollDraft(db,actor,month){
  const rates=new Map(inputs.map(i=>[i.user_id,i])),by=new Map();
  for(const p of people)if(p.active||rates.has(p.id))by.set(p.id,{...p,planned_minutes:0,worked_minutes:0,regular_minutes:0,extra_minutes:0,leave_shifts:0,absence_shifts:0,issues:0,pending:0,days:0,shifts:0,work_units:0,overtime_minutes:0,_days:new Set()});
  for(const a of assignments){
-  let p=by.get(a.user_id);if(!p){p={id:a.user_id,employee_code:a.employee_code,full_name:a.full_name,department:a.department,active:0,planned_minutes:0,worked_minutes:0,regular_minutes:0,extra_minutes:0,leave_shifts:0,absence_shifts:0,issues:0,pending:0,days:0,shifts:0,work_units:0,overtime_minutes:0,_days:new Set()};by.set(a.user_id,p);}
   if(a.extra_state==='REJECTED')continue;
+  let p=by.get(a.user_id);if(!p){p={id:a.user_id,employee_code:a.employee_code,full_name:a.full_name,department:a.department,active:0,planned_minutes:0,worked_minutes:0,regular_minutes:0,extra_minutes:0,leave_shifts:0,absence_shifts:0,issues:0,pending:0,days:0,shifts:0,work_units:0,overtime_minutes:0,_days:new Set()};by.set(a.user_id,p);}
   if(a.extra_state==='PENDING'||a.request_state==='PENDING'){p.pending++;continue;}
   const s=summarizeAssignment(a,now);
   p.planned_minutes+=Math.floor((a.ends_at-a.starts_at)/60000);
