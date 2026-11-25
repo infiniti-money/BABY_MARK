@@ -11,3 +11,6 @@ Giao diện dùng logo và sắc hồng rượu vang BABY MARK, bảng điều k
 
 ## RC.6 màn hình nhân viên/quản lý tự chấm công
 Chọn ca và thao tác vào/ra đặt trên cùng. Camera chưa bật chỉ chiếm thẻ nhỏ, khi bật mở khung xem trực tiếp; giữ nguyên mã kiểm tra camera/GPS/Timemark và xác nhận ảnh. Tóm tắt 5 chỉ số gọn, phân biệt đủ lượt với đủ công. Tiện ích ngoài lịch, kết quả duyệt, xin nghỉ/điều chỉnh, bàn giao, tin nhắn và thiết bị tập trung một khu vực; hướng dẫn mở khi cần. Không đổi phân quyền hay điều kiện ghi nhận công. Kiểm thử 320/390/768/1440px, thứ tự khối và kích thước camera đóng/mở.
+
+## RC.8 chuyển động giao diện
+Logo, tiêu đề và nội dung mở trang dùng chuyển động ngắn 140–300 ms, phản hồi nhấn nút nhẹ, đổi màu/đổ bóng khi hover trên thiết bị có chuột, focus rõ, hiệu ứng chữ một lần khi cuộn tới nội dung. Thanh tiến độ cuộn chỉ xuất hiện khi trình duyệt hỗ trợ scroll-driven animations. Không có splash bắt buộc, không trì hoãn request, không animation kích thước layout, không động vào video/GPS/Timemark, không thư viện ngoài. Tự tắt chuyển động nếu hệ điều hành yêu cầu reduced motion; in A4/POS không đổi. Nghiệm thu iOS vật lý vẫn cần thực hiện.

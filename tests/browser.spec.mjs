@@ -553,3 +553,22 @@ test('RC.6 employee capture comes first, idle camera is compact, live preview ex
  await work.getByRole('button',{name:'Tắt camera',exact:true}).click();
  await expect.poll(()=>camera.evaluate(el=>el.getBoundingClientRect().height)).toBeLessThan(190);
 });
+
+test('RC.8 motion follows scroll and accessibility preferences without delaying controls',async({page})=>{
+ await page.emulateMedia({reducedMotion:'no-preference'});
+ await page.setViewportSize({width:390,height:844});await login(page);
+ const title=page.getByRole('heading',{name:'Tổng quan quản trị',exact:true});
+ await expect(title).toHaveCSS('animation-name','bm-text-in');
+ const heading=page.getByRole('heading',{name:'Tình hình từng cửa hàng',exact:true});
+ await heading.scrollIntoViewIfNeeded();
+ await expect(heading).toHaveClass(/motion-revealed/);
+ await expect(page.locator('.scroll-progress')).toHaveCSS('pointer-events','none');
+ await page.emulateMedia({reducedMotion:'reduce'});
+ await expect(title).toHaveCSS('animation-name','none');
+ await expect(heading).toHaveCSS('animation-name','none');
+ await expect(page.locator('html')).toHaveCSS('scroll-behavior','auto');
+ await expect(page.locator('.scroll-progress')).toBeHidden();
+ await page.getByRole('button',{name:'Sức khỏe và phục hồi',exact:true}).click();
+ await expect(page.getByRole('dialog')).toHaveCSS('animation-name','none');
+ await expect(page.getByRole('heading',{name:'Migration đến 0020',exact:true})).toBeVisible();
+});

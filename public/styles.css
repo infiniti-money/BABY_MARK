@@ -249,3 +249,53 @@ td,th{overflow-wrap:anywhere}
  @media(max-width:620px){.employee-workspace .card-head,.employee-workspace .card-body{padding:10px 12px}.employee-metrics{grid-template-columns:repeat(3,minmax(0,1fr))}.employee-metrics>div{padding:9px 10px}.employee-metrics strong{font-size:21px}.employee-tool-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.employee-camera:has(#camera-placeholder:not([hidden])){padding:10px}.employee-checkin-body .camera-toolbar .camera-facing{font-size:12px;min-width:75px}.employee-capture-actions .btn{font-size:12px;padding:8px 6px}}
  @media(max-width:360px){.employee-capture-actions{grid-template-columns:repeat(2,minmax(0,1fr))}.employee-capture-actions .icon{display:none}.employee-tool-grid .btn{padding:6px 7px}.employee-tool-grid .btn .icon{display:none}}
 }
+
+
+/* RC.8 — lightweight brand motion; CSS-only feedback, opt-in scroll enhancement.
+   No blocking splash, no animated layout dimensions, no camera/video filters. */
+@media screen{
+ :root{--motion-fast:140ms;--motion-enter:260ms;--motion-ease:cubic-bezier(.2,.75,.25,1)}
+ .scroll-progress{display:none;pointer-events:none}
+ .btn,.nav button,.admin-nav button,.tabs button,.chat-thread,.close,.logout,.calendar-day .btn{touch-action:manipulation}
+ .btn:disabled{cursor:not-allowed}
+ @media(prefers-reduced-motion:no-preference){
+  html{scroll-behavior:smooth}
+  @keyframes bm-logo-in{from{opacity:.65;transform:translateY(5px) scale(.96)}to{opacity:1;transform:none}}
+  @keyframes bm-text-in{from{opacity:.78;transform:translateY(4px)}to{opacity:1;transform:none}}
+  @keyframes bm-surface-in{from{opacity:.88}to{opacity:1}}
+  @keyframes bm-modal-in{from{opacity:.86;transform:translateY(5px) scale(.99)}to{opacity:1;transform:none}}
+  @keyframes bm-scroll-progress{from{transform:scaleX(0)}to{transform:scaleX(1)}}
+  .boot img,.login-brand img,.login-box:before{animation:bm-logo-in 300ms var(--motion-ease) both}
+  .boot p,.login-brand strong,.login-story h1,.login-story .intro,.login-box h2,.page-head h1{animation:bm-text-in var(--motion-enter) var(--motion-ease) both}
+  .login-story .intro,.login-box>.muted,.page-head .muted{animation:bm-text-in var(--motion-enter) var(--motion-ease) both;animation-delay:35ms}
+  .login-note,.login-values,.login-foot,.login-box form{animation:bm-surface-in 280ms ease-out both}
+  .topbar-path span{animation:bm-surface-in 180ms ease-out both}
+  #content>.card:not(.employee-checkin),#content>.overview-grid,#content>.admin-layout{animation:bm-surface-in 180ms ease-out}
+  .motion-revealed{animation:bm-text-in 220ms var(--motion-ease) both}
+  dialog[open]{animation:bm-modal-in 200ms var(--motion-ease) both}
+  dialog[open]::backdrop{animation:bm-surface-in 180ms ease-out}
+  .notice:not([hidden]){animation:bm-surface-in 180ms ease-out}
+  .btn,.nav button,.admin-nav button,.tabs button,.chat-thread,.close,.logout{transition:background-color var(--motion-fast) ease,color var(--motion-fast) ease,border-color var(--motion-fast) ease,box-shadow var(--motion-fast) ease,transform var(--motion-fast) var(--motion-ease)}
+  .btn .icon,.nav button .icon,.admin-nav button .icon,.tabs button .icon{transition:transform var(--motion-fast) var(--motion-ease)}
+  .btn:active:not(:disabled),.close:active:not(:disabled),.nav button:active:not(:disabled),.admin-nav button:active:not(:disabled),.tabs button:active:not(:disabled),.chat-thread:active:not(:disabled){transform:scale(.975)}
+  .btn:active:not(:disabled) .icon,.nav button:active:not(:disabled) .icon{transform:scale(.92)}
+  input,select,textarea{transition:border-color var(--motion-fast) ease,box-shadow var(--motion-fast) ease}
+  input:focus,select:focus,textarea:focus{border-color:#a54a70;box-shadow:0 0 0 3px #95234512}
+  .nav button.active span,.admin-nav button.active span,.tabs button.active{animation:bm-text-in 170ms var(--motion-ease)}
+  @media(hover:hover) and (pointer:fine){
+   .btn:not(:disabled):hover{box-shadow:0 3px 9px #95234518}
+   .btn:not(:disabled):hover .icon{transform:translateY(-1px)}
+   .nav button:not(:disabled):hover .icon,.admin-nav button:not(:disabled):hover .icon{transform:translateX(2px)}
+   .chat-thread:hover{border-color:#d59ab3;background:#fbf0f4}
+  }
+  @supports(animation-timeline:scroll(root block)){
+   .scroll-progress{display:block;position:fixed;inset:0 0 auto;height:3px;background:linear-gradient(90deg,#952345,#d77e9e,#edb9ce);z-index:15;transform-origin:left center;animation:bm-scroll-progress linear both;animation-timeline:scroll(root block)}
+  }
+ }
+ @media(prefers-reduced-motion:reduce){
+  html{scroll-behavior:auto}
+  .boot img,.boot p,.login-brand img,.login-brand strong,.login-box:before,.login-story h1,.login-story .intro,.login-box h2,.login-box>.muted,.login-note,.login-values,.login-foot,.login-box form,.page-head h1,.page-head .muted,.topbar-path span,.motion-revealed,dialog[open],dialog[open]::backdrop,.notice:not([hidden]),.loading:before{animation:none!important}
+  .btn,.nav button,.admin-nav button,.tabs button,.chat-thread,.close,.logout,.btn .icon,.nav button .icon,input,select,textarea{transition:none!important}
+  .scroll-progress{display:none!important}
+ }
+}
