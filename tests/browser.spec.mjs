@@ -654,3 +654,24 @@ test('RC.11 assembled logo and exact welcome copy work on phone, tablet and desk
  await page.getByTestId('login-submit').click();
  await expect(page.getByRole('heading',{name:'Chấm công hôm nay',exact:true})).toBeVisible();
 });
+
+
+test('RC.12 official wordmark, transparent symbol and install icons load locally',async({page,request})=>{
+ await page.emulateMedia({reducedMotion:'reduce'});await page.setViewportSize({width:390,height:844});await page.goto('/');
+ await expect(page.getByRole('heading',{name:'Chào mừng bạn đến với ngôi nhà BABY MARK',exact:true})).toBeVisible();
+ const brand=page.locator('.login-mobile-brand img');
+ await expect(brand).toBeVisible();
+ await expect.poll(()=>brand.evaluate(i=>[i.complete,i.naturalWidth,i.naturalHeight])).toEqual([true,632,697]);
+ await expect(page.locator('link[rel="apple-touch-icon"]')).toHaveAttribute('sizes','180x180');
+ await expect(page.locator('meta[name="theme-color"]')).toHaveAttribute('content','#D2282F');
+ await page.setViewportSize({width:1440,height:900});
+ await expect(page.locator('.login-brand .brand-wordmark')).toBeVisible();
+ await expect.poll(()=>page.locator('.login-brand .brand-wordmark').evaluate(i=>i.complete&&i.naturalWidth>0)).toBeTruthy();
+ for(const [path,mime] of [['/brand/logo.png','image/png'],['/brand/wordmark.svg','image/svg+xml'],['/favicon-192x192.png','image/png'],['/favicon-512x512.png','image/png'],['/apple-touch-icon.png?v=3','image/png']]){
+  const r=await request.get(path);expect(r.ok()).toBeTruthy();expect(r.headers()['content-type']).toContain(mime);
+ }
+ const manifest=await (await request.get('/manifest.webmanifest?v=3')).json();
+ expect(manifest.icons.map(i=>i.sizes)).toEqual(['192x192','512x512']);
+ await login(page,'staff');
+ await expect(page.locator('.sidebar .brand-wordmark')).toBeVisible();
+});
