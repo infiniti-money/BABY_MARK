@@ -615,3 +615,29 @@ td,th{overflow-wrap:anywhere}
   .btn.secondary,input:not([type=checkbox]):not([type=radio]),select,textarea{background:#fff}
  }
 }
+
+/* RC.15 — honest server-confirmed attendance feedback. No simulated progress
+   percentage; original brand artwork and accessible reduced-motion fallback. */
+@media screen {
+ .attendance-upload-progress,.attendance-upload-success{
+  display:flex;align-items:center;gap:14px;margin:12px 0;padding:12px 14px;
+  border:1px solid var(--line);border-radius:14px;background:rgba(255,255,255,.82);
+  min-width:0;color:#49343d;
+ }
+ .attendance-upload-progress strong,.attendance-upload-success strong{display:block;font-size:14px;line-height:1.5}
+ .attendance-upload-progress p,.attendance-upload-success p{font-size:12px;line-height:1.6;margin-top:3px}
+ .attendance-upload-brand{position:relative;display:grid;place-items:center;flex:0 0 76px;width:76px;height:76px}
+ .attendance-upload-brand img{width:48px;height:53px;object-fit:contain}
+ .attendance-upload-ring{position:absolute;inset:0;border:2px solid #efd6dc;border-top-color:var(--brand-red,#D2282F);border-right-color:#e9979c;border-radius:50%}
+ .attendance-upload-success{border-color:#b9d9c7;background:#edf8f1;color:#145c40}
+ .attendance-success-icon{display:grid;place-items:center;flex:0 0 42px;height:42px;background:#d3efdf;border-radius:50%}
+ .attendance-success-icon .icon{width:25px;height:25px;stroke-width:2.5}
+ @media(prefers-reduced-motion:no-preference){
+  .attendance-upload-progress:not([hidden]) .attendance-upload-ring{animation:bm-upload-spin 1100ms linear infinite}
+  .attendance-upload-progress:not([hidden]) .attendance-upload-brand img{animation:bm-upload-pulse 1800ms ease-in-out infinite}
+  .attendance-upload-success .attendance-success-icon{animation:bm-upload-confirm 260ms var(--motion-ease,ease-out) both}
+ }
+ @keyframes bm-upload-spin{to{transform:rotate(360deg)}}
+ @keyframes bm-upload-pulse{0%,100%{transform:scale(.94)}50%{transform:scale(1.05)}}
+ @keyframes bm-upload-confirm{from{transform:scale(.84);opacity:.7}to{transform:none;opacity:1}}
+}

@@ -129,6 +129,8 @@ test.describe.serial('Cloudflare local frontend and actual D1/KV endpoints',()=>
       if(type==='in'){await page.getByRole('button',{name:'Chụp lại',exact:true}).click();expect(submitted).toBe(0);await expect.poll(()=>page.locator('#camera').evaluate(v=>v.videoWidth>0&&v.readyState>=2)).toBeTruthy();await page.getByTestId('attendance-in').click();await expect(page.getByRole('heading',{name:'Xác nhận ảnh chấm công',exact:true})).toBeVisible({timeout:30000});expect(submitted).toBe(0);}
       await page.getByRole('button',{name:'Xác nhận chấm công',exact:true}).click();
       await expect(page.getByRole('heading',{name:title,exact:true})).toBeVisible({timeout:30000});
+      await expect(page.locator('.attendance-upload-success')).toContainText('Chấm công thành công!');
+      await expect(page.locator('[data-upload-progress]')).toHaveCount(0);
       expect(submitted).toBe(1);page.off('request',countSubmit);
       const preview=page.getByRole('img',{name:'Ảnh Timemark vừa ghi nhận',exact:true});
       await expect.poll(()=>preview.evaluate(img=>img.complete&&img.naturalWidth>0)).toBeTruthy();
@@ -727,14 +729,32 @@ test('RC.15 500 and lost response lock repeat capture; reload recovers committed
  await expect.poll(()=>page.locator('#camera').evaluate(v=>v.videoWidth>0&&v.readyState>=2)).toBeTruthy();
  await page.getByTestId('attendance-in').click();
  await expect(page.getByRole('heading',{name:'Xác nhận ảnh chấm công',exact:true})).toBeVisible({timeout:30000});
- let submissions=0;
+ let submissions=0,release;
+ const gate=new Promise(r=>release=r);
+ await page.emulateMedia({reducedMotion:'no-preference'});
  await page.route('**/api/attendance/submit',async route=>{
   submissions++;
-  if(submissions===1)return route.fulfill({status:500,contentType:'application/json',body:JSON.stringify({error:'Lỗi giả lập'})});
-  const accepted=await route.fetch();expect(accepted.status()).toBe(201);await route.abort('failed');
+  if(submissions===1){await gate;return route.fulfill({status:500,contentType:'application/json',body:JSON.stringify({error:'Lỗi giả lập'})});}
+  const accepted=await route.fetch();
+  // 201 initial commit, 200 idempotent replay; validate the actual record.
+  expect([200,201]).toContain(accepted.status());
+  const result=await accepted.json();expect(result.attendance?.id).toBeTruthy();expect(result.attendance.assignment_id).toBe((await assignment.json()).id);
+  await route.abort('failed');
  });
  const confirm=page.getByRole('button',{name:'Xác nhận chấm công',exact:true}),retake=page.getByRole('button',{name:'Chụp lại',exact:true});
- await confirm.click();await expect(page.locator('[data-confirm-error]')).toContainText('Kiểm tra trạng thái');
+ try{
+  await confirm.click();
+  const progress=page.locator('[data-upload-progress]');
+  await expect(progress).toBeVisible();
+  await expect(progress.locator('img')).toHaveAttribute('src','/brand/logo.png');
+  await expect(progress.locator('.attendance-upload-ring')).toHaveCSS('animation-name','bm-upload-spin');
+  await expect(confirm).toBeDisabled();await expect(retake).toBeDisabled();
+  await expect(page.locator('.attendance-upload-success')).toHaveCount(0);
+  await page.emulateMedia({reducedMotion:'reduce'});
+  await expect(progress.locator('.attendance-upload-ring')).toHaveCSS('animation-name','none');
+ }finally{release();}
+ await expect(page.locator('[data-confirm-error]')).toContainText('Kiểm tra trạng thái');
+ await expect(page.locator('[data-upload-progress]')).toBeHidden();
  await expect(confirm).toBeDisabled();await expect(retake).toBeDisabled();
  await page.getByRole('button',{name:'Kiểm tra trạng thái',exact:true}).click();
  await expect(confirm).toBeEnabled();await expect(retake).toBeDisabled();

@@ -5,3 +5,6 @@
 - Status recognizes an already-recorded attendance for the same user, assignment and direction even if recorded through a different challenge. An orphan COMPLETED record remains UNKNOWN. Failed status checks retain the recovery lock.
 - 20/25-second client timeout is not a guarantee the server stopped. Explicit checks are required. A new login to the same account in the same tab can recover; closing the tab, clearing storage, or using another device may lose the local marker. Server uniqueness still applies.
 - No new migration; no production data, secret, policy or resource changes. Verify physical devices and actual network faults separately.
+
+## Upload feedback
+Original BABY MARK logo and indeterminate animated ring during submit/status check. No invented percentage. Reduced-motion disables animation. In-app success panel and notification require a matching server attendance record; GPS outside remains a review case, not proof of payable units. No new push subscription or notification permission.

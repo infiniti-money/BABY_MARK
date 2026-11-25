@@ -131,6 +131,9 @@ function drawRecovery(){
 function syncCaptureControls(){
  const p=pendingCapture;if(!p)return;
  const busy=p.sending||p.checking,expired=Date.now()>=p.prepared.expires_at;
+ const progress=$('[data-upload-progress]');
+ if(progress){progress.hidden=!busy;const label=progress.querySelector('[data-upload-label]');if(label)label.textContent=p.sending?'Đang gửi ảnh chấm công tới máy chủ…':'Đang xác minh trạng thái chấm công…';}
+ const expiry=$('[data-confirm-expiry]');if(expiry)expiry.hidden=busy;
  const set=(action,disabled)=>{const b=$('[data-action="'+action+'"]');if(b)b.disabled=!!disabled;};
  set('capture-confirm',busy||p.uncertain||p.terminal||expired);
  set('capture-retake',busy||p.uncertain||!!recoveryRecord());
@@ -148,7 +151,7 @@ async function checkCapture(cancel=false){
   if(epoch!==state.sessionEpoch||p&&p!==pendingCapture)return;
   if(d?.attendance?.id&&d.attendance.assignment_id===r.assignment_id&&d.attendance.type===r.type){
    clearRecovery(r.challenge_id);if(p){p.checking=false;p.terminal=true;closeModal();}
-   if(recoveryBusy===run)recoveryBusy=null;notify('Máy chủ đã ghi nhận '+dt(d.attendance.server_timestamp)+'. Không cần chụp lại.');await navigate('today');return;
+   if(recoveryBusy===run)recoveryBusy=null;notify('Chấm công thành công! Máy chủ đã ghi nhận '+dt(d.attendance.server_timestamp)+'. Không cần chụp lại.');await navigate('today');return;
   }
   let message;
   if(d?.state==='FAILED'&&!d.attendance){
@@ -577,7 +580,7 @@ async function capture(type,button) {
     stillCurrent();
     stopCamera();
     const url=URL.createObjectURL(photo);
-    const ticket=showModal('Xác nhận ảnh chấm công',`<p class="muted">Kiểm tra ảnh và thông tin. Chưa lưu chấm công cho đến khi bạn xác nhận.</p><img class="result-photo" src="${url}" alt="Ảnh Timemark xem trước"><p class="hint">Khoảng cách ${Math.round(prepared.metadata.distance)} / ${prepared.metadata.radius} m · Sai số ±${Math.round(prepared.metadata.accuracy)} m</p>${prepared.metadata.distance>prepared.metadata.radius?'<p class="error-text">Ngoài vùng: chưa cộng công tự động.</p>':''}<p data-confirm-expiry role="status" class="hint"></p><p data-confirm-error class="error-text" role="alert" hidden></p><div class="modal-actions"><button class="btn secondary" data-action="capture-retake">Chụp lại</button><button class="btn secondary" data-action="capture-status-check">Kiểm tra trạng thái</button><button class="btn secondary" data-action="capture-cancel-ready" disabled>Hủy yêu cầu chưa xử lý</button><button class="btn" data-action="capture-confirm">Xác nhận chấm công</button></div>`);
+    const ticket=showModal('Xác nhận ảnh chấm công',`<p class="muted">Kiểm tra ảnh và thông tin. Chưa lưu chấm công cho đến khi bạn xác nhận.</p><img class="result-photo" src="${url}" alt="Ảnh Timemark xem trước"><p class="hint">Khoảng cách ${Math.round(prepared.metadata.distance)} / ${prepared.metadata.radius} m · Sai số ±${Math.round(prepared.metadata.accuracy)} m</p>${prepared.metadata.distance>prepared.metadata.radius?'<p class="error-text">Ngoài vùng: chưa cộng công tự động.</p>':''}<div class="attendance-upload-progress" data-upload-progress role="status" aria-live="polite" hidden><span class="attendance-upload-brand" aria-hidden="true"><img src="/brand/logo.png" alt="" width="62" height="62"><span class="attendance-upload-ring"></span></span><div><strong data-upload-label>Đang gửi ảnh chấm công tới máy chủ…</strong><p>Vui lòng giữ kết nối và không gửi lại.</p></div></div><p data-confirm-expiry role="status" class="hint"></p><p data-confirm-error class="error-text" role="alert" hidden></p><div class="modal-actions"><button class="btn secondary" data-action="capture-retake">Chụp lại</button><button class="btn secondary" data-action="capture-status-check">Kiểm tra trạng thái</button><button class="btn secondary" data-action="capture-cancel-ready" disabled>Hủy yêu cầu chưa xử lý</button><button class="btn" data-action="capture-confirm">Xác nhận chấm công</button></div>`);
     photoURLs.push(url);
     pendingCapture={photo,prepared,assignment_id,type,epoch,renderId,ticket,sending:false};
     const expires=Number(prepared.expires_at);
@@ -598,8 +601,8 @@ async function confirmCapture(button){
   if(!result?.attendance?.id||result.attendance.assignment_id!==p.assignment_id||result.attendance.type!==p.type)throw Error('Phản hồi máy chủ không đủ bằng chứng đã lưu công.');
   clearRecovery(p.prepared.challenge_id);p.terminal=true;p.sending=false;
   const url=URL.createObjectURL(p.photo),m=p.prepared.metadata;
-  showModal('Đã ghi nhận '+(p.type==='IN'?'vào ca':'tan ca'),`<p class="muted">Đã lưu bản ghi trên máy chủ. Thời gian ghi nhận thực tế có thể khác giờ cấp dấu trên ảnh tối đa 90 giây.</p><div class="review-meta"><div>Thời gian máy chủ<strong>${dt(result.attendance?.server_timestamp||m.serverTimestamp)}</strong></div><div>Dung lượng ảnh<strong>${(p.photo.size/1000).toFixed(1)} KB / 200 KB</strong></div><div>Khoảng cách<strong>${Math.round(m.distance)} / ${m.radius} m</strong></div><div>Sai số GPS<strong>±${Math.round(m.accuracy)} m</strong></div></div><img class="result-photo" src="${url}" alt="Ảnh Timemark vừa ghi nhận">${p.type==='OUT'&&state.handover?.available?handoverForm(p.assignment_id):''}<div class="modal-actions"><button class="btn" data-action="close-modal">Hoàn tất</button></div>`);
-  photoURLs.push(url);await navigate('today');
+  showModal('Đã ghi nhận '+(p.type==='IN'?'vào ca':'tan ca'),`<div class="attendance-upload-success" role="status"><span class="attendance-success-icon" aria-hidden="true">${icon('check')}</span><div><strong>Chấm công thành công!</strong><p>Máy chủ đã ghi nhận ${p.type==='IN'?'vào ca':'tan ca'}.</p></div></div>${result.attendance.status==='OUTSIDE'?'<p class="error-text">Đã lưu lượt chấm công ngoài vùng GPS; cần quản lý đối soát trước khi cộng công.</p>':''}<p class="muted">Đã lưu bản ghi trên máy chủ. Thời gian ghi nhận thực tế có thể khác giờ cấp dấu trên ảnh tối đa 90 giây.</p><div class="review-meta"><div>Thời gian máy chủ<strong>${dt(result.attendance?.server_timestamp||m.serverTimestamp)}</strong></div><div>Dung lượng ảnh<strong>${(p.photo.size/1000).toFixed(1)} KB / 200 KB</strong></div><div>Khoảng cách<strong>${Math.round(m.distance)} / ${m.radius} m</strong></div><div>Sai số GPS<strong>±${Math.round(m.accuracy)} m</strong></div></div><img class="result-photo" src="${url}" alt="Ảnh Timemark vừa ghi nhận">${p.type==='OUT'&&state.handover?.available?handoverForm(p.assignment_id):''}<div class="modal-actions"><button class="btn" data-action="close-modal">Hoàn tất</button></div>`);
+  photoURLs.push(url);notify('Chấm công thành công! '+(p.type==='IN'?'Vào ca':'Tan ca')+' · '+dt(result.attendance.server_timestamp));await navigate('today');
  }catch(e){if(pendingCapture===p&&error?.isConnected&&!p.terminal){p.uncertain=true;error.textContent=e.message+' Dùng Kiểm tra trạng thái trước khi gửi lại.';error.hidden=false;}}
  finally{if(pendingCapture===p){p.sending=false;syncCaptureControls();drawRecovery();}}
 }
