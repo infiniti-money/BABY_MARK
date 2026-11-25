@@ -12,3 +12,12 @@ Owner-only controlled procedure. No scheduled backup or restore is enabled.
 - Admin diagnostics reports old PROCESSING and lock/uncertain inventory counts (capped at 101). These indications do not prove an invocation stopped.
 - Confirm original invocation is no longer running, then inspect D1 challenge, attendance, immutable inventory and actual KV object privately. Distinguish committed attendance, pending write and unknown state. Do not retry a new capture until outcome established.
 - No automatic lease stealing, deletion, or blind reset. Require a separately reviewed reconciliation operation with affected records, evidence, expected old state, rollback plan and operator authorization. Keep retention and eviction unchanged.
+
+## Executable offline tool (RC.2)
+Node >=22.13. Work on a trusted, already obtained SQLite file only, on an encrypted local drive. The tool does not download D1 or import SQL exports. It never contacts a remote service.
+```sh
+npm run backup:local -- backup /private/source.sqlite backups/snapshot-001
+npm run backup:local -- verify backups/snapshot-001
+npm run backup:local -- rehearse backups/snapshot-001 backups/rehearsal-001
+```
+Destination directories must not exist. VACUUM INTO creates a consistent SQLite snapshot; checks include quick_check, foreign keys, SHA-256 and table counts. No existing database is overwritten. The output is not encrypted by the tool; directory/file permissions are best effort, especially on Windows. Do not commit or upload any backup. KV photographs are excluded. On error, quarantine incomplete output locally and do not use it as a verified backup. A production D1 SQL export needs an independently authorized isolated import before this tool can inspect its SQLite database; this tool is not a Cloudflare restore mechanism.

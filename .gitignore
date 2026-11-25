@@ -13,3 +13,13 @@ bootstrap-admin.local.sql
 test-results/
 playwright-report/
 work/
+
+# Private offline backup and rehearsal data
+backups/
+*.sqlite
+*.sqlite-wal
+*.sqlite-shm
+*.sqlite-journal
+*.db
+*.db-wal
+*.db-shm
