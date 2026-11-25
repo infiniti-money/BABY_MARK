@@ -113,7 +113,8 @@ export const checks=[
   "",
   ""
  ],
- ["0017","employment_periods payroll_epoch","employment_periods_user","employment_periods_overlap_insert employment_periods_overlap_update payroll_epoch_profiles_insert payroll_epoch_profiles_update payroll_epoch_profiles_delete payroll_epoch_branches_insert payroll_epoch_branches_update payroll_epoch_branches_delete payroll_epoch_shifts_insert payroll_epoch_shifts_update payroll_epoch_shifts_delete payroll_epoch_assignments_insert payroll_epoch_assignments_update payroll_epoch_assignments_delete payroll_epoch_attendances_insert payroll_epoch_attendances_update payroll_epoch_attendances_delete payroll_epoch_workforce_requests_insert payroll_epoch_workforce_requests_update payroll_epoch_workforce_requests_delete payroll_epoch_extra_attendance_insert payroll_epoch_extra_attendance_update payroll_epoch_extra_attendance_delete payroll_epoch_payroll_inputs_insert payroll_epoch_payroll_inputs_update payroll_epoch_payroll_inputs_delete payroll_epoch_payroll_components_insert payroll_epoch_payroll_components_update payroll_epoch_payroll_components_delete payroll_epoch_employment_periods_insert payroll_epoch_employment_periods_update payroll_epoch_employment_periods_delete",""]
+ ["0017","employment_periods payroll_epoch","employment_periods_user","employment_periods_overlap_insert employment_periods_overlap_update payroll_epoch_profiles_insert payroll_epoch_profiles_update payroll_epoch_profiles_delete payroll_epoch_branches_insert payroll_epoch_branches_update payroll_epoch_branches_delete payroll_epoch_shifts_insert payroll_epoch_shifts_update payroll_epoch_shifts_delete payroll_epoch_assignments_insert payroll_epoch_assignments_update payroll_epoch_assignments_delete payroll_epoch_attendances_insert payroll_epoch_attendances_update payroll_epoch_attendances_delete payroll_epoch_workforce_requests_insert payroll_epoch_workforce_requests_update payroll_epoch_workforce_requests_delete payroll_epoch_extra_attendance_insert payroll_epoch_extra_attendance_update payroll_epoch_extra_attendance_delete payroll_epoch_payroll_inputs_insert payroll_epoch_payroll_inputs_update payroll_epoch_payroll_inputs_delete payroll_epoch_payroll_components_insert payroll_epoch_payroll_components_update payroll_epoch_payroll_components_delete payroll_epoch_employment_periods_insert payroll_epoch_employment_periods_update payroll_epoch_employment_periods_delete",""],
+ ["0018","","","attendance_no_rejected_extra",""]
 ];
 export async function schemaReadiness(db){
  const {results}=await db.prepare("SELECT name,type FROM sqlite_master WHERE type IN ('table','index','trigger')").all();
@@ -131,5 +132,5 @@ export async function schemaReadiness(db){
   for(const pair of cols.split(' ').filter(Boolean)){const [table,column]=pair.split('.');if(!columns.get(table)?.has(column))missing.push('column:'+pair);}
   return {id,status:id==='0002'?'manual':missing.length?'missing':'present',missing};
  });
- return {target:'0017',ready:migrations.every(m=>m.status!=='missing'),migrations,proof:'catalog_only'};
+ return {target:'0018',ready:migrations.every(m=>m.status!=='missing'),migrations,proof:'catalog_only'};
 }
