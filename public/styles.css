@@ -505,3 +505,113 @@ td,th{overflow-wrap:anywhere}
  .quick-actions .btn .icon{width:18px;height:18px;flex:0 0 18px;color:var(--wine)}
  @media(max-width:360px){.quick-actions .btn .icon{width:16px;height:16px;flex-basis:16px}.quick-actions .btn{gap:4px;font-size:11px}}
 }
+
+/* RC.14 — frosted glass design system. Screen only; no filters on camera,
+   captured images, print output or text. Nested surfaces use tint, not blur. */
+@media screen {
+ :root {
+  --glass-canvas:#f5e9ec;
+  --glass-solid:#fff9fa;
+  --glass-panel:rgba(255,255,255,.82);
+  --glass-nav:rgba(255,249,250,.88);
+  --glass-inset:rgba(255,255,255,.66);
+  --glass-edge:rgba(255,255,255,.92);
+  --glass-shadow:0 8px 24px rgba(112,37,53,.08),inset 0 1px 0 rgba(255,255,255,.95);
+  --glass-blur:14px;
+  --line:#e3cfd5;
+  --muted:#65525c;
+  --shadow:var(--glass-shadow);
+  background:var(--glass-canvas);
+ }
+ body {
+  background:radial-gradient(ellipse at 12% 0%,#f4c5cc 0%,transparent 46%),
+   radial-gradient(ellipse at 94% 12%,#e6d9f1 0%,transparent 38%),
+   radial-gradient(ellipse at 65% 92%,#f9d9cb 0%,transparent 45%),
+   linear-gradient(135deg,#fff4f5,#eee7f3);
+  background-repeat:no-repeat;
+  background-size:100% 100%;
+ }
+ .login-story{background:linear-gradient(135deg,rgba(255,255,255,.66),rgba(255,222,226,.32))}
+ .login-panel{background:transparent}
+ .login-box,.card,.stat,.admin-nav,dialog {
+  background:var(--glass-solid);
+  border:1px solid var(--line);
+  box-shadow:var(--glass-shadow);
+ }
+ .login-box{border-radius:22px;padding:clamp(16px,2.5vw,28px);max-width:455px}
+ .sidebar,.topbar {
+  background:var(--glass-solid);
+  box-shadow:0 4px 22px rgba(112,37,53,.08);
+  -webkit-backdrop-filter:none;backdrop-filter:none;
+ }
+ .sidebar{border-color:var(--line)}
+ .topbar{border-bottom-color:var(--line)}
+ .card-head,.modal-head,.toolbar,.admin-search{background:rgba(255,255,255,.30);border-color:var(--line)}
+ .overview-filter{background:transparent;border:0}
+ .assignment-card,.overview-store,.operation-row,.calendar-day,.overview-tasks>div,.overview-queue,
+ .employee-metrics>div,.privacy-note,.login-note,.date-chip,.checklist,.credential,.chat-thread,.chat-message {
+  background:#fffafa;
+  border-color:var(--line);
+ }
+ .btn.secondary,input:not([type=checkbox]):not([type=radio]),select,textarea {
+  background:#fffdfd;
+  border-color:#d8c0c9;
+  color:#392a32;
+ }
+ input[readonly]{background:#f6eef2}
+ input::placeholder,textarea::placeholder{color:#76626c}
+ .btn.quiet,.close{background:#f5e8ed;color:#62394b}
+ .nav button:hover,.admin-nav button:hover,.sidebar.menu-open .nav button{background:#f9edf1}
+ .nav button.active,.admin-nav button.active,.sidebar.menu-open .nav button.active,.chat-thread.active,.chat-message.mine,.calendar-entry{background:#fbe6e9;color:#792639}
+ .quick-actions .btn:first-child .icon{color:inherit}
+ th{background:#f6edf1;color:#59434f}
+ .table-wrap tr:nth-child(even) td{background:rgba(255,255,255,.42)}
+ .table-wrap tr:hover td{background:#fbeef1}
+ .notice{background:#492d3b;box-shadow:0 8px 24px rgba(61,25,42,.18)}
+ .notice.error{background:#a12542}
+ dialog::backdrop{background:rgba(48,23,38,.38)}
+ .camera-frame,.photo-view,.result-photo{filter:none;backdrop-filter:none;-webkit-backdrop-filter:none}
+ @supports ((backdrop-filter:blur(1px)) or (-webkit-backdrop-filter:blur(1px))) {
+  .login-box,.card,.stat,.admin-nav,dialog {
+   background:linear-gradient(140deg,var(--glass-panel),rgba(255,255,255,.69));
+   border-color:var(--glass-edge);
+  }
+  .sidebar,.topbar{background:var(--glass-nav)}
+  .sidebar,.topbar,.login-box,dialog,.admin-nav,#content>.card,.overview-grid>.card,.overview-kpis>.stat,.employee-workspace>.card {
+   -webkit-backdrop-filter:blur(var(--glass-blur)) saturate(120%);
+   backdrop-filter:blur(var(--glass-blur)) saturate(120%);
+  }
+  .assignment-card,.overview-store,.operation-row,.calendar-day,.overview-tasks>div,.overview-queue,
+  .employee-metrics>div,.privacy-note,.login-note,.date-chip,.checklist,.credential,.chat-thread,.chat-message {
+   background:var(--glass-inset);
+  }
+  .chat-thread.active,.chat-message.mine,.calendar-entry{background:#fbe6e9}
+  .btn.secondary,input:not([type=checkbox]):not([type=radio]),select,textarea{background:rgba(255,255,255,.90)}
+  input[readonly]{background:#f6eef2}
+ }
+ @media(max-width:900px) {
+  :root{--glass-blur:8px}
+  .sidebar{border-top:1px solid var(--line)}
+  /* The scrolling workspace remains lightweight on phones. */
+  #content>.card,.overview-grid>.card,.overview-kpis>.stat,.employee-workspace>.card,.admin-nav {
+   -webkit-backdrop-filter:none;backdrop-filter:none;
+  }
+ }
+ @media(max-width:620px) {
+  .login-box{padding:14px;max-width:100%}
+  .table-wrap tr:nth-child(even) td{background:transparent}
+ }
+ @media(prefers-reduced-transparency:reduce), (forced-colors:active) {
+  body{background:var(--glass-solid)}
+  .login-story,.login-box,.card,.stat,.admin-nav,dialog,.sidebar,.topbar,
+  .assignment-card,.overview-store,.operation-row,.calendar-day,.overview-tasks>div,.overview-queue,
+  .employee-metrics>div,.privacy-note,.login-note,.date-chip,.checklist,.credential,.chat-thread,.chat-message {
+   background:#fff;
+   -webkit-backdrop-filter:none;backdrop-filter:none;
+   border-color:var(--line);
+  }
+  .chat-thread.active,.chat-message.mine{background:#fbe6e9}
+  dialog::backdrop{-webkit-backdrop-filter:none;backdrop-filter:none}
+  .btn.secondary,input:not([type=checkbox]):not([type=radio]),select,textarea{background:#fff}
+ }
+}

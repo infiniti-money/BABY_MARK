@@ -690,3 +690,27 @@ test('RC.13 admin navigation, settings tabs, KPI and quick actions have distinct
  await expect(page.getByRole('tab',{name:'Vận hành',exact:true})).toHaveAttribute('aria-selected','true');
  for(const width of [320,390,768,1440]){await page.setViewportSize({width,height:844});expect(await page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth)).toBeTruthy();}
 });
+
+test('RC.14 frosted surfaces keep navigation, camera and print readable',async({page},testInfo)=>{
+ await page.emulateMedia({reducedMotion:'reduce'});
+ await page.setViewportSize({width:1440,height:900});
+ await page.goto('/');
+ const supports=await page.evaluate(()=>CSS.supports('backdrop-filter','blur(1px)')||CSS.supports('-webkit-backdrop-filter','blur(1px)'));
+ await expect(page.locator('.login-box')).toBeVisible();
+ if(supports) await expect(page.locator('.login-box')).toHaveCSS('backdrop-filter',/blur\(14px\)/);
+ await screenshot(page,testInfo,'rc14-glass-login');
+ await login(page);
+ if(supports){
+  await expect(page.locator('.sidebar')).toHaveCSS('backdrop-filter',/blur\(14px\)/);
+  await expect(page.locator('.overview-kpis>.stat').first()).toHaveCSS('backdrop-filter',/blur\(14px\)/);
+ }
+ await screenshot(page,testInfo,'rc14-glass-admin');
+ await page.getByRole('button',{name:'Quản trị',exact:true}).click();
+ await expect(page.getByRole('tab',{name:'Cửa hàng',exact:true})).toBeVisible();
+ await expect(page.locator('.admin-nav')).toBeVisible();
+ await page.setViewportSize({width:390,height:844});
+ await expect(page.locator('.admin-nav')).toHaveCSS('backdrop-filter','none');
+ expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBeTruthy();
+ await page.emulateMedia({media:'print'});
+ expect(await page.evaluate(()=>getComputedStyle(document.documentElement).getPropertyValue('--glass-panel').trim())).toBe('');
+});
