@@ -6,7 +6,7 @@ test('14-store demo: 31 accounts, 280 future shifts, scoped login and monthly cl
  const admin=await login('demo-admin'),staff=await login('demo-01-a'),manager=await login('demo-ql-01');
  for(const token of [staff,manager])assert.equal((await payroll.onRequestGet({env,request:request('payroll?month='+d.prevMonth,null,token)})).status,403);
  const draft=await (await payroll.onRequestGet({env,request:request('payroll?month='+d.prevMonth,null,admin)})).json();assert.equal(draft.data.missing_rates,0);assert.equal(draft.data.pending,0);assert.equal(draft.data.rows.length,30);assert.equal(draft.data.leave_shifts,14);assert.equal(draft.data.absences,14);
- assert.equal((await payroll.onRequestPost({env,request:request('payroll',{action:'close',month:d.prevMonth,reviewed:true,reason:'DEMO đã đối soát',expected_revision:0},admin)})).status,201);
+ assert.equal((await payroll.onRequestPost({env,request:request('payroll',{action:'close',month:d.prevMonth,reviewed:true,reason:'DEMO đã đối soát',expected_revision:0,expected_source_version:draft.data.source_version},admin)})).status,201);
  const repeat=await (await scheduler.onRequestPost({env,request:request('maintenance/rosters?branch_id=BM-001',{},cron)})).json();assert.equal(repeat.created,0);assert.equal(repeat.skipped,20);assert.equal(repeat.failed,0);
  await assert.rejects(seedDemo(db,cron),/empty profile/);
  }finally{db.close()}});

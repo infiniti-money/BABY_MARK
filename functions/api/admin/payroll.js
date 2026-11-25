@@ -1,6 +1,7 @@
 import {actorFor,apiFailure,ApiError,identifier,invalid,textField,csvCell,managementAudit} from '../../../cloudflare/lib/access.mjs';
 import {reply,bodyJSON} from '../../../cloudflare/lib/auth.mjs';
-import {monthBounds,payrollDraft} from '../../../cloudflare/lib/payroll.mjs';
+import {readAssignments,summarizeAssignment,workUnitEvidence} from '../../../cloudflare/lib/reports.mjs';
+import {monthBounds,payrollDraft,payrollVersion} from '../../../cloudflare/lib/payroll.mjs';
 import {componentsReady,validateComponents} from '../../../cloudflare/lib/payroll-components.mjs';
 import {componentFields,salaryModes} from '../../../public/payroll-components.mjs';
 const ready=async db=>!!await db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='payroll_closings'").first();
@@ -39,6 +40,17 @@ export async function onRequestPost({request,env}){
   if(!await db.prepare("SELECT id FROM profiles WHERE id=? AND role<>'admin'").bind(id).first())invalid('Nhân viên không hợp lệ');
   await db.batch([db.prepare('INSERT INTO payroll_inputs(month,user_id,hourly_rate,additions,deductions,note,updated_by,updated_at) VALUES(?,?,?,?,?,?,?,?) ON CONFLICT(month,user_id) DO UPDATE SET hourly_rate=excluded.hourly_rate,additions=excluded.additions,deductions=excluded.deductions,note=excluded.note,updated_by=excluded.updated_by,updated_at=excluded.updated_at').bind(month,id,b.hourly_rate,b.additions,b.deductions,note,actor.id,Date.now()),...(details?[db.prepare('INSERT INTO payroll_components(month,user_id,details_json) VALUES(?,?,?) ON CONFLICT(month,user_id) DO UPDATE SET details_json=excluded.details_json').bind(month,id,JSON.stringify(details))]:[]),managementAudit(db,actor,'payroll',month,'SAVE_INPUT',{user_id:id,extended:!!details})]);
   return reply({ok:true});
+ }
+ if(b.action==='review-units'){
+  if(!await db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='work_unit_reviews'").first())throw new ApiError(409,'Cần migration 0020');
+  const id=identifier(b.assignment_id),reason=textField(b.reason,500),units=b.units,version=await payrollVersion(db);
+  if(reason.length<5||![0,0.5,1,1.5,2].includes(units)||b.reviewed!==true)invalid('Nhập công đã đối soát và lý do; xác nhận rõ quyết định');
+  if(version===null||b.expected_source_version!==version)throw new ApiError(409,'Bảng công đã thay đổi; tải lại');
+  const bounds=monthBounds(month),{assignments}=await readAssignments(db,actor,new URL('https://internal.invalid/?from='+bounds.from+'&to='+bounds.to));
+  const a=assignments.find(x=>x.id===id),s=a&&summarizeAssignment(a);
+  if(!s?.short_full_day||a.request_state==='PENDING'||a.extra_state==='PENDING')throw new ApiError(409,'Chỉ đối soát công ca cả ngày có đủ lượt hợp lệ, không chờ duyệt');
+  const result=await db.batch([db.prepare('INSERT INTO work_unit_reviews(assignment_id,evidence,units,reason,reviewed_by,reviewed_at) SELECT ?,?,?,?,?,? WHERE EXISTS(SELECT 1 FROM payroll_epoch WHERE id=1 AND version=?)').bind(id,workUnitEvidence(a),units,reason,actor.id,Date.now(),version),db.prepare("INSERT INTO management_audit(id,actor_id,resource,resource_id,action,details_json,created_at) SELECT ?,?,'payroll',?,'REVIEW_UNITS',?,? WHERE changes()=1").bind(crypto.randomUUID(),actor.id,id,JSON.stringify({units,reason}),Date.now())]);
+  if(result[0].meta.changes!==1)throw new ApiError(409,'Dữ liệu đã thay đổi; tải lại');return reply({ok:true},201);
  }
  if(b.action==='close'){
   const reason=textField(b.reason,500);if(reason.length<5||b.reviewed!==true)invalid('Cần lý do và xác nhận đối soát');
