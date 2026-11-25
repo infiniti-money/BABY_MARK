@@ -446,6 +446,7 @@ test('device permission setup explicitly checks camera and GPS without uploading
 });
 
 test('remembered staff session survives closing the tab',async({page,context})=>{
+ await page.goto('/');await expect(page.locator('input[name="remember"]')).toBeChecked();
  await login(page,'staff');
  const expiry=await page.evaluate(()=>JSON.parse(localStorage.getItem('babymark-session')||'null')?.expires_at);
  expect(expiry-Date.now()).toBeGreaterThan(29*86400000);
@@ -836,4 +837,14 @@ test('HR contract expiry dashboard and private saved CV print',async({page,reque
  await expect(page.locator('#print-document')).toContainText('<script>HR fixture</script>');
  await page.evaluate(()=>window.dispatchEvent(new Event('afterprint')));
  await expect(page.locator('#print-document')).toBeEmpty();
+});
+
+test('remember login defaults on but can be disabled for shared devices',async({page})=>{
+ await page.goto('/');const remember=page.locator('input[name="remember"]');await expect(remember).toBeChecked();await remember.uncheck();
+ await page.getByLabel('Tên đăng nhập',{exact:true}).fill(username.staff);
+ await page.getByLabel('Mật khẩu hoặc mã truy cập',{exact:true}).fill(secret);
+ await page.getByTestId('login-submit').click();
+ await expect(page.getByRole('heading',{name:'Chấm công hôm nay',exact:true})).toBeVisible();
+ const saved=await page.evaluate(()=>({persistent:localStorage.getItem('babymark-session'),temporary:JSON.parse(sessionStorage.getItem('babymark-session')||'null')}));
+ expect(saved.persistent).toBeNull();expect(saved.temporary?.remember).toBe(false);expect(saved.temporary.expires_at-Date.now()).toBeLessThanOrEqual(8*3600000);
 });
