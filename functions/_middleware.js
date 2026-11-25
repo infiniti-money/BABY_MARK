@@ -1,5 +1,5 @@
 export async function onRequest(context){
- const {request}=context,url=new URL(request.url),api=url.pathname.startsWith('/api/');
+ const {request}=context,url=new URL(request.url),api=url.pathname==='/api'||url.pathname.startsWith('/api/');
  const started=performance.now(),requestId=api?crypto.randomUUID():null;
  const origin=request.headers.get('origin');
  let response;

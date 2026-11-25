@@ -1,6 +1,7 @@
 /*
   Content-Security-Policy: default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data: blob:; media-src 'self' blob:; connect-src 'self'; font-src 'self'; object-src 'none'; frame-src 'none'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'
   X-Content-Type-Options: nosniff
+  X-Frame-Options: DENY
   Referrer-Policy: no-referrer
   Permissions-Policy: camera=(self), geolocation=(self), microphone=()
   Cross-Origin-Opener-Policy: same-origin
@@ -12,3 +13,16 @@
 
 /apple-touch-icon.png
   Content-Type: image/png
+
+# Only public application assets may be stored; validate before reuse.
+/*.mjs
+  ! Cache-Control
+  Cache-Control: public, no-cache
+
+/*.css
+  ! Cache-Control
+  Cache-Control: public, no-cache
+
+/brand/*
+  ! Cache-Control
+  Cache-Control: public, no-cache
