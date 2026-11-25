@@ -76,15 +76,17 @@ export async function dispatchPush(env,now=Date.now(),fetcher=fetch){
  // send scheduled reminders or late alerts for unapproved additional shifts.
  const extra=!!await db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='extra_attendance'").first();
  const approvedExtra=extra?" AND NOT EXISTS(SELECT 1 FROM extra_attendance x WHERE x.assignment_id=a.id AND x.state<>'APPROVED')":"";
- const {results}=await db.prepare(`
+ const queued=!!await db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='push_queue'").first();
+ const window=queued?30:10,lateWindow=queued?30:15;
+ const candidates=`
  WITH candidates AS (
-  SELECT a.id||':REMINDER' AS event_key,a.user_id AS recipient FROM assignments a
+  SELECT a.id||':REMINDER' AS event_key,a.user_id AS recipient,a.starts_at AS deadline FROM assignments a
    JOIN profiles p ON p.id=a.user_id AND p.active=1 JOIN branches b ON b.id=a.branch_id AND b.active=1
    WHERE ?=1 AND a.starts_at>? AND a.starts_at<=?
     AND NOT EXISTS(SELECT 1 FROM attendances t WHERE t.assignment_id=a.id AND t.type='IN')
     AND NOT EXISTS(SELECT 1 FROM workforce_requests w WHERE w.assignment_id=a.id AND w.kind='LEAVE' AND w.state='APPROVED')${approvedExtra}
   UNION
-  SELECT a.id||':LATE',p.id FROM assignments a JOIN profiles employee ON employee.id=a.user_id AND employee.active=1
+  SELECT a.id||':LATE',p.id,min(a.ends_at,a.starts_at+a.grace_minutes*60000+${lateWindow}*60000) FROM assignments a JOIN profiles employee ON employee.id=a.user_id AND employee.active=1
    JOIN branches b ON b.id=a.branch_id AND b.active=1
    JOIN profiles p ON p.active=1 AND (p.role='admin' OR (p.role='manager' AND EXISTS(SELECT 1 FROM branch_managers bm WHERE bm.user_id=p.id AND bm.branch_id=a.branch_id)))
    WHERE ?=1 AND a.starts_at BETWEEN ? AND ?
@@ -92,19 +94,28 @@ export async function dispatchPush(env,now=Date.now(),fetcher=fetch){
     AND NOT EXISTS(SELECT 1 FROM attendances t WHERE t.assignment_id=a.id AND t.type='IN' AND t.late_minutes=0)
     AND NOT EXISTS(SELECT 1 FROM workforce_requests w WHERE w.assignment_id=a.id AND w.kind='LEAVE' AND w.state='APPROVED')${approvedExtra}
  )
- SELECT DISTINCT c.event_key,s.endpoint,s.user_id FROM candidates c JOIN web_push_subscriptions s ON s.user_id=c.recipient
- WHERE NOT EXISTS(SELECT 1 FROM web_push_receipts r WHERE r.event_key=c.event_key AND r.endpoint=s.endpoint)
- ORDER BY c.event_key,s.endpoint LIMIT 12`).bind(+settings.reminders,now,now+600000,+(settings.late_alerts&&!!inApp?.late_alerts),now-135*60000,now,now,now-15*60000,now).all();
+ SELECT DISTINCT c.event_key,s.endpoint,s.user_id,c.deadline FROM candidates c JOIN web_push_subscriptions s ON s.user_id=c.recipient
+ WHERE NOT EXISTS(SELECT 1 FROM web_push_receipts r WHERE r.event_key=c.event_key AND r.endpoint=s.endpoint)`;
+ const args=[+settings.reminders,now,now+window*60000,+(settings.late_alerts&&!!inApp?.late_alerts),now-(120+lateWindow)*60000,now,now,now-lateWindow*60000,now];
+ if(queued){
+  await db.prepare('INSERT INTO push_queue(event_key,endpoint,user_id,created_at,expires_at) SELECT event_key,endpoint,user_id,?,deadline FROM ('+candidates+' ORDER BY deadline,event_key,endpoint LIMIT 500) WHERE deadline>? ON CONFLICT(event_key,endpoint) DO NOTHING').bind(now,...args,now).run();
+  await db.prepare("UPDATE push_queue SET state='expired' WHERE rowid IN (SELECT rowid FROM push_queue WHERE state='pending' AND expires_at<=? LIMIT 500)").bind(now).run();
+ }
+ const selection=queued?'SELECT c.event_key,c.endpoint,c.user_id FROM ('+candidates+') c JOIN push_queue q ON q.event_key=c.event_key AND q.endpoint=c.endpoint AND q.user_id=c.user_id WHERE q.state=\'pending\' AND q.expires_at>? ORDER BY q.expires_at,q.created_at,q.event_key,q.endpoint LIMIT 12':candidates+' ORDER BY deadline,event_key,endpoint LIMIT 12';
+ const {results}=await db.prepare(selection).bind(...args,...(queued?[now]:[])).all();
  let accepted=0,failed=0,claimed=0;
  for(const row of results){
   const claim=await db.prepare("INSERT INTO web_push_receipts(event_key,endpoint,claimed_at,state) SELECT ?,?,?,'claimed' WHERE EXISTS(SELECT 1 FROM web_push_subscriptions s JOIN profiles p ON p.id=s.user_id AND p.active=1 WHERE s.endpoint=? AND s.user_id=?) ON CONFLICT DO NOTHING RETURNING event_key").bind(row.event_key,row.endpoint,now,row.endpoint,row.user_id).first();
   if(!claim)continue;claimed++;
+  if(queued)await db.prepare("UPDATE push_queue SET state='claimed' WHERE event_key=? AND endpoint=? AND state='pending'").bind(row.event_key,row.endpoint).run();
   let status=0;try{status=await sendEmptyPush(config,row.endpoint,fetcher)}catch{}
   const ok=status>=200&&status<300;ok?accepted++:failed++;
   await db.prepare("UPDATE web_push_receipts SET state=? WHERE event_key=? AND endpoint=?").bind(ok?'accepted':'failed',row.event_key,row.endpoint).run();
+  if(queued)await db.prepare('UPDATE push_queue SET state=? WHERE event_key=? AND endpoint=?').bind(ok?'accepted':'failed',row.event_key,row.endpoint).run();
   if(status===404||status===410)await db.prepare('DELETE FROM web_push_subscriptions WHERE endpoint=? AND user_id=?').bind(row.endpoint,row.user_id).run();
  }
  // Bound cleanup and keep event receipts longer than the scheduling lookback.
  await db.prepare('DELETE FROM web_push_receipts WHERE rowid IN (SELECT rowid FROM web_push_receipts WHERE claimed_at<? LIMIT 100)').bind(now-7*86400000).run();
- return {enabled:true,accepted,failed,claimed};
+ const pending=queued?(await db.prepare("SELECT count(*) AS n FROM push_queue WHERE state='pending' AND expires_at>?").bind(now).first()).n:null;
+ return {enabled:true,accepted,failed,claimed,queue_ready:queued,pending};
 }

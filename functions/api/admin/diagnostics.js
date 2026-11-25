@@ -39,7 +39,10 @@ export async function onRequestGet({request,env}){
    const recent=receipts.filter(x=>x.claimed_at>=now-24*3600000);
    const failed=recent.filter(x=>x.state==='failed').length,uncertain=recent.filter(x=>x.state==='claimed'&&x.claimed_at<now-600000).length;
    if(failed||uncertain)add('PUSH_DELIVERY_REVIEW','review',failed+uncertain);
-   return {schema_ready:s.available,enabled:s.enabled,vapid_ready:v.ready,cron_secret_ready:cron,recent_receipts:recent.length,failed,uncertain,receipt_sample_limit:100,last_receipt_at:receipts[0]?.claimed_at??null};
+   const queueReady=!!await db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='push_queue'").first();
+   const queue=queueReady?(await db.prepare("SELECT state,count(*) AS n FROM push_queue WHERE state IN ('pending','claimed','expired') GROUP BY state").all()).results:[];
+   if(queue.some(x=>x.state==='expired'&&x.n))add('PUSH_QUEUE_EXPIRED','review',queue.find(x=>x.state==='expired').n);
+   return {queue_ready:queueReady,queue,schema_ready:s.available,enabled:s.enabled,vapid_ready:v.ready,cron_secret_ready:cron,recent_receipts:recent.length,failed,uncertain,receipt_sample_limit:100,last_receipt_at:receipts[0]?.claimed_at??null};
   });
   const retention=await check('RETENTION_UNAVAILABLE',async()=>{const p=await policy(env);return {attendance_enabled:p.attendance_retention,photo_eviction_enabled:p.photo_eviction}});
   return reply({version:'1.2.0-rc',generated_at:now,schema,kv_read_ready:kv===true,recovery,roster,push,retention,issues,backup:{status:'manual_verification_required',restore_mode:'isolated_environment_only',offline_tool:'npm run backup:local',kv_included:false}});

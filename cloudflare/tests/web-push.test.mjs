@@ -37,3 +37,13 @@ test('unapproved extra shifts do not emit reminder or late pushes; approved ones
  assert.equal((await dispatchPush(env,now,send)).accepted,2);
  }finally{f.close()}
 });
+
+test('50 employees with three endpoints queue 150 reminders and drain in bounded batches',async()=>{const f=await appFixture();try{
+ const db=f.db,now=Date.now(),env={...f.env,...await keyEnv()};await db.prepare('UPDATE web_push_settings SET enabled=1,late_alerts=0 WHERE id=1').run();
+ const users=[f.ids.staff,f.ids.other,f.ids.manager];for(let i=0;i<47;i++){const id=crypto.randomUUID();users.push(id);await db.prepare("INSERT INTO profiles(id,employee_code,full_name,role) VALUES(?,?,?,'staff')").bind(id,'LOAD-'+i,'Load '+i).run();}
+ await db.prepare('UPDATE assignments SET starts_at=?,ends_at=?').bind(now+25*60000,now+8*3600000).run();
+ for(const [i,user] of users.entries()){if(i>=2)await db.prepare("INSERT INTO assignments(id,user_id,branch_id,shift_id,work_date,starts_at,ends_at,grace_minutes) VALUES(?,?,'BM-001','test-day',?,?,?,5)").bind(crypto.randomUUID(),user,f.workDate,now+25*60000,now+8*3600000).run();for(let j=0;j<3;j++)await db.prepare('INSERT INTO web_push_subscriptions(endpoint,user_id,created_at,updated_at) VALUES(?,?,?,?)').bind('https://fcm.googleapis.com/fcm/send/load-'+i+'-'+j,user,now,now).run();}
+ const seen=new Set();let n=0;const send=async url=>{assert.ok(!seen.has(url));seen.add(url);return {status:201}};
+ for(let i=0;i<13;i++){const d=await dispatchPush(env,now+i*2*60000,send);assert.ok(d.claimed<=12);n+=d.accepted;}
+ assert.equal(n,150);assert.equal(seen.size,150);assert.equal((await db.prepare("SELECT count(*) AS n FROM push_queue WHERE state='accepted'").first()).n,150);
+ }finally{f.close()}});

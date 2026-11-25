@@ -63,7 +63,7 @@ async function api(path,{body,method='GET',raw=false}={}) {
   const headers = new Headers();
   if (state.token) headers.set('Authorization',`Bearer ${state.token}`);
   if (body && !(body instanceof FormData)) { headers.set('Content-Type','application/json'); body=JSON.stringify(body); }
-  const response = await fetch(path,{method,headers,body,cache:'no-store',credentials:'same-origin'});
+  let response;try{response=await fetch(path,{method,headers,body,cache:'no-store',credentials:'same-origin'});}catch{const e=new Error('Mất kết nối hoặc máy chủ chưa phản hồi. Kiểm tra mạng và lịch sử trước khi gửi lại.');e.network=true;throw e;}
   if(epoch!==state.sessionEpoch)throw new Error('Tài khoản đã thay đổi. Vui lòng thử lại trong phiên hiện tại.');
   if (!response.ok) {
     const result = await response.json().catch(()=>({}));
@@ -495,7 +495,7 @@ async function capture(type,button) {
     stillCurrent();
     stopCamera();
     const url=URL.createObjectURL(photo);
-    const ticket=showModal('Xác nhận ảnh chấm công',`<p class="muted">Kiểm tra ảnh và thông tin. Chưa lưu chấm công cho đến khi bạn xác nhận.</p><img class="result-photo" src="${url}" alt="Ảnh Timemark xem trước"><p class="hint">Khoảng cách ${Math.round(prepared.metadata.distance)} / ${prepared.metadata.radius} m · Sai số ±${Math.round(prepared.metadata.accuracy)} m</p>${prepared.metadata.distance>prepared.metadata.radius?'<p class="error-text">Ngoài vùng: chưa cộng công tự động.</p>':''}<p data-confirm-expiry role="status" class="hint"></p><p data-confirm-error class="error-text" role="alert" hidden></p><div class="modal-actions"><button class="btn secondary" data-action="capture-retake">Chụp lại</button><button class="btn" data-action="capture-confirm">Xác nhận chấm công</button></div>`);
+    const ticket=showModal('Xác nhận ảnh chấm công',`<p class="muted">Kiểm tra ảnh và thông tin. Chưa lưu chấm công cho đến khi bạn xác nhận.</p><img class="result-photo" src="${url}" alt="Ảnh Timemark xem trước"><p class="hint">Khoảng cách ${Math.round(prepared.metadata.distance)} / ${prepared.metadata.radius} m · Sai số ±${Math.round(prepared.metadata.accuracy)} m</p>${prepared.metadata.distance>prepared.metadata.radius?'<p class="error-text">Ngoài vùng: chưa cộng công tự động.</p>':''}<p data-confirm-expiry role="status" class="hint"></p><p data-confirm-error class="error-text" role="alert" hidden></p><div class="modal-actions"><button class="btn secondary" data-action="capture-retake">Chụp lại</button><button class="btn secondary" data-action="capture-status-check">Kiểm tra trạng thái</button><button class="btn" data-action="capture-confirm">Xác nhận chấm công</button></div>`);
     photoURLs.push(url);
     pendingCapture={photo,prepared,assignment_id,type,epoch,renderId,ticket,sending:false};
     const expires=Number(prepared.expires_at);
@@ -505,7 +505,7 @@ async function capture(type,button) {
 }
 async function confirmCapture(button){
  const p=pendingCapture;
- if(!p||p.sending||p.epoch!==state.sessionEpoch||p.renderId!==state.renderId||p.ticket!==modalTicket||!modal.open)return;
+ if(!p||p.sending||p.uncertain||p.epoch!==state.sessionEpoch||p.renderId!==state.renderId||p.ticket!==modalTicket||!modal.open)return;
  if(Date.now()>=p.prepared.expires_at)throw Error('Ảnh đã hết hạn. Hãy chụp lại.');
  p.sending=true;button.disabled=true;const retake=$('[data-action="capture-retake"]'),close=$('.modal-head .close');if(retake)retake.disabled=true;if(close)close.disabled=true;
  const error=$('[data-confirm-error]');if(error)error.hidden=true;
@@ -516,8 +516,8 @@ async function confirmCapture(button){
   const url=URL.createObjectURL(p.photo),m=p.prepared.metadata;
   showModal('Đã ghi nhận '+(p.type==='IN'?'vào ca':'tan ca'),`<p class="muted">Đã lưu bản ghi trên máy chủ. Thời gian ghi nhận thực tế có thể khác giờ cấp dấu trên ảnh tối đa 90 giây.</p><div class="review-meta"><div>Thời gian máy chủ<strong>${dt(result.attendance?.server_timestamp||m.serverTimestamp)}</strong></div><div>Dung lượng ảnh<strong>${(p.photo.size/1000).toFixed(1)} KB / 200 KB</strong></div><div>Khoảng cách<strong>${Math.round(m.distance)} / ${m.radius} m</strong></div><div>Sai số GPS<strong>±${Math.round(m.accuracy)} m</strong></div></div><img class="result-photo" src="${url}" alt="Ảnh Timemark vừa ghi nhận">${p.type==='OUT'&&state.handover?.available?handoverForm(p.assignment_id):''}<div class="modal-actions"><button class="btn" data-action="close-modal">Hoàn tất</button></div>`);
   photoURLs.push(url);await navigate('today');
- }catch(e){if(pendingCapture===p&&error?.isConnected){error.textContent=e.message+' Kiểm tra lịch sử nếu không chắc lượt công đã được lưu.';error.hidden=false;}}
- finally{if(pendingCapture===p){p.sending=false;button.disabled=Date.now()>=p.prepared.expires_at;if(retake)retake.disabled=false;if(close)close.disabled=false;}}
+ }catch(e){if(pendingCapture===p&&error?.isConnected){p.uncertain=!!e.network||e.status===503||e.status===409;error.textContent=e.message+(p.uncertain?' Dùng Kiểm tra trạng thái trước khi gửi lại.':' Kiểm tra lịch sử nếu không chắc lượt công đã được lưu.');error.hidden=false;}}
+ finally{if(pendingCapture===p){p.sending=false;button.disabled=!!p.uncertain||Date.now()>=p.prepared.expires_at;if(retake)retake.disabled=false;if(close)close.disabled=false;}}
 }
 async function showPhoto(id) {
   const epoch=state.sessionEpoch,ticket=showModal('Ảnh chấm công',loading());
@@ -619,6 +619,12 @@ document.addEventListener('click',async event=>{
     if(action==='payroll-close'){showModal('Chốt phiên bản bảng công tháng',`<form data-form="payroll-close" class="form-stack"><p>Bản chốt là ảnh chụp dữ liệu đối soát, không khóa sửa bản công gốc. Nếu điều chỉnh sau chốt, tạo phiên bản mới có lý do.</p><label>Lý do<textarea name="reason" minlength="5" maxlength="500" required></textarea></label><label><input name="reviewed" type="checkbox" required> Tôi đã kiểm tra giờ ngoài ca, nghỉ phép, ca vắng, ca bất thường và các khoản điều chỉnh.</label><p class="error-text" data-form-error hidden></p><button class="btn" type="submit">Xác nhận chốt</button></form>`);return;}
     if(action==='session-retry')return await boot();
     if(action==='close-modal'){if(!pendingCapture?.sending)closeModal();return;}
+    if(action==='capture-status-check'){
+      const p=pendingCapture;if(!p||p.sending)return;
+      const d=await api('/api/attendance/status?'+query({challenge_id:p.prepared.challenge_id}));if(p!==pendingCapture||p.epoch!==state.sessionEpoch)return;
+      const e=$('[data-confirm-error]');if(e){e.hidden=false;e.textContent=d.attendance?'Máy chủ đã ghi nhận '+dt(d.attendance.server_timestamp)+'. Đóng và xem lịch sử, không chụp lại.':d.state==='READY'?'Máy chủ chưa ghi nhận; có thể xác nhận lại nếu còn hạn.':d.state==='PROCESSING'||d.state==='UNKNOWN'?'Trạng thái chưa chắc chắn. Không chụp lại; kiểm tra lịch sử hoặc liên hệ quản trị.':'Yêu cầu không còn hiệu lực. Kiểm tra lịch sử trước khi chụp mới.';}
+      if(d.attendance||['PROCESSING','UNKNOWN'].includes(d.state)){p.uncertain=true;const b=$('[data-action="capture-confirm"]');if(b)b.disabled=true;}else if(d.state==='READY'){p.uncertain=false;const b=$('[data-action="capture-confirm"]');if(b)b.disabled=Date.now()>=p.prepared.expires_at;}return;
+    }
     if(action==='capture-confirm')return await confirmCapture(button);
     if(action==='capture-retake'){if(pendingCapture?.sending)return;closeModal();await startCamera();return;}
     if(action==='refresh')return void navigate();

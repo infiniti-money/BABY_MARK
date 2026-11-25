@@ -112,6 +112,12 @@ export async function onRequestGet({request,env,params}){
  if(!env.DB)return reply({error:'Chưa cấu hình D1'},503);
  try{
   const user=await sessionUser(request,env.DB);if(!user)return reply({error:'Chưa đăng nhập'},401);
+  if(params.action==='status'){
+   const id=new URL(request.url).searchParams.get('challenge_id');if(!idPattern.test(id||''))fail(400,'Mã yêu cầu không hợp lệ');
+   const c=await env.DB.prepare('SELECT id,state,expires_at,attendance_id FROM attendance_challenges WHERE id=? AND user_id=?').bind(id,user.id).first();if(!c)fail(404,'Không tìm thấy yêu cầu');
+   const t=c.attendance_id?await env.DB.prepare('SELECT id,assignment_id,type,server_timestamp FROM attendances WHERE id=? AND user_id=?').bind(c.attendance_id,user.id).first():null;
+   return reply({state:t?'COMPLETED':c.state==='COMPLETED'?'UNKNOWN':c.state==='READY'&&c.expires_at<=Date.now()?'EXPIRED':c.state,attendance:t,expires_at:c.expires_at});
+  }
   if(params.action!=='history')return reply({error:'Không tìm thấy API'},404);
   const u=new URL(request.url),from=u.searchParams.get('from')||new Date(Date.now()+7*3600000-31*86400000).toISOString().slice(0,10),to=u.searchParams.get('to')||new Date(Date.now()+7*3600000).toISOString().slice(0,10);
   if(!/^\d{4}-\d{2}-\d{2}$/.test(from)||!/^\d{4}-\d{2}-\d{2}$/.test(to)||from>to||Date.parse(to)-Date.parse(from)>93*86400000)fail(400,'Khoảng ngày phải trong 93 ngày');
