@@ -2,7 +2,7 @@
 self.addEventListener('install',event=>event.waitUntil(self.skipWaiting()));
 self.addEventListener('activate',event=>event.waitUntil(self.clients.claim()));
 self.addEventListener('push',event=>{
- event.waitUntil(self.registration.showNotification('BABY MARK',{body:'Bạn có cập nhật về ca làm việc hoặc chấm công. Mở ứng dụng để kiểm tra.',icon:'/brand/logo.png',tag:'babymark-work-update',data:{path:'/'}}));
+ event.waitUntil(self.registration.showNotification('BABY MARK',{body:'Bạn có cập nhật về ca làm việc hoặc chấm công. Mở ứng dụng để kiểm tra.',icon:'/favicon-192x192.png?v=3',tag:'babymark-work-update',data:{path:'/'}}));
 });
 self.addEventListener('notificationclick',event=>{
  event.notification.close();

@@ -8,7 +8,11 @@
       "supportsTablet": false
     },
     "android": {
-      "package": "com.infinitimoney.babymark"
+      "package": "com.infinitimoney.babymark",
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#FFFFFF"
+      }
     },
     "plugins": [
       [
@@ -26,12 +30,12 @@
       ],
       "expo-notifications"
     ],
-    "icon": "./assets/logo.png",
+    "icon": "./assets/app-icon.png",
     "userInterfaceStyle": "light",
     "splash": {
       "image": "./assets/logo.png",
       "resizeMode": "contain",
-      "backgroundColor": "#fff1f4"
+      "backgroundColor": "#FFF7F7"
     }
   }
 }

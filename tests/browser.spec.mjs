@@ -481,3 +481,212 @@ test('admin overview and role navigation do not duplicate primary modules',async
  await expect(page.getByRole('button',{name:'Nghỉ phép / điều chỉnh',exact:true})).toBeVisible();
  await page.getByRole('button',{name:'Ca bổ sung / thay ca',exact:true}).click();await expect(page.getByRole('heading',{name:'Chấm công ngoài lịch / thay ca',exact:true})).toBeVisible();
 });
+
+test('v1.2 admin opens diagnostics from overview; staff is denied',async({page,request})=>{
+ await login(page);
+ await page.getByRole('button',{name:'Sức khỏe và phục hồi',exact:true}).click();
+ await expect(page.getByRole('heading',{name:'Sức khỏe hệ thống · v1.2.0 RC',exact:true})).toBeVisible();
+ await expect(page.getByRole('heading',{name:'Migration đến 0020',exact:true})).toBeVisible();
+ await expect(page.getByText('0016 · Có dấu hiệu schema',{exact:true})).toBeVisible();
+ await expect(page.getByRole('heading',{name:'Sao lưu và phục hồi',exact:true})).toBeVisible();
+ const staff=await apiToken(request,'staff');
+ expect((await request.get('/api/admin/diagnostics',{headers:auth(staff)})).status()).toBe(403);
+});
+
+test('v1.2 calendar and audit log are accessible from admin navigation',async({page})=>{
+ await login(page);
+ await page.getByRole('button',{name:'Nhật ký quản trị',exact:true}).click();
+ await expect(page.getByRole('heading',{name:'Nhật ký quản trị',exact:true})).toBeVisible();
+ await expect(page.getByRole('button',{name:'Lọc nhật ký',exact:true})).toBeVisible();
+ await page.getByRole('button',{name:'Đóng',exact:true}).last().click();
+ await page.getByRole('button',{name:'Lịch làm việc',exact:true}).click();
+ await page.getByRole('button',{name:'Xem lịch trực quan',exact:true}).click();
+ await expect(page.getByRole('heading',{name:'Lịch tuần',exact:true})).toBeVisible();
+ await expect(page.locator('.calendar-day')).toHaveCount(7);
+});
+
+test('RC.4 overview distribution and quick actions fit narrow and desktop screens',async({page})=>{
+ await page.setViewportSize({width:390,height:844});await login(page);
+ await expect(page.getByRole('heading',{name:'Phân bố trạng thái ca',exact:true})).toBeVisible();
+ await expect(page.locator('.distribution-item')).toHaveCount(9);
+ await expect(page.locator('.quick-actions').getByRole('button',{name:'Sức khỏe và phục hồi',exact:true})).toBeVisible();
+ for(const size of [{width:320,height:640},{width:390,height:844},{width:768,height:1024},{width:1440,height:900}]){
+  await page.setViewportSize(size);expect(await page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth)).toBeTruthy();
+ }
+});
+
+test('RC.5 compact overview uses full rows and keeps all quick actions accessible',async({page})=>{
+ await page.setViewportSize({width:1440,height:900});await login(page);
+ const grid=page.locator('.overview-grid');
+ await expect(grid.locator('.overview-command')).toBeVisible();
+ await expect(grid.locator('.quick-actions .btn')).toHaveCount(8);
+ for(const width of [1440,1024,768,390,320]){
+  await page.setViewportSize({width,height:900});
+  const bounds=await grid.evaluate(el=>{
+   const r=el.getBoundingClientRect();
+   const full=['.overview-command','.overview-kpis','.overview-attendance','.overview-branches'].map(s=>el.querySelector(s).getBoundingClientRect());
+   return {fits:full.every(x=>Math.abs(x.left-r.left)<2&&Math.abs(x.width-r.width)<2),ordered:full[0].bottom<=full[1].top&&full[1].bottom<=full[2].top&&full[2].bottom<=full[3].top,overflow:document.documentElement.scrollWidth>window.innerWidth};
+  });
+  expect(bounds.fits).toBeTruthy();expect(bounds.ordered).toBeTruthy();expect(bounds.overflow).toBeFalsy();
+ }
+ await expect(grid.getByRole('button',{name:'Mở danh sách yêu cầu',exact:true})).toBeVisible();
+});
+
+test('RC.6 employee capture comes first, idle camera is compact, live preview expands',async({page})=>{
+ await page.setViewportSize({width:390,height:844});await login(page,'staff');
+ const work=page.locator('.employee-workspace'),camera=work.locator('.employee-camera');
+ await expect(work.getByLabel('Chọn ca làm')).toBeVisible();
+ await expect(work.getByTestId('attendance-in')).toBeVisible();
+ const idle=await camera.evaluate(el=>el.getBoundingClientRect().height);
+ expect(idle).toBeLessThan(190);
+ const order=await work.evaluate(el=>{const top=s=>el.querySelector(s).getBoundingClientRect().top;return top('.employee-checkin')<top('.employee-summary')&&top('.employee-summary')<top('.employee-shifts')&&top('.employee-shifts')<top('.employee-tools')});
+ expect(order).toBeTruthy();
+ await expect(work.getByRole('button',{name:'Kết quả duyệt của tôi',exact:true})).toBeVisible();
+ await expect(work.getByRole('button',{name:'Xin nghỉ / điều chỉnh',exact:true})).toBeVisible();
+ for(const width of [320,390,768,1440]){
+  await page.setViewportSize({width,height:844});
+  expect(await page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth)).toBeTruthy();
+ }
+ await page.setViewportSize({width:390,height:844});
+ await work.getByRole('button',{name:'Bật camera',exact:true}).click();
+ await expect.poll(()=>camera.evaluate(el=>el.getBoundingClientRect().height)).toBeGreaterThan(idle+50);
+ await work.getByRole('button',{name:'Tắt camera',exact:true}).click();
+ await expect.poll(()=>camera.evaluate(el=>el.getBoundingClientRect().height)).toBeLessThan(190);
+});
+
+test('RC.8 motion follows scroll and accessibility preferences without delaying controls',async({page})=>{
+ await page.emulateMedia({reducedMotion:'no-preference'});
+ await page.setViewportSize({width:390,height:844});await login(page);
+ const title=page.getByRole('heading',{name:'Tổng quan quản trị',exact:true});
+ await expect(title).toHaveCSS('animation-name','bm-text-in');
+ const heading=page.getByRole('heading',{name:'Tình hình từng cửa hàng',exact:true});
+ await heading.scrollIntoViewIfNeeded();
+ await expect(heading).toHaveClass(/motion-revealed/);
+ await expect(page.locator('.scroll-progress')).toHaveCSS('pointer-events','none');
+ await page.emulateMedia({reducedMotion:'reduce'});
+ await expect(title).toHaveCSS('animation-name','none');
+ await expect(heading).toHaveCSS('animation-name','none');
+ await expect(page.locator('html')).toHaveCSS('scroll-behavior','auto');
+ await expect(page.locator('.scroll-progress')).toBeHidden();
+ await page.getByRole('button',{name:'Sức khỏe và phục hồi',exact:true}).click();
+ await expect(page.getByRole('dialog')).toHaveCSS('animation-name','none');
+ await expect(page.getByRole('heading',{name:'Migration đến 0020',exact:true})).toBeVisible();
+});
+
+
+test('RC.9 real brand logo opening is decorative, dismisses on interaction, and respects reduced motion',async({page})=>{
+ await page.emulateMedia({reducedMotion:'no-preference'});await page.goto('/');
+ const intro=page.locator('#brand-intro');
+ await expect(intro).toHaveAttribute('aria-hidden','true');
+ await expect(intro.locator('.brand-logo-complete')).toHaveAttribute('src','/brand/logo.png');
+ await expect(intro.locator('.brand-piece')).toHaveCount(4);
+ await expect(intro.locator('.brand-piece-tl')).toHaveCSS('animation-name','bm-piece-tl');
+ await expect(intro).toHaveCSS('pointer-events','none');
+ await page.getByLabel('Tên đăng nhập',{exact:true}).fill('test-staff');
+ await expect(intro).toBeHidden();
+ await page.emulateMedia({reducedMotion:'reduce'});await page.reload();
+ await expect(intro).toBeHidden();
+ await expect(page.getByLabel('Tên đăng nhập',{exact:true})).toBeVisible();
+});
+test('RC.9 viewport reveals alternate left and right without layout overflow',async({page})=>{
+ await page.emulateMedia({reducedMotion:'no-preference'});await page.setViewportSize({width:390,height:844});await login(page);
+ const left=page.locator('#content [data-motion-side="left"]').first(),right=page.locator('#content [data-motion-side="right"]').last();
+ await left.scrollIntoViewIfNeeded();await expect(left).toHaveClass(/motion-revealed/);await expect(left).toHaveCSS('animation-name','bm-reveal-left');
+ await right.scrollIntoViewIfNeeded();await expect(right).toHaveClass(/motion-revealed/);await expect(right).toHaveCSS('animation-name','bm-reveal-right');
+ expect(await page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth)).toBeTruthy();
+ await page.emulateMedia({reducedMotion:'reduce'});await expect(left).toHaveCSS('animation-name','none');await expect(right).toHaveCSS('animation-name','none');
+});
+
+
+test('RC.10 phone-first employee layout, tablet expansion and desktop navigation',async({page})=>{
+ await page.emulateMedia({reducedMotion:'reduce'});await page.setViewportSize({width:390,height:844});await login(page,'staff');
+ const more=page.getByRole('button',{name:'Thêm',exact:true}),work=page.locator('.employee-workspace');
+ const fits=()=>page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth);
+ for(const width of [320,360,390,430]){
+  await page.setViewportSize({width,height:844});
+  expect(await fits()).toBeTruthy();
+  await expect(page.locator('.mobile-brand-logo')).toBeVisible();
+  await expect(more).toBeVisible();
+  for(const id of ['attendance-in','attendance-out']){
+   const b=await work.getByTestId(id).boundingBox();expect(b.height).toBeGreaterThanOrEqual(44);
+  }
+  await expect(work.locator('#capture-assignment')).toHaveCSS('font-size','16px');
+ }
+ await more.click();await expect(more).toHaveAttribute('aria-expanded','true');
+ await page.getByRole('heading',{name:'Ghi nhận chấm công',exact:true}).click();
+ await expect(more).toHaveAttribute('aria-expanded','false');
+ for(const size of [{width:768,height:1024},{width:820,height:1180}]){
+  await page.setViewportSize(size);expect(await fits()).toBeTruthy();
+  const a=await work.locator('.employee-checkin').boundingBox(),b=await work.locator('.employee-summary').boundingBox();
+  expect(b.x).toBeGreaterThan(a.x);expect(Math.abs(a.y-b.y)).toBeLessThan(2);
+ }
+ for(const size of [{width:1024,height:768},{width:1440,height:900},{width:1920,height:1080}]){
+  await page.setViewportSize(size);expect(await fits()).toBeTruthy();await expect(more).toBeHidden();await expect(page.getByRole('button',{name:'Lịch làm việc',exact:true})).toBeVisible();
+ }
+ await page.setViewportSize({width:844,height:390});await expect(more).toBeVisible();expect(await fits()).toBeTruthy();
+ await expect(page.locator('.employee-checkin')).toBeVisible();
+});
+
+
+test('RC.11 assembled logo and exact welcome copy work on phone, tablet and desktop',async({page})=>{
+ await page.emulateMedia({reducedMotion:'no-preference'});await page.setViewportSize({width:390,height:844});
+ await page.goto('/');
+ const intro=page.locator('#brand-intro');
+ await expect(intro.locator('.brand-piece')).toHaveCount(4);
+ await expect(intro.locator('.brand-piece-br')).toHaveCSS('animation-name','bm-piece-br');
+ await expect(intro.locator('.brand-intro-slogan')).toHaveText('Thấu hiểu điều mẹ muốn');
+ await expect(intro.locator('.brand-intro-slogan')).toHaveCSS('animation-delay','0.7s');
+ await expect(intro).toHaveCSS('pointer-events','none');
+ await expect(intro).toBeHidden({timeout:4000});
+ const welcome=page.getByRole('heading',{name:'Chào mừng bạn đến với ngôi nhà BABY MARK',exact:true});
+ for(const size of [{width:320,height:640},{width:390,height:844},{width:768,height:1024},{width:844,height:390},{width:1440,height:900}]){
+  await page.setViewportSize(size);
+  await expect(welcome).toBeVisible();
+  await expect(page.getByText('Đăng nhập để bắt đầu làm việc cùng BabyMark',{exact:true})).toBeVisible();
+  await expect(page.getByLabel('Tên đăng nhập',{exact:true})).toBeVisible();
+  await expect(page.getByLabel('Mật khẩu hoặc mã truy cập',{exact:true})).toBeVisible();
+  expect(await page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth)).toBeTruthy();
+ }
+ await page.emulateMedia({reducedMotion:'reduce'});await page.reload();
+ await expect(intro).toBeHidden();await expect(welcome).toHaveCSS('animation-name','none');
+ await page.getByLabel('Tên đăng nhập',{exact:true}).fill(username.staff);
+ await page.getByLabel('Mật khẩu hoặc mã truy cập',{exact:true}).fill(secret);
+ await page.getByTestId('login-submit').click();
+ await expect(page.getByRole('heading',{name:'Chấm công hôm nay',exact:true})).toBeVisible();
+});
+
+
+test('RC.12 official wordmark, transparent symbol and install icons load locally',async({page,request})=>{
+ await page.emulateMedia({reducedMotion:'reduce'});await page.setViewportSize({width:390,height:844});await page.goto('/');
+ await expect(page.getByRole('heading',{name:'Chào mừng bạn đến với ngôi nhà BABY MARK',exact:true})).toBeVisible();
+ const brand=page.locator('.login-mobile-brand img');
+ await expect(brand).toBeVisible();
+ await expect.poll(()=>brand.evaluate(i=>[i.complete,i.naturalWidth,i.naturalHeight])).toEqual([true,632,697]);
+ await expect(page.locator('link[rel="apple-touch-icon"]')).toHaveAttribute('sizes','180x180');
+ await expect(page.locator('meta[name="theme-color"]')).toHaveAttribute('content','#D2282F');
+ await page.setViewportSize({width:1440,height:900});
+ await expect(page.locator('.login-brand .brand-wordmark')).toBeVisible();
+ await expect.poll(()=>page.locator('.login-brand .brand-wordmark').evaluate(i=>i.complete&&i.naturalWidth>0)).toBeTruthy();
+ for(const [path,mime] of [['/brand/logo.png','image/png'],['/brand/wordmark.svg','image/svg+xml'],['/favicon-192x192.png','image/png'],['/favicon-512x512.png','image/png'],['/apple-touch-icon.png?v=3','image/png']]){
+  const r=await request.get(path);expect(r.ok()).toBeTruthy();expect(r.headers()['content-type']).toContain(mime);
+ }
+ const manifest=await (await request.get('/manifest.webmanifest?v=3')).json();
+ expect(manifest.icons.map(i=>i.sizes)).toEqual(['192x192','512x512']);
+ await login(page,'staff');
+ await expect(page.locator('.sidebar .brand-wordmark')).toBeVisible();
+});
+
+test('RC.13 admin navigation, settings tabs, KPI and quick actions have distinct functional SVGs',async({page})=>{
+ await page.emulateMedia({reducedMotion:'reduce'});await page.setViewportSize({width:1440,height:900});await login(page);
+ const unique=async selector=>{const icons=await page.locator(selector).evaluateAll(nodes=>nodes.map(n=>({name:n.dataset.icon,shape:n.innerHTML})));expect(icons.length).toBeGreaterThan(1);expect(icons.every(x=>x.name&&x.shape)).toBeTruthy();expect(new Set(icons.map(x=>x.name)).size).toBe(icons.length);expect(new Set(icons.map(x=>x.shape)).size).toBe(icons.length);};
+ await unique('#main-nav button[data-view] svg[data-icon]');
+ await unique('.overview-kpis svg[data-icon]');
+ await unique('.quick-actions svg[data-icon]');
+ await page.getByRole('button',{name:'Quản trị',exact:true}).click();
+ await expect(page.getByRole('tab',{name:'Cài đặt',exact:true})).toBeVisible();
+ await expect(page.locator('.admin-nav button[role=tab] svg[data-icon]')).toHaveCount(7);
+ await unique('.admin-nav button[role=tab] svg[data-icon]');
+ await page.getByRole('tab',{name:'Vận hành',exact:true}).click();
+ await expect(page.getByRole('tab',{name:'Vận hành',exact:true})).toHaveAttribute('aria-selected','true');
+ for(const width of [320,390,768,1440]){await page.setViewportSize({width,height:844});expect(await page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth)).toBeTruthy();}
+});
