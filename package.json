@@ -1,12 +1,13 @@
 {
   "name": "babymark-cloudflare",
-  "version": "1.1.0",
+  "version": "1.2.0-rc.13",
   "private": true,
   "type": "module",
   "engines": {
     "node": ">=22.13"
   },
   "scripts": {
+    "backup:local": "node scripts/backup-local.mjs",
     "build": "node scripts/build.mjs",
     "test": "node --test cloudflare/tests/*.test.mjs tests/*.test.mjs",
     "test:browser": "playwright test",

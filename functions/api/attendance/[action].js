@@ -1,3 +1,4 @@
+import {inAttendanceWindow} from '../../../public/attendance-window.mjs';
 import {sessionUser,reply,digest} from '../../../cloudflare/lib/auth.mjs';
 import {distanceMeters,attendanceTiming} from '../../../cloudflare/lib/timemark-layout.mjs';
 import {storeStampedPhoto} from '../../../cloudflare/lib/timemark-kv.mjs';
@@ -9,7 +10,8 @@ const fail=(status,message,code)=>{throw new HttpError(status,message,code);};
 const assignmentSQL=`SELECT a.*,b.name AS branch_name,b.code AS branch_code,b.latitude,b.longitude,b.allowed_radius,b.address_text,
  s.name AS shift_name FROM assignments a JOIN branches b ON b.id=a.branch_id JOIN shifts s ON s.id=a.shift_id WHERE a.id=? AND a.user_id=?`;
 const planHash=a=>digest(JSON.stringify([a.user_id,a.branch_id,a.branch_name,a.shift_id,a.work_date,a.starts_at,a.ends_at,a.grace_minutes,a.latitude,a.longitude,a.allowed_radius,a.address_text]));
-function openWindow(a,now){if(now<a.starts_at-4*3600000||now>a.ends_at+12*3600000)fail(409,'Ca ngoài thời gian cho phép chấm công','OUTSIDE_SHIFT_WINDOW');}
+function openWindow(a,now){if(!inAttendanceWindow(a,now))fail(409,'Ca ngoài thời gian cho phép chấm công','OUTSIDE_SHIFT_WINDOW');}
+async function rejectedExtra(db,id){const t=await db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='extra_attendance'").first();return !!t&&!!await db.prepare("SELECT 1 AS yes FROM extra_attendance WHERE assignment_id=? AND state='REJECTED'").bind(id).first();}
 async function existing(db,assignment,type){return db.prepare('SELECT * FROM attendances WHERE assignment_id=? AND type=?').bind(assignment,type).first();}
 async function prepare(request,env,user){
  const b=await jsonLimited(request);if(!b||typeof b!=='object'||!idPattern.test(b.assignment_id||'')||!['IN','OUT'].includes(b.type))fail(400,'Yêu cầu không hợp lệ');
@@ -17,6 +19,7 @@ async function prepare(request,env,user){
  if(![lat,lng,accuracy].every(Number.isFinite)||Math.abs(lat)>90||Math.abs(lng)>180||accuracy<0||accuracy>50||b.mocked===true)fail(400,'GPS phải có độ chính xác từ 0 đến 50 m','INVALID_GPS');
  const now=Date.now(),a=await env.DB.prepare(assignmentSQL).bind(b.assignment_id,user.id).first();
  if(!a)fail(404,'Không có ca được phân công');openWindow(a,now);
+ if(await rejectedExtra(env.DB,a.id))fail(409,'Ca bổ sung đã bị từ chối','EXTRA_REJECTED');
  if(await env.DB.prepare("SELECT id FROM workforce_requests WHERE assignment_id=? AND kind='LEAVE' AND state='APPROVED'").bind(a.id).first())fail(409,'Ca đã có nghỉ phép được duyệt','APPROVED_LEAVE');
  if(a.latitude==null||a.longitude==null)fail(409,'Cửa hàng chưa cấu hình GPS','BRANCH_GPS_MISSING');
  if(await existing(env.DB,a.id,b.type))fail(409,'Đã chấm công loại này; hãy kiểm tra lịch sử','ALREADY_RECORDED');
@@ -57,6 +60,7 @@ async function submit(request,env,user){
  const a=await env.DB.prepare(assignmentSQL).bind(c.assignment_id,user.id).first();
  if(!a||await planHash(a)!==c.plan_hash)fail(409,'Thông tin ca hoặc cửa hàng đã thay đổi; chụp lại','PLAN_CHANGED');
  openWindow(a,receivedAt);
+ if(await rejectedExtra(env.DB,a.id))fail(409,'Ca bổ sung đã bị từ chối','EXTRA_REJECTED');
  if(await existing(env.DB,a.id,c.type))fail(409,'Đã chấm công loại này; kiểm tra lịch sử','ALREADY_RECORDED');
  if(c.type==='OUT'&&!await existing(env.DB,a.id,'IN'))fail(409,'Cần chấm vào trước khi tan ca','IN_REQUIRED');
  const id=crypto.randomUUID(),key='timemark/'+id+'.jpg';
@@ -108,6 +112,12 @@ export async function onRequestGet({request,env,params}){
  if(!env.DB)return reply({error:'Chưa cấu hình D1'},503);
  try{
   const user=await sessionUser(request,env.DB);if(!user)return reply({error:'Chưa đăng nhập'},401);
+  if(params.action==='status'){
+   const id=new URL(request.url).searchParams.get('challenge_id');if(!idPattern.test(id||''))fail(400,'Mã yêu cầu không hợp lệ');
+   const c=await env.DB.prepare('SELECT id,state,expires_at,attendance_id FROM attendance_challenges WHERE id=? AND user_id=?').bind(id,user.id).first();if(!c)fail(404,'Không tìm thấy yêu cầu');
+   const t=c.attendance_id?await env.DB.prepare('SELECT id,assignment_id,type,server_timestamp FROM attendances WHERE id=? AND user_id=?').bind(c.attendance_id,user.id).first():null;
+   return reply({state:t?'COMPLETED':c.state==='COMPLETED'?'UNKNOWN':c.state==='READY'&&c.expires_at<=Date.now()?'EXPIRED':c.state,attendance:t,expires_at:c.expires_at});
+  }
   if(params.action!=='history')return reply({error:'Không tìm thấy API'},404);
   const u=new URL(request.url),from=u.searchParams.get('from')||new Date(Date.now()+7*3600000-31*86400000).toISOString().slice(0,10),to=u.searchParams.get('to')||new Date(Date.now()+7*3600000).toISOString().slice(0,10);
   if(!/^\d{4}-\d{2}-\d{2}$/.test(from)||!/^\d{4}-\d{2}-\d{2}$/.test(to)||from>to||Date.parse(to)-Date.parse(from)>93*86400000)fail(400,'Khoảng ngày phải trong 93 ngày');

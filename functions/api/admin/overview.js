@@ -19,7 +19,7 @@ export async function onRequestGet({request,env}){
  const by=new Map(stores.results.map(b=>[b.id,{...b,...counters(),people:0,_people:new Set()}])),totals=counters();
  const rows=data.assignments.map(a=>{
  const summary=summarizeAssignment(a,now),flags=attendanceExceptions(a,now);
- const status=a.extra_state==='REJECTED'?'rejected':a.extra_state==='PENDING'||a.request_state==='PENDING'?'pending':summary.leave?'leave':summary.outside||flags.includes('INVALID_TIME')?'review':summary.days?'completed':flags.includes('ABSENT_RECORD')?'absent':flags.includes('MISSING_OUT')?'missing_out':flags.includes('MISSING_IN')?'missing_in':a.in_at!=null&&a.out_at==null?'working':'waiting';
+ const status=a.extra_state==='REJECTED'?'rejected':a.extra_state==='PENDING'||a.request_state==='PENDING'?'pending':summary.leave?'leave':summary.outside||summary.work_unit_review||flags.includes('INVALID_TIME')?'review':summary.days?'completed':flags.includes('ABSENT_RECORD')?'absent':flags.includes('MISSING_OUT')?'missing_out':flags.includes('MISSING_IN')?'missing_in':a.in_at!=null&&a.out_at==null?'working':'waiting';
  const b=by.get(a.branch_id);
  for(const item of [b,totals].filter(Boolean)){item[status]++;if(status!=='rejected')item.scheduled++;item.late+=Number(flags.includes('LATE'));item.work_units+=summary.work_units||0;item.overtime_minutes+=summary.overtime_minutes||0;}
  if(b&&status!=='rejected')b._people.add(a.user_id);

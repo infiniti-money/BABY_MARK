@@ -9,7 +9,8 @@ export function attendanceExceptions(a,now){
  if(entry!=null&&exit==null&&now>a.ends_at)flags.push('MISSING_OUT');
  if(s.early>0)flags.push('EARLY');
  if(s.outside)flags.push('OUTSIDE');
- if(entry!=null&&exit!=null&&exit<entry)flags.push('INVALID_TIME');
+ if(s.work_unit_review)flags.push('WORK_UNIT_REVIEW');
+ if((entry==null&&exit!=null)||(entry!=null&&exit!=null&&exit<=entry))flags.push('INVALID_TIME');
  return flags;
 }
 export function groupBranchReports(rows,now){
