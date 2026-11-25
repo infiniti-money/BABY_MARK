@@ -1,5 +1,5 @@
 # Chính sách lưu trữ BABY MARK
-- KV ảnh JPEG tối đa 200 KB, ngân sách payload 900 MB, TTL tối đa 60 ngày, xóa ảnh cũ nhất khi cần chỗ. Với 50 người × 2 ảnh/ngày × 200 KB, khoảng 45 ngày. Nếu trung bình <=150 KB, có thể lưu đủ 60 ngày. Ngân sách này không bảo đảm hạn mức tài khoản vì còn overhead và namespace khác.
+- KV ảnh JPEG tối đa 200 KB, ngân sách payload 900 MB, TTL tối đa 90 ngày cho ảnh mới, xóa ảnh cũ nhất khi cần chỗ nếu eviction bật. Với 50 người × 2 ảnh/ngày × 200 KB, khoảng 45 ngày. Nếu trung bình <=100 KB, về lý thuyết có thể lưu đủ 90 ngày (không tính ca bổ sung/ảnh khác). Ngân sách này không bảo đảm hạn mức tài khoản vì còn overhead và namespace khác. Ảnh đã lưu giữ nguyên hạn D1/KV cũ; không ghi lại, gia hạn hoặc khôi phục ảnh cũ.
 - D1 giữ dữ liệu ca/chấm công trong 2 năm lịch, tính từ ngày kết thúc ca theo giờ Việt Nam. Khi quá hạn, xóa theo cả ca (IN/OUT, yêu cầu và thông báo liên quan) để báo cáo không bị mất một nửa ca. Không xóa tài khoản, cửa hàng, định nghĩa ca. Giữ yêu cầu đang chờ hoặc có hoạt động mới trong kỳ lưu; xử lý ngoại lệ trước khi xóa.
 - Ảnh hết hạn không xóa bản ghi công. Không đồng bộ xóa ảnh với cleanup 2 năm. Bản sao lưu cũng cần chính sách lưu phù hợp.
 ## Triển khai

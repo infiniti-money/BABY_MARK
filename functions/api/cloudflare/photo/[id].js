@@ -1,4 +1,5 @@
 import {sessionUser,digest} from '../../../../cloudflare/lib/auth.mjs';
+import {RETENTION_SECONDS} from '../../../../cloudflare/lib/timemark-kv.mjs';
 // Private KV photo read, authorized via D1 internal account.
 export async function onRequestGet({request,env,params}){
  const headers={'Cache-Control':'private, no-store','X-Content-Type-Options':'nosniff'};
@@ -15,7 +16,7 @@ export async function onRequestGet({request,env,params}){
  ).bind(user.id,hash,Date.now(),id).first();
  const check=record=>{
   if(!record)return fail(404,'Not found');
-  if(Date.now()>=record.server_timestamp+60*86400000||(record.photo_expires_at!=null&&Date.now()>=record.photo_expires_at)||['evicted','evicting','expired'].includes(record.photo_state))return fail(410,'Ảnh đã hết hạn hoặc đã được xóa để giải phóng dung lượng');
+  if(Date.now()>=record.server_timestamp+RETENTION_SECONDS*1000||(record.photo_expires_at!=null&&Date.now()>=record.photo_expires_at)||['evicted','evicting','expired'].includes(record.photo_state))return fail(410,'Ảnh đã hết hạn hoặc đã được xóa để giải phóng dung lượng');
   if(record.photo_state!=='stored')return fail(404,'Ảnh chưa sẵn sàng');
   return null;
  };

@@ -37,4 +37,4 @@ npm run test:browser
 - [Migration D1](cloudflare/d1/) — chỉ áp dụng migration còn thiếu, không tự chạy trên production.
 - [Lỗi còn tồn tại / phạm vi xác minh](docs/releases/v1.1.0.md).
 
-Ảnh tối đa 200 KB, KV TTL tối đa 60 ngày theo ngân sách ảnh 900 MB, có thể hết hạn sớm. Chính sách dọn bảng công và dọn dung lượng do Admin kiểm soát; không tự kích hoạt trong release. Ảnh và GPS client không chứng minh tuyệt đối sự hiện diện. Giờ máy chủ ghi nhận khi lưu; dấu giờ được cấp trước tối đa 90 giây.
+Ảnh tối đa 200 KB, KV TTL tối đa 90 ngày cho ảnh mới theo ngân sách ảnh 900 MB, có thể hết hạn sớm; ảnh cũ giữ hạn đã cấp. Chính sách dọn bảng công và dọn dung lượng do Admin kiểm soát; không tự kích hoạt trong release. Ảnh và GPS client không chứng minh tuyệt đối sự hiện diện. Giờ máy chủ ghi nhận khi lưu; dấu giờ được cấp trước tối đa 90 giây.

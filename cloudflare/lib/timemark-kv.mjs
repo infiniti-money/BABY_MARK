@@ -1,6 +1,6 @@
 // Private image storage with D1 reservations. The caller supplies client-rendered
 // bytes; this helper does not verify a visible Timemark, camera, or GPS evidence.
-export const RETENTION_SECONDS=60*86400;
+export const RETENTION_SECONDS=90*86400;
 export const MAX_IMAGE_BYTES=200000;
 export const STORAGE_BUDGET_BYTES=900000000;
 export function validatePhoto(key,bytes,capturedAt,now=Date.now()){

@@ -23,8 +23,8 @@ function namespace(){
  return {calls,async put(path,bytes,options){calls.push({action:'put',path,bytes:bytes.byteLength,...options})},async delete(path){calls.push({action:'delete',path})},async get(path){calls.push({action:'get',path});return jpeg(4)}};
 }
 
-test('200 KB decimal cap, JPEG envelope and server time; KV TTL is sixty days',()=>{
- const now=Date.now();assert.equal(validatePhoto(key,jpeg(200000),now,now),Math.floor(now/1000)+RETENTION_SECONDS);assert.equal(MAX_IMAGE_BYTES,200000);
+test('200 KB decimal cap, JPEG envelope and server time; KV TTL is exactly ninety days',()=>{
+ const now=Date.now();assert.equal(validatePhoto(key,jpeg(200000),now,now),Math.floor(now/1000)+RETENTION_SECONDS);assert.equal(MAX_IMAGE_BYTES,200000);assert.equal(RETENTION_SECONDS,90*86400);
  assert.throws(()=>validatePhoto(key,jpeg(200001),now,now),/INVALID_IMAGE_SIZE/);
  assert.throws(()=>validatePhoto(key,new ArrayBuffer(4),now,now),/INVALID_JPEG/);
  assert.throws(()=>validatePhoto('../photo.jpg',jpeg(4),now,now),/INVALID_KEY/);
@@ -119,4 +119,22 @@ test('concurrent storage attempts serialize through D1 without duplicate reserva
   releasePut();await first;
   assert.equal(inventory(db,key).state,'stored');assert.equal(kv.calls.length,1);assert.equal(usage(db),4);
  }finally{releasePut();db.close()}
+});
+
+test('new 90-day photo is readable after day 60; legacy expiry and capacity state still control access',async()=>{
+ const db=await createD1(),kv=namespace(),now=Date.now(),DAY=86400000;try{
+  db.sqlite.prepare("INSERT INTO profiles(id,employee_code,full_name,role) VALUES('staff','BM001','Nhân viên','staff')").run();
+  db.sqlite.prepare("INSERT INTO credentials(user_id,username,salt,secret_hash,created_at,updated_at) VALUES('staff','staff',?,?,?,?)").run('a'.repeat(32),'b'.repeat(64),now,now);
+  const token='f'.repeat(64);db.sqlite.prepare("INSERT INTO sessions(token_hash,user_id,credential_version,created_at,expires_at) VALUES(?,'staff',1,?,?)").run(await digest('babymark-session-v1:'+token),now,now+3600000);
+  db.sqlite.prepare("INSERT INTO shifts(id,name,start_time,end_time) VALUES('shift','Ca','08:00','16:00')").run();
+  for(const [i,age,ttl,state,expected] of [[1,75,90,'stored',200],[2,76,60,'stored',410],[3,91,90,'stored',410],[4,77,90,'evicted',410]]){
+   const timestamp=now-age*DAY,assignment='assignment-'+i,id='attendance-'+i,path=pathFor(i),day=new Date(timestamp+7*3600000).toISOString().slice(0,10);
+   db.sqlite.prepare("INSERT INTO assignments(id,user_id,branch_id,shift_id,work_date,starts_at,ends_at) VALUES(?,'staff','BM-001','shift',?,?,?)").run(assignment,day,timestamp-3600000,timestamp+3600000);
+   db.sqlite.prepare("INSERT INTO photo_inventory(photo_path,byte_size,captured_at,expires_at,state) VALUES(?,4,?,?,?)").run(path,timestamp,timestamp+ttl*DAY,state);
+   db.sqlite.prepare("INSERT INTO attendances(id,assignment_id,user_id,type,server_timestamp,gps_lat,gps_lng,accuracy_m,distance_m,photo_path,status) VALUES(?,?,'staff','IN',?,0,0,5,0,?,'ON_TIME')").run(id,assignment,timestamp,path);
+   const response=await readPhoto({request:new Request('https://test.invalid/api/cloudflare/photo/'+id,{headers:{authorization:'Bearer '+token}}),env:{DB:db,TIMEMARKS:kv},params:{id}});
+   assert.equal(response.status,expected,'age '+age+' TTL '+ttl+' state '+state);
+  }
+  assert.deepEqual(kv.calls.map(x=>x.path),[pathFor(1)]);
+ }finally{db.close()}
 });
