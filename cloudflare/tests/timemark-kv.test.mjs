@@ -127,7 +127,7 @@ test('new 90-day photo is readable after day 60; legacy expiry and capacity stat
   db.sqlite.prepare("INSERT INTO credentials(user_id,username,salt,secret_hash,created_at,updated_at) VALUES('staff','staff',?,?,?,?)").run('a'.repeat(32),'b'.repeat(64),now,now);
   const token='f'.repeat(64);db.sqlite.prepare("INSERT INTO sessions(token_hash,user_id,credential_version,created_at,expires_at) VALUES(?,'staff',1,?,?)").run(await digest('babymark-session-v1:'+token),now,now+3600000);
   db.sqlite.prepare("INSERT INTO shifts(id,name,start_time,end_time) VALUES('shift','Ca','08:00','16:00')").run();
-  for(const [i,age,ttl,state,expected] of [[1,75,90,'stored',200],[2,75,60,'stored',410],[3,91,90,'stored',410],[4,75,90,'evicted',410]]){
+  for(const [i,age,ttl,state,expected] of [[1,75,90,'stored',200],[2,76,60,'stored',410],[3,91,90,'stored',410],[4,77,90,'evicted',410]]){
    const timestamp=now-age*DAY,assignment='assignment-'+i,id='attendance-'+i,path=pathFor(i),day=new Date(timestamp+7*3600000).toISOString().slice(0,10);
    db.sqlite.prepare("INSERT INTO assignments(id,user_id,branch_id,shift_id,work_date,starts_at,ends_at) VALUES(?,'staff','BM-001','shift',?,?,?)").run(assignment,day,timestamp-3600000,timestamp+3600000);
    db.sqlite.prepare("INSERT INTO photo_inventory(photo_path,byte_size,captured_at,expires_at,state) VALUES(?,4,?,?,?)").run(path,timestamp,timestamp+ttl*DAY,state);
