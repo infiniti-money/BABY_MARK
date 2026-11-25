@@ -52,7 +52,7 @@ function notify(message,error=false) {
   clearTimeout(noticeTimer); noticeTimer=setTimeout(()=>el.hidden=true,error?10000:5500);
 }
 function setSession(session) {
-  stopCamera();closeModal();resetChat();
+  stopCamera();closeModal();resetChat();recoveryBusy=null;
   state.sessionEpoch++;state.renderId++;
   state.token=session?.token||null;cameraFacing='user';adminList={tab:'',search:'',page:1};viewFilters={};listState=null;state.filters=defaultFilters();state.view='today';state.adminTab='employees';
   overviewDay='';overviewBranch='';overviewStatus='';state.overview=null;state.assignments=[];state.attendances=[];state.admin={};state.reports=[];state.reportData=null;state.requests=[];state.handover=null;state.extra=null;state.payrollData=null;state.payrollMonth=null;state.payrollRevision=null;
@@ -102,7 +102,7 @@ function stopCamera() {
   const stop=$('[data-action="camera-stop"]');if(stop)stop.hidden=true;
 }
 function clearPhotos() { photoURLs.forEach(URL.revokeObjectURL); photoURLs=[]; }
-let pendingCapture=null,confirmationTimer=null,recoveryBusy=false;
+let pendingCapture=null,confirmationTimer=null,recoveryBusy=null;
 const recoveryMemory=new Map(),RECOVERY_PREFIX='babymark-attendance-recovery:';
 const recoveryKey=()=>state.user?.id?RECOVERY_PREFIX+state.user.id:null;
 const validRecovery=r=>r&&typeof r.challenge_id==='string'&&/^[0-9a-f-]{36}$/i.test(r.challenge_id)&&typeof r.assignment_id==='string'&&/^[0-9a-f-]{36}$/i.test(r.assignment_id)&&['IN','OUT'].includes(r.type);
@@ -141,14 +141,14 @@ function syncCaptureControls(){
 async function checkCapture(cancel=false){
  const p=pendingCapture,r=p?{challenge_id:p.prepared.challenge_id,assignment_id:p.assignment_id,type:p.type}:recoveryRecord();
  if(!r||recoveryBusy||p?.sending||p?.checking)return;
- const epoch=state.sessionEpoch;
- if(p)p.checking=true;recoveryBusy=true;syncCaptureControls();drawRecovery();
+ const epoch=state.sessionEpoch,run={};
+ if(p)p.checking=true;recoveryBusy=run;syncCaptureControls();drawRecovery();
  try{
   const d=await api(cancel?'/api/attendance/cancel':'/api/attendance/status?'+query({challenge_id:r.challenge_id}),cancel?{method:'POST',body:{challenge_id:r.challenge_id},timeout:20000}:{timeout:20000});
   if(epoch!==state.sessionEpoch||p&&p!==pendingCapture)return;
   if(d?.attendance?.id&&d.attendance.assignment_id===r.assignment_id&&d.attendance.type===r.type){
    clearRecovery(r.challenge_id);if(p){p.checking=false;p.terminal=true;closeModal();}
-   recoveryBusy=false;notify('Máy chủ đã ghi nhận '+dt(d.attendance.server_timestamp)+'. Không cần chụp lại.');await navigate('today');return;
+   if(recoveryBusy===run)recoveryBusy=null;notify('Máy chủ đã ghi nhận '+dt(d.attendance.server_timestamp)+'. Không cần chụp lại.');await navigate('today');return;
   }
   let message;
   if(d?.state==='FAILED'&&!d.attendance){
@@ -161,10 +161,10 @@ async function checkCapture(cancel=false){
    if(p)p.uncertain=true;
    message=d?.state==='EXPIRED'?'Ảnh hết hạn. Hủy yêu cầu chưa xử lý trước khi chụp mới.':'Chưa xác minh được kết quả. Không chụp lại; kiểm tra trạng thái hoặc liên hệ quản trị.';
   }
-  drawRecovery();const e=p?$('[data-confirm-error]'):$('[data-recovery-message]');if(e){e.hidden=false;e.textContent=message;}
+  drawRecovery();const e=p?$('[data-confirm-error]'):$('[data-recovery-message]');if(e){e.hidden=false;e.textContent=message;}else notify(message);
  }catch(e){
   if(epoch===state.sessionEpoch){if(p===pendingCapture&&p)p.uncertain=true;const el=p?$('[data-confirm-error]'):$('[data-recovery-message]');if(el){el.hidden=false;el.textContent=e.message+' Chưa thể xác minh; không chụp lại.';}else notify(e.message,true);}
- }finally{recoveryBusy=false;if(p===pendingCapture&&p)p.checking=false;if(epoch===state.sessionEpoch){syncCaptureControls();cameraControls();document.querySelectorAll('[data-action="capture-recover"],[data-action="capture-recover-cancel"]').forEach(b=>b.disabled=false);}}
+ }finally{if(recoveryBusy===run)recoveryBusy=null;if(p===pendingCapture&&p)p.checking=false;if(epoch===state.sessionEpoch){syncCaptureControls();cameraControls();document.querySelectorAll('[data-action="capture-recover"],[data-action="capture-recover-cancel"]').forEach(b=>b.disabled=!!recoveryBusy);}}
 }
 function closeModal() { clearPrint();pendingCapture=null;clearInterval(confirmationTimer);confirmationTimer=null;modalTicket++;modal.close(); modal.innerHTML=''; clearPhotos(); }
 function showModal(title,body) {
@@ -1057,5 +1057,5 @@ async function boot(){
   try{state.user=(await api('/api/auth/me')).user;await navigate(landing());}
   catch(e){if(e.status===401||e.status===403){setSession(null);renderLogin(e.message);}else{app.innerHTML='<main class="login-panel"><section class="login-box"><h2>Chưa thể kết nối BABY MARK</h2><p class="muted">Phiên đã lưu chưa bị xóa. Kiểm tra mạng và thử lại.</p><button class="btn" data-action="session-retry">Thử lại</button><button class="btn secondary" data-action="logout">Đăng xuất</button></section></main>';}}
 }
-window.addEventListener('storage',event=>{if(event.key!==SESSION_KEY&&event.key!==null)return;if(!state.token)return;let old=null;try{old=JSON.parse(event.oldValue||'null');}catch{}if(event.key!==null&&old?.token!==state.token)return;state.user=null;stopCamera();closeModal();resetChat();state.sessionEpoch++;state.renderId++;state.token=null;overviewDay='';overviewBranch='';overviewStatus='';state.overview=null;state.assignments=[];state.attendances=[];state.admin={};state.reports=[];state.reportData=null;state.requests=[];state.handover=null;state.extra=null;state.payrollData=null;state.payrollMonth=null;state.payrollRevision=null;viewFilters={};state.filters=defaultFilters();state.adminTab='employees';try{sessionStorage.removeItem(SESSION_KEY)}catch{}renderLogin('Phiên trên thiết bị đã thay đổi. Vui lòng mở lại ứng dụng hoặc đăng nhập.');});
+window.addEventListener('storage',event=>{if(event.key!==SESSION_KEY&&event.key!==null)return;if(!state.token)return;let old=null;try{old=JSON.parse(event.oldValue||'null');}catch{}if(event.key!==null&&old?.token!==state.token)return;state.user=null;stopCamera();closeModal();resetChat();recoveryBusy=null;state.sessionEpoch++;state.renderId++;state.token=null;overviewDay='';overviewBranch='';overviewStatus='';state.overview=null;state.assignments=[];state.attendances=[];state.admin={};state.reports=[];state.reportData=null;state.requests=[];state.handover=null;state.extra=null;state.payrollData=null;state.payrollMonth=null;state.payrollRevision=null;viewFilters={};state.filters=defaultFilters();state.adminTab='employees';try{sessionStorage.removeItem(SESSION_KEY)}catch{}renderLogin('Phiên trên thiết bị đã thay đổi. Vui lòng mở lại ứng dụng hoặc đăng nhập.');});
 await boot();

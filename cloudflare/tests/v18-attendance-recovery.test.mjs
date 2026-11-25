@@ -40,3 +40,16 @@ test('RC15 cancel/submit race never creates a second attendance or overwrites an
  assert.equal(n,b.status===201?1:0);assert.equal(d.state,n?'COMPLETED':'FAILED');
  assert.equal(f.objects.size,n);
  }finally{f.close()}});
+
+test('RC15 expired unused challenge can be cancelled, orphan COMPLETED is UNKNOWN, no false success',async()=>{const f=await appFixture();try{
+ const id=await prepare(f);
+ await f.db.prepare('UPDATE attendance_challenges SET expires_at=? WHERE id=?').bind(Date.now()-1,id).run();
+ assert.equal((await (await status(f,id)).json()).state,'EXPIRED');
+ assert.equal((await (await cancel(f,id)).json()).state,'FAILED');
+ const orphan=await prepare(f);
+ await f.db.prepare("UPDATE attendance_challenges SET state='COMPLETED' WHERE id=?").bind(orphan).run();
+ assert.equal((await (await status(f,orphan)).json()).state,'UNKNOWN');
+ assert.equal((await (await cancel(f,orphan)).json()).state,'UNKNOWN');
+ assert.equal((await f.db.prepare('SELECT count(*) AS n FROM attendances').first()).n,0);
+ assert.equal(f.objects.size,0);
+ }finally{f.close()}});
