@@ -35,3 +35,28 @@ test('mobile thread list leaves unseen messages unread and keeps private drafts 
  expect(await page.evaluate(()=>[localStorage,sessionStorage].some(store=>Object.values(store).some(value=>typeof value==='string'&&value.includes('Bản nháp riêng'))))).toBe(false);
  await page.locator('[data-action="mobile-menu"]').click();await page.locator('#navigation-menu [data-action="logout"]').click();await expect(page.getByTestId('login-submit')).toBeVisible();await login(page,'staff');await open(page,'messages');await page.locator('[data-action="chat-open"][data-id="'+first+'"]').click();await expect(page.locator('[data-form="chat-send"] textarea')).toBeEmpty();expect(sends).toBe(0);
 });
+
+test('floating iOS-style dock has four touch targets, inset edges and room below content',async({page})=>{
+ await page.emulateMedia({reducedMotion:'reduce'});
+ await login(page,'staff');
+ const dock=page.locator('.sidebar'),nav=page.locator('#main-nav');
+ for(const viewport of [{width:320,height:640},{width:375,height:812},{width:390,height:844},{width:430,height:932},{width:844,height:390}]){
+  await page.setViewportSize(viewport);
+  const geometry=await dock.evaluate(el=>{
+   const r=el.getBoundingClientRect(),s=getComputedStyle(el),buttons=[...el.querySelectorAll('#main-nav button')].filter(b=>getComputedStyle(b).display!=='none');
+   return {left:r.left,right:r.right,bottom:r.bottom,height:r.height,radius:parseFloat(s.borderRadius),position:s.position,
+    reserve:parseFloat(getComputedStyle(document.querySelector('.workspace')).paddingBottom),
+    targets:buttons.map(b=>{const q=b.getBoundingClientRect(),icon=b.querySelector('.icon').getBoundingClientRect();return {x:q.x,right:q.right,w:q.width,h:q.height,iconW:icon.width,iconH:icon.height};})};
+  });
+  expect(geometry.position).toBe('fixed');expect(geometry.left).toBeGreaterThanOrEqual(8);expect(geometry.right).toBeLessThanOrEqual(viewport.width-8);
+  expect(geometry.bottom).toBeLessThanOrEqual(viewport.height-5);expect(geometry.radius).toBeGreaterThanOrEqual(20);
+  expect(geometry.reserve).toBeGreaterThanOrEqual(geometry.height+viewport.height-geometry.bottom);
+  expect(geometry.targets).toHaveLength(4);
+  for(const t of geometry.targets){expect(t.w).toBeGreaterThanOrEqual(44);expect(t.h).toBeGreaterThanOrEqual(44);expect(t.iconW).toBeGreaterThanOrEqual(32);expect(t.iconH).toBeGreaterThanOrEqual(32);}
+  const sorted=[...geometry.targets].sort((a,b)=>a.x-b.x);for(let i=1;i<sorted.length;i++)expect(sorted[i].x).toBeGreaterThanOrEqual(sorted[i-1].right-1);
+  expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1)).toBe(true);
+ }
+ await page.setViewportSize({width:390,height:844});await nav.locator('[data-view="schedule"]').click();await expect(nav.locator('[data-view="schedule"]')).toHaveAttribute('aria-current','page');
+ await nav.locator('[data-action="mobile-menu"]').click();await expect(page.locator('#navigation-menu')).toBeVisible();await page.keyboard.press('Escape');
+ await page.setViewportSize({width:1440,height:900});await expect(nav.locator('[data-action="mobile-menu"]')).toBeHidden();await expect(nav.locator('[data-view="schedule"]')).toBeVisible();
+});

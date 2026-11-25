@@ -743,3 +743,49 @@ td,th{overflow-wrap:anywhere}
  .table-wrap .responsive-table td[data-label] .tag .icon{flex-shrink:0}
  .table-wrap .responsive-table td[data-label] small{font-size:12px;line-height:1.5}
 }
+
+/* Floating home-screen-inspired dock: inset glass, rounded app tiles and
+   four role-scoped actions. No change to the desktop navigation or permissions. */
+@media screen and (max-width:900px){
+ :root{--bottom-nav:116px;--dock-edge:12px;--dock-bottom:10px}
+ .shell .sidebar,.shell .sidebar.menu-open{
+  position:fixed;inset:auto max(var(--dock-edge),env(safe-area-inset-right)) calc(var(--dock-bottom) + env(safe-area-inset-bottom)) max(var(--dock-edge),env(safe-area-inset-left));
+  width:auto;max-width:520px;height:auto;max-height:none;margin:0 auto;padding:6px;
+  border:1px solid rgba(255,255,255,.92);border-radius:28px;
+  background:#f6edf1;box-shadow:0 8px 28px rgba(68,34,50,.16),0 1px 2px rgba(68,34,50,.08);
+  overflow:visible;z-index:20;
+ }
+ .shell .sidebar .nav{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:3px;align-items:stretch;overflow:visible}
+ .shell .sidebar .nav button{position:relative;display:flex;flex-direction:column;align-items:center;justify-content:flex-start;gap:4px;min-width:0;min-height:78px;max-width:100%;padding:5px 2px 4px;border:1px solid transparent;border-radius:21px;background:transparent;box-shadow:none;color:#59414d;text-align:center;line-height:1.2;font-size:11px;white-space:normal}
+ .shell .sidebar .nav button.extra-nav,.shell .sidebar.menu-open .nav button.extra-nav{display:none}
+ .shell .sidebar .nav button .icon{display:block;box-sizing:border-box;flex:0 0 43px;width:43px;height:43px;padding:10px;border:1px solid rgba(115,68,86,.12);border-radius:14px;background:linear-gradient(155deg,#fff,#f1e3e9);color:#754858;box-shadow:0 2px 5px rgba(83,39,57,.1);stroke-width:1.9}
+ .shell .sidebar .nav button span{display:block;max-width:100%;min-width:0;overflow-wrap:anywhere;font-weight:650;animation:none}
+ .shell .sidebar .nav button.active,.shell .sidebar .nav button[aria-current=page]{color:#88223b;background:rgba(255,255,255,.62);border-color:rgba(153,52,78,.14);box-shadow:none}
+ .shell .sidebar .nav button.active .icon,.shell .sidebar .nav button[aria-current=page] .icon{background:linear-gradient(145deg,#e54853,#b81f36);border-color:#b81f36;color:#fff;box-shadow:0 3px 8px rgba(166,32,55,.22)}
+ .shell .sidebar .nav button:focus-visible{outline-offset:1px}
+ .shell .workspace{padding-bottom:calc(var(--bottom-nav) + env(safe-area-inset-bottom))}
+ html{scroll-padding-bottom:calc(var(--bottom-nav) + env(safe-area-inset-bottom) + 12px)}
+ .notice{bottom:calc(var(--bottom-nav) + env(safe-area-inset-bottom) + 8px)}
+ .navigation-sheet{border-radius:28px 28px 0 0}
+ @supports ((-webkit-backdrop-filter:blur(1px)) or (backdrop-filter:blur(1px))){
+  .shell .sidebar,.shell .sidebar.menu-open{background:rgba(250,242,247,.83);-webkit-backdrop-filter:blur(18px) saturate(145%);backdrop-filter:blur(18px) saturate(145%)}
+ }
+}
+@media screen and (max-width:360px){
+ .shell .sidebar .nav button{font-size:10px}
+ .shell .sidebar .nav button .icon{width:39px;height:39px;flex-basis:39px;padding:9px}
+}
+@media screen and (max-width:900px) and (orientation:landscape) and (max-height:500px){
+ :root{--bottom-nav:78px;--dock-bottom:6px}
+ .shell .sidebar,.shell .sidebar.menu-open{max-width:580px;border-radius:23px;padding:4px}
+ .shell .sidebar .nav button{min-height:48px;flex-direction:row;justify-content:center;gap:6px;padding:3px 4px;font-size:11px;border-radius:16px}
+ .shell .sidebar .nav button .icon{width:34px;height:34px;flex:0 0 34px;padding:7px;border-radius:11px}
+}
+@media screen and (max-width:900px) and (prefers-reduced-transparency:reduce){
+ .shell .sidebar,.shell .sidebar.menu-open{background:#fff;-webkit-backdrop-filter:none;backdrop-filter:none;border-color:#d8c3cd}
+}
+@media screen and (max-width:900px) and (forced-colors:active){
+ .shell .sidebar,.shell .sidebar.menu-open{background:Canvas;color:CanvasText;box-shadow:none;border-color:CanvasText;-webkit-backdrop-filter:none;backdrop-filter:none}
+ .shell .sidebar .nav button,.shell .sidebar .nav button .icon{background:Canvas;color:CanvasText;border-color:CanvasText;box-shadow:none}
+ .shell .sidebar .nav button.active,.shell .sidebar .nav button.active .icon{background:Highlight;color:HighlightText;border-color:Highlight}
+}
