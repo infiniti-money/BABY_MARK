@@ -1,6 +1,6 @@
 {
   "name": "babymark-cloudflare",
-  "version": "1.2.0-rc.5",
+  "version": "1.2.0-rc.6",
   "private": true,
   "type": "module",
   "engines": {

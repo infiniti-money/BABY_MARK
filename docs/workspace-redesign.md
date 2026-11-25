@@ -8,3 +8,6 @@ Giao diện dùng logo và sắc hồng rượu vang BABY MARK, bảng điều k
 - Tổng quan dùng vùng lưới có chủ đích: điều hành và KPI toàn chiều ngang, phân bố ca và việc cần xử lý cạnh nhau trên desktop đủ rộng, bảng chấm công trước danh sách cửa hàng. Không kéo giãn thẻ theo chiều cao của khối dài.
 - Tận dụng chiều rộng làm việc; giảm đệm header, form, thẻ, menu; lưới KPI và cửa hàng thích ứng kích thước màn hình. Danh sách chờ duyệt dài thu gọn bằng details có số mục, có vùng cuộn khi mở; nút mở danh sách đầy đủ luôn hiện.
 - Giữ vùng chạm 44px cho thao tác cảm ứng, cột bảng responsive và in A4/POS. Kiểm thử năm chiều rộng, xác minh không có hàng nửa trống ở các vùng bắt buộc toàn chiều ngang. Không thay đổi API/schema.
+
+## RC.6 màn hình nhân viên/quản lý tự chấm công
+Chọn ca và thao tác vào/ra đặt trên cùng. Camera chưa bật chỉ chiếm thẻ nhỏ, khi bật mở khung xem trực tiếp; giữ nguyên mã kiểm tra camera/GPS/Timemark và xác nhận ảnh. Tóm tắt 5 chỉ số gọn, phân biệt đủ lượt với đủ công. Tiện ích ngoài lịch, kết quả duyệt, xin nghỉ/điều chỉnh, bàn giao, tin nhắn và thiết bị tập trung một khu vực; hướng dẫn mở khi cần. Không đổi phân quyền hay điều kiện ghi nhận công. Kiểm thử 320/390/768/1440px, thứ tự khối và kích thước camera đóng/mở.

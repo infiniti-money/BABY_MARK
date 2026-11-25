@@ -531,3 +531,25 @@ test('RC.5 compact overview uses full rows and keeps all quick actions accessibl
  }
  await expect(grid.getByRole('button',{name:'Mở danh sách yêu cầu',exact:true})).toBeVisible();
 });
+
+test('RC.6 employee capture comes first, idle camera is compact, live preview expands',async({page})=>{
+ await page.setViewportSize({width:390,height:844});await login(page,'staff');
+ const work=page.locator('.employee-workspace'),camera=work.locator('.employee-camera');
+ await expect(work.getByLabel('Chọn ca làm')).toBeVisible();
+ await expect(work.getByTestId('attendance-in')).toBeVisible();
+ const idle=await camera.evaluate(el=>el.getBoundingClientRect().height);
+ expect(idle).toBeLessThan(190);
+ const order=await work.evaluate(el=>{const top=s=>el.querySelector(s).getBoundingClientRect().top;return top('.employee-checkin')<top('.employee-summary')&&top('.employee-summary')<top('.employee-shifts')&&top('.employee-shifts')<top('.employee-tools')});
+ expect(order).toBeTruthy();
+ await expect(work.getByRole('button',{name:'Kết quả duyệt của tôi',exact:true})).toBeVisible();
+ await expect(work.getByRole('button',{name:'Xin nghỉ / điều chỉnh',exact:true})).toBeVisible();
+ for(const width of [320,390,768,1440]){
+  await page.setViewportSize({width,height:844});
+  expect(await page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth)).toBeTruthy();
+ }
+ await page.setViewportSize({width:390,height:844});
+ await work.getByRole('button',{name:'Bật camera',exact:true}).click();
+ await expect.poll(()=>camera.evaluate(el=>el.getBoundingClientRect().height)).toBeGreaterThan(idle+50);
+ await work.getByRole('button',{name:'Tắt camera',exact:true}).click();
+ await expect.poll(()=>camera.evaluate(el=>el.getBoundingClientRect().height)).toBeLessThan(190);
+});
