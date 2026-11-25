@@ -714,3 +714,38 @@ test('RC.14 frosted surfaces keep navigation, camera and print readable',async({
  await page.emulateMedia({media:'print'});
  expect(await page.evaluate(()=>getComputedStyle(document.documentElement).getPropertyValue('--glass-panel').trim())).toBe('');
 });
+
+test('RC.15 500 and lost response lock repeat capture; reload recovers committed attendance',async({page,request})=>{
+ const admin=await apiToken(request,'admin'),employee=await disposableAccount(request,admin,'test-recovery');
+ const now=Date.now(),start=now-3600000,end=now+7200000,clock=t=>new Intl.DateTimeFormat('en-GB',{timeZone:'Asia/Ho_Chi_Minh',hour:'2-digit',minute:'2-digit',hourCycle:'h23'}).format(t);
+ const shift=await request.post('/api/admin/shifts',{headers:auth(admin),data:{name:'Ca phục hồi '+now,start_time:clock(start),end_time:clock(end),grace_period:5}});
+ expect(shift.status()).toBe(201);
+ const assignment=await request.post('/api/admin/assignments',{headers:auth(admin),data:{user_id:employee.id,branch_id:'BM-001',shift_id:(await shift.json()).id,work_date:dayVN(start)}});
+ expect(assignment.status()).toBe(201);
+ await loginAccount(page,employee.username,employee.secret);
+ await page.getByRole('button',{name:'Bật camera',exact:true}).click();
+ await expect.poll(()=>page.locator('#camera').evaluate(v=>v.videoWidth>0&&v.readyState>=2)).toBeTruthy();
+ await page.getByTestId('attendance-in').click();
+ await expect(page.getByRole('heading',{name:'Xác nhận ảnh chấm công',exact:true})).toBeVisible({timeout:30000});
+ let submissions=0;
+ await page.route('**/api/attendance/submit',async route=>{
+  submissions++;
+  if(submissions===1)return route.fulfill({status:500,contentType:'application/json',body:JSON.stringify({error:'Lỗi giả lập'})});
+  const accepted=await route.fetch();expect(accepted.status()).toBe(201);await route.abort('failed');
+ });
+ const confirm=page.getByRole('button',{name:'Xác nhận chấm công',exact:true}),retake=page.getByRole('button',{name:'Chụp lại',exact:true});
+ await confirm.click();await expect(page.locator('[data-confirm-error]')).toContainText('Kiểm tra trạng thái');
+ await expect(confirm).toBeDisabled();await expect(retake).toBeDisabled();
+ await page.getByRole('button',{name:'Kiểm tra trạng thái',exact:true}).click();
+ await expect(confirm).toBeEnabled();await expect(retake).toBeDisabled();
+ await confirm.click();await expect(confirm).toBeDisabled();await expect(page.locator('[data-confirm-error]')).toContainText('Kiểm tra trạng thái');
+ expect(submissions).toBe(2);await page.reload();
+ await expect(page.getByRole('button',{name:'Kiểm tra yêu cầu trước',exact:true})).toBeVisible();
+ await expect(page.getByTestId('attendance-in')).toBeDisabled();
+ await page.getByRole('button',{name:'Kiểm tra yêu cầu trước',exact:true}).click();
+ await expect(page.locator('[data-capture-recovery]')).toBeHidden();
+ await expect(page.locator('#notice')).toContainText('Máy chủ đã ghi nhận');
+ const token=(await (await request.post('/api/auth/login',{data:{username:employee.username,secret:employee.secret}})).json()).token;
+ const history=await (await request.get('/api/attendance/history?from='+dayVN(start)+'&to='+dayVN(end),{headers:auth(token)})).json();
+ expect(history.attendances.filter(a=>a.type==='IN')).toHaveLength(1);
+});

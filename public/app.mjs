@@ -60,23 +60,28 @@ function setSession(session) {
   try{localStorage.removeItem(SESSION_KEY);}catch{}
   if(session){if(session.remember){try{localStorage.setItem(SESSION_KEY,JSON.stringify(session));return;}catch{}}try{sessionStorage.setItem(SESSION_KEY,JSON.stringify(session));}catch{}}
 }
-async function api(path,{body,method='GET',raw=false}={}) {
+async function api(path,{body,method='GET',raw=false,timeout=0}={}) {
   const epoch=state.sessionEpoch;
   const headers = new Headers();
   if (state.token) headers.set('Authorization',`Bearer ${state.token}`);
   if (body && !(body instanceof FormData)) { headers.set('Content-Type','application/json'); body=JSON.stringify(body); }
-  let response;try{response=await fetch(path,{method,headers,body,cache:'no-store',credentials:'same-origin'});}catch{const e=new Error('Mất kết nối hoặc máy chủ chưa phản hồi. Kiểm tra mạng và lịch sử trước khi gửi lại.');e.network=true;throw e;}
-  if(epoch!==state.sessionEpoch)throw new Error('Tài khoản đã thay đổi. Vui lòng thử lại trong phiên hiện tại.');
-  if (!response.ok) {
-    const result = await response.json().catch(()=>({}));
+  const controller=timeout?new AbortController():null;
+  const timer=controller?setTimeout(()=>controller.abort(),timeout):null;
+  const networkError=()=>Object.assign(new Error('Mất kết nối hoặc máy chủ chưa phản hồi. Kiểm tra trạng thái trước khi gửi lại.'),{network:true});
+  try{
+   let response;try{response=await fetch(path,{method,headers,body,cache:'no-store',credentials:'same-origin',signal:controller?.signal});}catch{throw networkError();}
+   if(epoch!==state.sessionEpoch)throw new Error('Tài khoản đã thay đổi. Vui lòng thử lại trong phiên hiện tại.');
+   if(!response.ok){
+    const result=await response.json().catch(()=>({}));
     if(epoch!==state.sessionEpoch)throw new Error('Tài khoản đã thay đổi. Vui lòng thử lại trong phiên hiện tại.');
-    if (response.status===401 && state.user) { stopCamera(); state.user=null; setSession(null); renderLogin('Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.'); }
-    const error=new Error(result.error||`Không thể xử lý yêu cầu (${response.status}).`);error.status=response.status;throw error;
-  }
-  if(raw)return response;
-  const data=await response.json();
-  if(epoch!==state.sessionEpoch)throw new Error('Tài khoản đã thay đổi. Vui lòng thử lại trong phiên hiện tại.');
-  return data;
+    if(response.status===401&&state.user){stopCamera();state.user=null;setSession(null);renderLogin('Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.');}
+    throw Object.assign(new Error(typeof result?.error==='string'?result.error:`Không thể xử lý yêu cầu (${response.status}).`),{status:response.status,code:result?.code});
+   }
+   if(raw)return response;
+   let data;try{data=await response.json();}catch{throw networkError();}
+   if(epoch!==state.sessionEpoch)throw new Error('Tài khoản đã thay đổi. Vui lòng thử lại trong phiên hiện tại.');
+   return data;
+  }finally{clearTimeout(timer);}
 }
 const query = values => new URLSearchParams(Object.entries(values).filter(([,v])=>v!==''&&v!=null)).toString();
 const dateFilters = () => ({from:state.filters.from,to:state.filters.to});
@@ -97,7 +102,70 @@ function stopCamera() {
   const stop=$('[data-action="camera-stop"]');if(stop)stop.hidden=true;
 }
 function clearPhotos() { photoURLs.forEach(URL.revokeObjectURL); photoURLs=[]; }
-let pendingCapture=null,confirmationTimer=null;
+let pendingCapture=null,confirmationTimer=null,recoveryBusy=false;
+const recoveryMemory=new Map(),RECOVERY_PREFIX='babymark-attendance-recovery:';
+const recoveryKey=()=>state.user?.id?RECOVERY_PREFIX+state.user.id:null;
+const validRecovery=r=>r&&typeof r.challenge_id==='string'&&/^[0-9a-f-]{36}$/i.test(r.challenge_id)&&typeof r.assignment_id==='string'&&/^[0-9a-f-]{36}$/i.test(r.assignment_id)&&['IN','OUT'].includes(r.type);
+function recoveryRecord(){
+ const key=recoveryKey();if(!key)return null;
+ if(recoveryMemory.has(key))return recoveryMemory.get(key);
+ try{const r=JSON.parse(sessionStorage.getItem(key)||'null');if(validRecovery(r)){recoveryMemory.set(key,r);return r;}}catch{}
+ return null;
+}
+function saveRecovery(p){
+ const key=recoveryKey();if(!key)return;
+ const r={challenge_id:p.prepared.challenge_id,assignment_id:p.assignment_id,type:p.type};
+ recoveryMemory.set(key,r);
+ try{sessionStorage.setItem(key,JSON.stringify(r));}catch{notify('Thiết bị không lưu được mã phục hồi. Không tải lại trang cho đến khi kiểm tra kết quả.',true);}
+}
+function clearRecovery(id){
+ const key=recoveryKey();if(!key||recoveryRecord()?.challenge_id!==id)return;
+ recoveryMemory.delete(key);try{sessionStorage.removeItem(key);}catch{}
+}
+function drawRecovery(){
+ const host=$('[data-capture-recovery]'),r=recoveryRecord();if(!host)return;
+ host.hidden=!r;
+ host.innerHTML=r?`<p>Chưa xác định kết quả ${r.type==='IN'?'vào ca':'tan ca'} trước đó. Không chụp mới cho đến khi xác minh.</p><div class="modal-actions"><button class="btn secondary" data-action="capture-recover" ${recoveryBusy?'disabled':''}>Kiểm tra yêu cầu trước</button><button class="btn secondary" data-action="capture-recover-cancel" ${recoveryBusy?'disabled':''}>Hủy yêu cầu chưa xử lý</button></div><p class="hint" role="status" data-recovery-message></p>`:'';
+ cameraControls();
+}
+function syncCaptureControls(){
+ const p=pendingCapture;if(!p)return;
+ const busy=p.sending||p.checking,expired=Date.now()>=p.prepared.expires_at;
+ const set=(action,disabled)=>{const b=$('[data-action="'+action+'"]');if(b)b.disabled=!!disabled;};
+ set('capture-confirm',busy||p.uncertain||p.terminal||expired);
+ set('capture-retake',busy||p.uncertain||!!recoveryRecord());
+ set('capture-status-check',busy);
+ set('capture-cancel-ready',busy||!recoveryRecord());
+ set('close-modal',busy);
+}
+async function checkCapture(cancel=false){
+ const p=pendingCapture,r=p?{challenge_id:p.prepared.challenge_id,assignment_id:p.assignment_id,type:p.type}:recoveryRecord();
+ if(!r||recoveryBusy||p?.sending||p?.checking)return;
+ const epoch=state.sessionEpoch;
+ if(p)p.checking=true;recoveryBusy=true;syncCaptureControls();drawRecovery();
+ try{
+  const d=await api(cancel?'/api/attendance/cancel':'/api/attendance/status?'+query({challenge_id:r.challenge_id}),cancel?{method:'POST',body:{challenge_id:r.challenge_id},timeout:20000}:{timeout:20000});
+  if(epoch!==state.sessionEpoch||p&&p!==pendingCapture)return;
+  if(d?.attendance?.id&&d.attendance.assignment_id===r.assignment_id&&d.attendance.type===r.type){
+   clearRecovery(r.challenge_id);if(p){p.checking=false;p.terminal=true;closeModal();}
+   recoveryBusy=false;notify('Máy chủ đã ghi nhận '+dt(d.attendance.server_timestamp)+'. Không cần chụp lại.');await navigate('today');return;
+  }
+  let message;
+  if(d?.state==='FAILED'&&!d.attendance){
+   clearRecovery(r.challenge_id);if(p){p.uncertain=false;p.terminal=true;}
+   message='Yêu cầu đã kết thúc mà không có bản ghi công. Có thể chụp mới.';
+  }else if(d?.state==='READY'&&!d.attendance){
+   if(p){p.uncertain=false;p.terminal=false;}
+   message=p?'Máy chủ chưa ghi nhận. Chỉ xác nhận lại cùng ảnh và mã yêu cầu nếu còn hạn, hoặc hủy yêu cầu chưa xử lý.':'Yêu cầu chưa được xử lý. Hủy yêu cầu này trước khi chụp ảnh mới.';
+  }else{
+   if(p)p.uncertain=true;
+   message=d?.state==='EXPIRED'?'Ảnh hết hạn. Hủy yêu cầu chưa xử lý trước khi chụp mới.':'Chưa xác minh được kết quả. Không chụp lại; kiểm tra trạng thái hoặc liên hệ quản trị.';
+  }
+  drawRecovery();const e=p?$('[data-confirm-error]'):$('[data-recovery-message]');if(e){e.hidden=false;e.textContent=message;}
+ }catch(e){
+  if(epoch===state.sessionEpoch){if(p===pendingCapture&&p)p.uncertain=true;const el=p?$('[data-confirm-error]'):$('[data-recovery-message]');if(el){el.hidden=false;el.textContent=e.message+' Chưa thể xác minh; không chụp lại.';}else notify(e.message,true);}
+ }finally{recoveryBusy=false;if(p===pendingCapture&&p)p.checking=false;if(epoch===state.sessionEpoch){syncCaptureControls();cameraControls();document.querySelectorAll('[data-action="capture-recover"],[data-action="capture-recover-cancel"]').forEach(b=>b.disabled=false);}}
+}
 function closeModal() { clearPrint();pendingCapture=null;clearInterval(confirmationTimer);confirmationTimer=null;modalTicket++;modal.close(); modal.innerHTML=''; clearPhotos(); }
 function showModal(title,body) {
   closeModal(); modal.innerHTML=`<div class="modal-head"><h2 id="modal-title">${esc(title)}</h2><button class="close" data-action="close-modal" aria-label="Đóng">×</button></div><div class="modal-body">${body}</div>`;
@@ -199,7 +267,7 @@ async function renderToday(id) {
      <div class="camera-frame employee-camera"><video id="camera" autoplay muted playsinline aria-label="Camera chấm công"></video><div id="camera-placeholder" class="camera-placeholder">${icon('camera')}<strong>Camera chưa bật</strong><p>Bật camera và giữ rõ khuôn mặt trước khi chụp.</p><button class="btn" data-action="camera-start">Bật camera</button></div><span class="camera-corner tl"></span><span class="camera-corner br"></span><span id="camera-live" class="camera-live" hidden><span class="dot"></span>CAMERA TRỰC TIẾP</span></div>
      <div class="camera-toolbar"><span id="camera-facing" class="camera-facing" aria-live="polite">${cameraFacing==='environment'?'Camera sau':'Camera trước'}</span><button type="button" class="btn secondary small" data-action="camera-switch">${icon('refresh')} Đổi camera</button><button type="button" class="btn quiet small" data-action="camera-stop" hidden>Tắt camera</button></div>
      <div class="camera-actions employee-capture-actions"><button class="btn" data-action="capture" data-type="IN" data-testid="attendance-in" ${!captureRows.length?'disabled':''}>${icon('camera')} Chụp vào ca</button><button class="btn secondary" data-action="capture" data-type="OUT" data-testid="attendance-out" ${!captureRows.length?'disabled':''}>${icon('camera')} Chụp tan ca</button></div>
-     <p id="capture-status" class="hint" role="status" aria-live="polite"></p><p class="camera-note">${icon('shield')}<span>Ảnh Timemark được ghép trên thiết bị từ thông tin máy chủ. Giờ đóng dấu được cấp trước lúc lưu tối đa 90 giây. Máy chủ xác thực bản ghi; ảnh và GPS không chứng minh tuyệt đối sự hiện diện.</span></p>
+     <div class="error-text" data-capture-recovery hidden></div><p id="capture-status" class="hint" role="status" aria-live="polite"></p><p class="camera-note">${icon('shield')}<span>Ảnh Timemark được ghép trên thiết bị từ thông tin máy chủ. Giờ đóng dấu được cấp trước lúc lưu tối đa 90 giây. Máy chủ xác thực bản ghi; ảnh và GPS không chứng minh tuyệt đối sự hiện diện.</span></p>
     </div></section>
     <section class="card employee-summary"><div class="card-head"><h2>Tình hình ca của bạn</h2><span class="tag">${esc(dateVN(today()))}</span></div><div class="employee-metrics">
      <div><span>Ca có lịch</span><strong>${dayRows.length}</strong></div><div><span>Đã vào ca</span><strong>${started}</strong></div><div><span>Đủ hai lượt</span><strong>${complete}</strong></div><div><span>Chưa đủ lượt</span><strong>${dayRows.length-complete}</strong></div><div><span>Làm thêm</span><strong>${overtime}<small> phút</small></strong></div>
@@ -209,6 +277,7 @@ async function renderToday(id) {
     <section class="card employee-guidance"><details class="employee-policy"><summary>${icon('pin')} Để chấm công chính xác</summary><p>Cho phép camera và vị trí chính xác. GPS cần sai số tối đa 50 m. Thời gian công lấy từ máy chủ; ngoài vùng được ghi cờ để quản lý xem xét.</p></details><div data-handover-preview class="employee-handover-preview"></div></section>
   </div>`;
   if(captureRows.length===1)$('#capture-assignment').value=captureRows[0].id;
+  drawRecovery();
   try{const h=await api('/api/handover?'+query({from:dayString(Date.now()-2*86400000),to:today()}));if(id===state.renderId&&h.available){state.handover=h;const panel=$('[data-handover-preview]');if(panel)panel.innerHTML=handoverCards(h.rows.filter(r=>dayRows.some(a=>a.branch_id===r.branch_id&&a.id!==r.assignment_id&&a.starts_at>r.starts_at)).slice(0,5));}}catch{/* Attendance remains usable if optional handover unavailable. */}
 }
 async function renderSchedule(id) {
@@ -429,7 +498,7 @@ function prepareResponsiveTables(){
  }
 }
 async function navigate(view=state.view) {
-  if(!state.user)return;
+  if(!state.user||pendingCapture?.sending||pendingCapture?.checking||recoveryBusy)return;
   const allowed=new Set(navItems().map(x=>x[0]));allowed.add('extra');if(!allowed.has(view))view=landing();
   const changed=state.view!==view;stopChat();if(documentPreview)closeModal();stopCamera();if(pendingCapture&&!pendingCapture.sending)closeModal();
   if(changed){viewFilters[state.view]={...state.filters};state.filters={...(viewFilters[view]||defaultFilters())};}
@@ -446,6 +515,9 @@ function cameraControls(){
  document.querySelectorAll('[data-action="camera-start"],[data-action="camera-switch"],[data-action="camera-stop"]').forEach(b=>b.disabled=busy);
  const label=$('#camera-facing');if(label)label.textContent=cameraFacing==='environment'?'Camera sau':'Camera trước';
  const stop=$('[data-action="camera-stop"]');if(stop)stop.hidden=!state.stream;
+ const blocked=!!recoveryRecord()||!!pendingCapture;
+ const select=$('#capture-assignment');
+ document.querySelectorAll('[data-action="capture"]').forEach(b=>b.disabled=busy||blocked||!!select?.disabled);
 }
 async function startCamera(facing=cameraFacing,{strict=false}={}) {
  if(!navigator.mediaDevices?.getUserMedia)throw Error('Camera cần HTTPS và trình duyệt hỗ trợ camera.');
@@ -476,11 +548,13 @@ async function switchCamera(){
  }
 }
 async function capture(type,button) {
+  if(recoveryRecord()||pendingCapture||recoveryBusy)throw Error('Cần kiểm tra kết quả chấm công trước đó trước khi chụp mới.');
   const epoch=state.sessionEpoch;
   const assignment_id=$('#capture-assignment').value;
   if(!assignment_id)throw new Error('Vui lòng chọn ca làm trước khi chụp.');
   if(cameraOpening||!state.stream)throw new Error('Bật camera và đợi hình ảnh xuất hiện trước khi chụp.');
   const a=state.assignments.find(r=>r.id===assignment_id);
+  if(!a)throw Error('Ca đã thay đổi. Tải lại lịch làm việc.');
   if(type==='IN'&&a.in_id)throw new Error('Ca này đã có lượt vào ca.');
   if(type==='OUT'&&!a.in_id)throw new Error('Cần ghi nhận vào ca trước khi tan ca.');
   if(type==='OUT'&&a.out_id)throw new Error('Ca này đã có lượt tan ca.');
@@ -496,36 +570,38 @@ async function capture(type,button) {
     stillCurrent();
     const frame=cameraFrame($('#camera'));
     status.textContent='Đang xác thực ca làm và thời gian máy chủ…';
-    const prepared=await api('/api/attendance/prepare',{method:'POST',body:{assignment_id,type,...location}});
+    const prepared=await api('/api/attendance/prepare',{method:'POST',body:{assignment_id,type,...location},timeout:20000});
     stillCurrent();
     status.textContent='Đang ghép Timemark và nén ảnh…';
     const photo=await composeTimemark(frame,prepared.metadata);
     stillCurrent();
     stopCamera();
     const url=URL.createObjectURL(photo);
-    const ticket=showModal('Xác nhận ảnh chấm công',`<p class="muted">Kiểm tra ảnh và thông tin. Chưa lưu chấm công cho đến khi bạn xác nhận.</p><img class="result-photo" src="${url}" alt="Ảnh Timemark xem trước"><p class="hint">Khoảng cách ${Math.round(prepared.metadata.distance)} / ${prepared.metadata.radius} m · Sai số ±${Math.round(prepared.metadata.accuracy)} m</p>${prepared.metadata.distance>prepared.metadata.radius?'<p class="error-text">Ngoài vùng: chưa cộng công tự động.</p>':''}<p data-confirm-expiry role="status" class="hint"></p><p data-confirm-error class="error-text" role="alert" hidden></p><div class="modal-actions"><button class="btn secondary" data-action="capture-retake">Chụp lại</button><button class="btn secondary" data-action="capture-status-check">Kiểm tra trạng thái</button><button class="btn" data-action="capture-confirm">Xác nhận chấm công</button></div>`);
+    const ticket=showModal('Xác nhận ảnh chấm công',`<p class="muted">Kiểm tra ảnh và thông tin. Chưa lưu chấm công cho đến khi bạn xác nhận.</p><img class="result-photo" src="${url}" alt="Ảnh Timemark xem trước"><p class="hint">Khoảng cách ${Math.round(prepared.metadata.distance)} / ${prepared.metadata.radius} m · Sai số ±${Math.round(prepared.metadata.accuracy)} m</p>${prepared.metadata.distance>prepared.metadata.radius?'<p class="error-text">Ngoài vùng: chưa cộng công tự động.</p>':''}<p data-confirm-expiry role="status" class="hint"></p><p data-confirm-error class="error-text" role="alert" hidden></p><div class="modal-actions"><button class="btn secondary" data-action="capture-retake">Chụp lại</button><button class="btn secondary" data-action="capture-status-check">Kiểm tra trạng thái</button><button class="btn secondary" data-action="capture-cancel-ready" disabled>Hủy yêu cầu chưa xử lý</button><button class="btn" data-action="capture-confirm">Xác nhận chấm công</button></div>`);
     photoURLs.push(url);
     pendingCapture={photo,prepared,assignment_id,type,epoch,renderId,ticket,sending:false};
     const expires=Number(prepared.expires_at);
-    const tick=()=>{if(!pendingCapture||pendingCapture.ticket!==ticket)return;const left=Math.max(0,Math.ceil((expires-Date.now())/1000));const el=$('[data-confirm-expiry]');if(el)el.textContent=left?'Còn '+left+' giây để xác nhận.':'Ảnh đã hết hạn. Hãy chụp lại.';const b=$('[data-action="capture-confirm"]');if(b&&!left&&!pendingCapture.sending)b.disabled=true;};
+    const tick=()=>{if(!pendingCapture||pendingCapture.ticket!==ticket)return;const left=Math.max(0,Math.ceil((expires-Date.now())/1000));const el=$('[data-confirm-expiry]');if(el)el.textContent=left?'Còn '+left+' giây để xác nhận.':recoveryRecord()?'Ảnh đã hết hạn. Xác minh hoặc hủy yêu cầu chưa xử lý.':'Ảnh đã hết hạn. Hãy chụp lại.';syncCaptureControls();};
     tick();confirmationTimer=setInterval(tick,500);
-  } finally { if(captureAbort===run)captureAbort=null;cameraControls();if(status.isConnected){status.textContent='';document.querySelectorAll('[data-action="capture"]').forEach(b=>b.disabled=false);} }
+  } finally { if(captureAbort===run)captureAbort=null;cameraControls();if(status.isConnected)status.textContent=''; }
 }
 async function confirmCapture(button){
  const p=pendingCapture;
- if(!p||p.sending||p.uncertain||p.epoch!==state.sessionEpoch||p.renderId!==state.renderId||p.ticket!==modalTicket||!modal.open)return;
+ if(!p||p.sending||p.checking||p.uncertain||p.terminal||p.epoch!==state.sessionEpoch||p.renderId!==state.renderId||p.ticket!==modalTicket||!modal.open)return;
  if(Date.now()>=p.prepared.expires_at)throw Error('Ảnh đã hết hạn. Hãy chụp lại.');
- p.sending=true;button.disabled=true;const retake=$('[data-action="capture-retake"]'),close=$('.modal-head .close');if(retake)retake.disabled=true;if(close)close.disabled=true;
+ p.sending=true;saveRecovery(p);syncCaptureControls();drawRecovery();
  const error=$('[data-confirm-error]');if(error)error.hidden=true;
  try{
   const form=new FormData();form.set('challenge_id',p.prepared.challenge_id);form.set('photo',p.photo,'timemark.jpg');
-  const result=await api('/api/attendance/submit',{method:'POST',body:form});
+  const result=await api('/api/attendance/submit',{method:'POST',body:form,timeout:25000});
   if(p.epoch!==state.sessionEpoch||p.renderId!==state.renderId||pendingCapture!==p)return;
+  if(!result?.attendance?.id||result.attendance.assignment_id!==p.assignment_id||result.attendance.type!==p.type)throw Error('Phản hồi máy chủ không đủ bằng chứng đã lưu công.');
+  clearRecovery(p.prepared.challenge_id);p.terminal=true;p.sending=false;
   const url=URL.createObjectURL(p.photo),m=p.prepared.metadata;
   showModal('Đã ghi nhận '+(p.type==='IN'?'vào ca':'tan ca'),`<p class="muted">Đã lưu bản ghi trên máy chủ. Thời gian ghi nhận thực tế có thể khác giờ cấp dấu trên ảnh tối đa 90 giây.</p><div class="review-meta"><div>Thời gian máy chủ<strong>${dt(result.attendance?.server_timestamp||m.serverTimestamp)}</strong></div><div>Dung lượng ảnh<strong>${(p.photo.size/1000).toFixed(1)} KB / 200 KB</strong></div><div>Khoảng cách<strong>${Math.round(m.distance)} / ${m.radius} m</strong></div><div>Sai số GPS<strong>±${Math.round(m.accuracy)} m</strong></div></div><img class="result-photo" src="${url}" alt="Ảnh Timemark vừa ghi nhận">${p.type==='OUT'&&state.handover?.available?handoverForm(p.assignment_id):''}<div class="modal-actions"><button class="btn" data-action="close-modal">Hoàn tất</button></div>`);
   photoURLs.push(url);await navigate('today');
- }catch(e){if(pendingCapture===p&&error?.isConnected){p.uncertain=!!e.network||e.status===503||e.status===409;error.textContent=e.message+(p.uncertain?' Dùng Kiểm tra trạng thái trước khi gửi lại.':' Kiểm tra lịch sử nếu không chắc lượt công đã được lưu.');error.hidden=false;}}
- finally{if(pendingCapture===p){p.sending=false;button.disabled=!!p.uncertain||Date.now()>=p.prepared.expires_at;if(retake)retake.disabled=false;if(close)close.disabled=false;}}
+ }catch(e){if(pendingCapture===p&&error?.isConnected&&!p.terminal){p.uncertain=true;error.textContent=e.message+' Dùng Kiểm tra trạng thái trước khi gửi lại.';error.hidden=false;}}
+ finally{if(pendingCapture===p){p.sending=false;syncCaptureControls();drawRecovery();}}
 }
 async function showPhoto(id) {
   const epoch=state.sessionEpoch,ticket=showModal('Ảnh chấm công',loading());
@@ -581,7 +657,7 @@ async function exportReports() {
 }
 
 document.addEventListener('click',async event=>{
-  const button=event.target.closest('button');if(!button)return;
+  const button=event.target.closest('button');if(!button||button.disabled)return;
   if(button.dataset.view)return void navigate(button.dataset.view);
   if(button.dataset.adminTab){state.adminTab=button.dataset.adminTab;return void navigate('admin');}
   const action=button.dataset.action;if(!action)return;
@@ -630,15 +706,11 @@ document.addEventListener('click',async event=>{
     }
     if(action==='payroll-close'){showModal('Chốt phiên bản bảng công tháng',`<form data-form="payroll-close" class="form-stack"><p>Bản chốt là ảnh chụp dữ liệu đối soát, không khóa sửa bản công gốc. Nếu điều chỉnh sau chốt, tạo phiên bản mới có lý do.</p><label>Lý do<textarea name="reason" minlength="5" maxlength="500" required></textarea></label><label><input name="reviewed" type="checkbox" required> Tôi đã kiểm tra giờ ngoài ca, nghỉ phép, ca vắng, ca bất thường và các khoản điều chỉnh.</label><p class="error-text" data-form-error hidden></p><button class="btn" type="submit">Xác nhận chốt</button></form>`);return;}
     if(action==='session-retry')return await boot();
-    if(action==='close-modal'){if(!pendingCapture?.sending)closeModal();return;}
-    if(action==='capture-status-check'){
-      const p=pendingCapture;if(!p||p.sending)return;
-      const d=await api('/api/attendance/status?'+query({challenge_id:p.prepared.challenge_id}));if(p!==pendingCapture||p.epoch!==state.sessionEpoch)return;
-      const e=$('[data-confirm-error]');if(e){e.hidden=false;e.textContent=d.attendance?'Máy chủ đã ghi nhận '+dt(d.attendance.server_timestamp)+'. Đóng và xem lịch sử, không chụp lại.':d.state==='READY'?'Máy chủ chưa ghi nhận; có thể xác nhận lại nếu còn hạn.':d.state==='PROCESSING'||d.state==='UNKNOWN'?'Trạng thái chưa chắc chắn. Không chụp lại; kiểm tra lịch sử hoặc liên hệ quản trị.':'Yêu cầu không còn hiệu lực. Kiểm tra lịch sử trước khi chụp mới.';}
-      if(d.attendance||['PROCESSING','UNKNOWN'].includes(d.state)){p.uncertain=true;const b=$('[data-action="capture-confirm"]');if(b)b.disabled=true;}else if(d.state==='READY'){p.uncertain=false;const b=$('[data-action="capture-confirm"]');if(b)b.disabled=Date.now()>=p.prepared.expires_at;}return;
-    }
+    if(action==='close-modal'){if(!pendingCapture?.sending&&!pendingCapture?.checking){closeModal();drawRecovery();}return;}
+    if(action==='capture-status-check'||action==='capture-recover')return await checkCapture();
+    if(action==='capture-cancel-ready'||action==='capture-recover-cancel')return await checkCapture(true);
     if(action==='capture-confirm')return await confirmCapture(button);
-    if(action==='capture-retake'){if(pendingCapture?.sending)return;closeModal();await startCamera();return;}
+    if(action==='capture-retake'){if(pendingCapture?.sending||pendingCapture?.checking||pendingCapture?.uncertain||recoveryRecord())return;closeModal();drawRecovery();await startCamera();return;}
     if(action==='refresh')return void navigate();
     if(action.startsWith('overview-')){
       if(state.view!=='overview'||state.user?.role!=='admin')return;
@@ -825,7 +897,7 @@ document.addEventListener('click',async event=>{
       showModal('Xem xét yêu cầu công',`<p class="muted"><strong>${esc(r.full_name)}</strong> · ${dateVN(r.work_date)}<br>${esc(r.branch_name)}</p><div class="credential">${esc(r.reason)}${r.kind==='CORRECTION'?`<p class="hint">Đề xuất: ${dt(r.proposed_in)} – ${dt(r.proposed_out)}</p>`:''}</div><form data-form="request-decide" data-id="${esc(r.id)}" class="form-stack section-gap"><label>Quyết định<select name="state"><option value="APPROVED">Phê duyệt</option><option value="REJECTED">Từ chối</option></select></label><label>Ghi chú quyết định<textarea name="decision_note" required minlength="3" maxlength="1000" placeholder="Nội dung đã đối soát"></textarea></label><p class="error-text" data-form-error hidden></p><div class="modal-actions"><button class="btn secondary" type="button" data-action="close-modal">Hủy</button><button class="btn" type="submit">Lưu quyết định</button></div></form>`);return;
     }
   }catch(e){notify(e.message||'Không thể thực hiện. Vui lòng thử lại.',true);}
-  finally{if(button.isConnected)button.disabled=false;}
+  finally{if(button.isConnected&&!['capture','capture-confirm','capture-retake','capture-status-check','capture-cancel-ready','capture-recover','capture-recover-cancel','close-modal'].includes(action))button.disabled=false;else{syncCaptureControls();cameraControls();}}
 });
 document.addEventListener('keydown',event=>{
  if(event.key==='Escape'&&!modal.open&&$('.sidebar.menu-open')){mobileMenu(false);$('[data-action="mobile-menu"]')?.focus();}
@@ -976,7 +1048,7 @@ document.addEventListener('submit',async event=>{
   }catch(e){if(error&&error.isConnected){error.textContent=e.message;error.hidden=false;}else notify(e.message,true);}
   finally{if(button.isConnected){button.disabled=false;button.innerHTML=old;}}
 });
-modal.addEventListener('cancel',event=>{event.preventDefault();if(!pendingCapture?.sending)closeModal();});
+modal.addEventListener('cancel',event=>{event.preventDefault();if(!pendingCapture?.sending&&!pendingCapture?.checking){closeModal();drawRecovery();}});
 window.addEventListener('pagehide',()=>{stopCamera();if(pendingCapture&&!pendingCapture.sending)closeModal();clearPhotos();});
 document.addEventListener('visibilitychange',()=>{if(document.hidden)stopCamera();});
 
