@@ -1,0 +1,393 @@
+@media screen {
+  .overview-grid,
+  .admin-layout {
+    gap: clamp(12px, 1.3vw, 20px);
+    color: var(--bm-ink);
+  }
+
+  .overview-grid > .card,
+  .admin-layout :is(.admin-nav, .admin-panel) {
+    min-width: 0;
+    border-color: var(--bm-edge);
+    border-radius: var(--bm-radius);
+    background: var(--bm-surface);
+    box-shadow: var(--bm-shadow);
+  }
+
+  .overview-grid > .overview-command {
+    background:
+      radial-gradient(ellipse at 92% 6%, #ffc7d67d, transparent 52%),
+      var(--bm-hero);
+  }
+
+  .overview-grid > .card > .card-head,
+  .admin-panel > .card-head {
+    padding: clamp(13px, 1.45vw, 22px);
+    border-bottom-color: var(--bm-border);
+    background: transparent;
+  }
+
+  .overview-grid .card-head h2,
+  .admin-panel .card-head h2 {
+    color: var(--bm-ink);
+    font-size: clamp(17px, 1.7vw, 22px);
+    font-weight: 820;
+    letter-spacing: -.035em;
+  }
+
+  .overview-command > .card-head,
+  .admin-panel > .card-head {
+    flex-wrap: wrap;
+  }
+
+  .overview-command > .card-head > div,
+  .admin-panel > .card-head > div {
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+
+  .overview-command-body {
+    padding: clamp(12px, 1.5vw, 22px);
+    gap: clamp(12px, 1.4vw, 20px);
+  }
+
+  .overview-filter {
+    background: transparent;
+  }
+
+  .overview-filter :is(input, select) {
+    min-width: 0;
+    min-height: 44px;
+    border-color: var(--bm-border);
+    border-radius: 12px;
+  }
+
+  .overview-filter .btn,
+  .admin-panel :is([data-action="admin-add"], [data-form="system-settings"] > [type="submit"]) {
+    min-height: 44px;
+    border: 1px solid transparent;
+    border-radius: 12px;
+    background: var(--bm-action);
+    color: #fff;
+    box-shadow: 0 4px 10px #b9193730;
+  }
+
+  .overview-command .quick-actions {
+    gap: 8px;
+  }
+
+  .overview-command .quick-actions .btn {
+    --admin-tile: var(--bm-tone-red);
+    --admin-tile-ink: var(--bm-tone-red-ink);
+    min-width: 0;
+    min-height: 68px;
+    gap: 7px;
+    border-color: var(--bm-edge);
+    border-radius: var(--bm-radius-small);
+    padding: 8px;
+    background: var(--bm-surface);
+    color: var(--bm-ink);
+    overflow-wrap: anywhere;
+    text-align: center;
+    white-space: normal;
+    box-shadow: 0 3px 9px #47375415;
+  }
+
+  .overview-command .quick-actions .btn .icon,
+  .overview-kpis .stat .label .icon,
+  .admin-nav button .icon {
+    width: 34px;
+    height: 34px;
+    flex: 0 0 34px;
+    padding: 7px;
+    border-radius: 11px;
+    background: var(--admin-tile);
+    color: var(--admin-tile-ink);
+  }
+
+  .overview-command .quick-actions .btn:hover {
+    border-color: var(--bm-red);
+    background: var(--bm-surface);
+  }
+
+  .overview-kpis .overview-kpi:hover,
+  .overview-kpis .overview-kpi[aria-pressed="true"] {
+    border-color: var(--bm-red);
+  }
+
+  .overview-kpis {
+    gap: clamp(8px, 1vw, 15px);
+  }
+
+  .overview-kpis > .overview-kpi {
+    --admin-tile: var(--bm-tone-red);
+    --admin-tile-ink: var(--bm-tone-red-ink);
+    min-height: 132px;
+    padding: clamp(11px, 1.15vw, 17px);
+    border-color: var(--bm-edge);
+    border-radius: var(--bm-radius-small);
+    background: var(--bm-surface);
+    box-shadow: var(--bm-shadow);
+  }
+
+  .overview-kpis .overview-kpi .label {
+    justify-content: flex-start;
+    color: var(--bm-ink);
+    line-height: 1.25;
+  }
+
+  .overview-kpis .overview-kpi .label .icon {
+    order: -1;
+  }
+
+  .overview-kpis .overview-kpi > strong {
+    color: var(--bm-ink);
+    font-size: clamp(25px, 2.5vw, 36px);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .overview-kpis .overview-kpi small {
+    color: var(--bm-muted);
+  }
+
+  .overview-kpis .overview-kpi .kpi-link {
+    color: var(--bm-red);
+  }
+
+  .overview-kpis [data-id="branches"],
+  .overview-kpis [data-id="scheduled"],
+  .overview-command .quick-actions :is([data-action="overview-assign"], [data-action="overview-chat"]),
+  .admin-nav [data-admin-tab="branches"],
+  .admin-nav [data-admin-tab="assignments"] {
+    --admin-tile: var(--bm-tone-blue);
+    --admin-tile-ink: var(--bm-tone-blue-ink);
+  }
+
+  .overview-kpis [data-id="completed"],
+  .overview-kpis [data-id="working"],
+  .admin-nav [data-admin-tab="rosters"] {
+    --admin-tile: var(--bm-tone-green);
+    --admin-tile-ink: var(--bm-tone-green-ink);
+  }
+
+  .overview-kpis [data-id="units"],
+  .overview-kpis [data-id="leave_or_pending"],
+  .overview-command .quick-actions :is([data-action="event-assign"], [data-action="overview-payroll"], [data-action="system-diagnostics"]),
+  .admin-nav [data-admin-tab="settings"],
+  .admin-nav [data-admin-tab="operations"] {
+    --admin-tile: var(--bm-tone-violet);
+    --admin-tile-ink: var(--bm-tone-violet-ink);
+  }
+
+  .overview-kpis [data-id="missing_out"],
+  .overview-kpis [data-id="overtime"],
+  .overview-command .quick-actions :is([data-action="overview-print"], [data-action="audit-open"]),
+  .admin-nav [data-admin-tab="shifts"] {
+    --admin-tile: var(--bm-tone-amber);
+    --admin-tile-ink: var(--bm-tone-amber-ink);
+  }
+
+  .overview-grid :is(.overview-tasks > div, .overview-queue, .overview-store),
+  .admin-panel :is(.operation-row, .assignment-card) {
+    border-color: var(--bm-border);
+    border-radius: var(--bm-radius-small);
+    background: var(--bm-inset);
+  }
+
+  .overview-tasks strong,
+  .overview-distribution .distribution-total {
+    color: var(--bm-ink);
+  }
+
+  .overview-tasks > div:last-child {
+    border-bottom-color: var(--bm-border);
+  }
+
+  .overview-distribution .distribution-bar {
+    background: var(--bm-border);
+  }
+
+  .admin-layout .admin-nav {
+    padding: 13px;
+  }
+
+  .admin-nav > .eyebrow,
+  .admin-panel > .card-head .eyebrow {
+    color: var(--bm-red);
+  }
+
+  .admin-nav-group > span {
+    color: var(--bm-muted);
+    font-size: 11px;
+    letter-spacing: .035em;
+  }
+
+  .admin-nav-group > div {
+    gap: 6px;
+  }
+
+  .admin-nav button {
+    --admin-tile: var(--bm-tone-red);
+    --admin-tile-ink: var(--bm-tone-red-ink);
+    min-width: 0;
+    min-height: 48px;
+    border: 1px solid transparent;
+    border-radius: 12px;
+    padding: 5px 7px;
+    background: var(--bm-inset);
+    color: var(--bm-ink);
+    overflow-wrap: anywhere;
+  }
+
+  .admin-nav button:hover,
+  .admin-nav button[aria-selected="true"] {
+    border-color: var(--bm-pink);
+    background: var(--bm-hero);
+    color: var(--bm-red-dark);
+    box-shadow: none;
+  }
+
+  .admin-nav button[aria-selected="true"] .icon {
+    background: var(--bm-action);
+    color: #fff;
+  }
+
+  .admin-panel > .card-head {
+    background: var(--bm-hero);
+  }
+
+  .admin-panel > .card-head > div {
+    flex-basis: 160px;
+  }
+
+  .admin-count {
+    border-radius: 999px;
+    padding: 5px 9px;
+    background: var(--bm-inset);
+    color: var(--bm-muted);
+  }
+
+  .admin-panel :is(.admin-tools, .admin-search, .admin-pager) {
+    border-color: var(--bm-border);
+  }
+
+  .admin-panel .admin-tools {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .admin-panel .admin-search {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: end;
+    gap: 7px 16px;
+    background: var(--bm-inset);
+  }
+
+  .admin-search > label:first-child {
+    flex: 1 1 240px;
+    max-width: 440px;
+  }
+
+  .admin-search .admin-active-filter {
+    min-height: 44px;
+  }
+
+  .admin-panel [data-form="system-settings"] {
+    padding: clamp(12px, 1.5vw, 24px);
+  }
+
+  .admin-panel [data-form="system-settings"] > label {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-height: 47px;
+    border: 1px solid var(--bm-border);
+    border-radius: var(--bm-radius-small);
+    padding: 10px 12px;
+    background: var(--bm-inset);
+    color: var(--bm-ink);
+    line-height: 1.45;
+  }
+
+  .admin-panel [data-form="system-settings"] :is(label:first-child input, input[type="checkbox"]) {
+    margin: 0;
+    accent-color: var(--bm-red);
+  }
+
+  .admin-panel [data-form="system-settings"] label:first-child {
+    flex-wrap: wrap;
+    justify-content: space-between;
+  }
+
+  .admin-panel [data-form="system-settings"] input[type="number"] {
+    width: 92px;
+    min-height: 44px;
+  }
+
+  .admin-panel [data-form="system-settings"] input[type="checkbox"] {
+    flex: 0 0 19px;
+    width: 19px;
+    height: 19px;
+  }
+}
+
+@media screen and (max-width: 900px) {
+  .overview-command .quick-actions .btn {
+    flex-direction: column;
+    justify-content: center;
+    font-size: 12px;
+    line-height: 1.25;
+  }
+}
+
+@media screen and (max-width: 620px) {
+  .overview-command .quick-actions {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 5px;
+  }
+
+  .overview-command .quick-actions .btn {
+    justify-content: flex-start;
+    padding: 7px 3px;
+    font-size: clamp(10px, 2.9vw, 12px);
+  }
+
+  .overview-command .quick-actions .btn .icon {
+    width: 32px;
+    height: 32px;
+    flex-basis: 32px;
+  }
+
+  .overview-kpis > .overview-kpi {
+    min-height: 123px;
+  }
+
+  .admin-panel .admin-search {
+    align-items: flex-start;
+  }
+}
+
+@media screen and (prefers-reduced-transparency: reduce) {
+  .overview-grid > .card,
+  .overview-kpis > .overview-kpi,
+  .admin-layout :is(.admin-nav, .admin-panel) {
+    background: #fff;
+  }
+}
+
+@media screen and (forced-colors: active) {
+  .overview-grid > .card,
+  .overview-kpis > .overview-kpi,
+  .admin-layout :is(.admin-nav, .admin-panel) {
+    border-color: CanvasText;
+    background: Canvas;
+    box-shadow: none;
+  }
+
+  .overview-kpis .overview-kpi[aria-pressed="true"],
+  .admin-nav button[aria-selected="true"] {
+    border-color: Highlight;
+  }
+}

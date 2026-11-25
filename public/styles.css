@@ -819,7 +819,6 @@ td,th{overflow-wrap:anywhere}
  .employee-workspace .card-head{padding:13px 14px;gap:8px}
  .employee-workspace .card-head h2{font-weight:800;color:#26212a}
  .employee-workspace .card-body{padding:12px 14px}
- .employee-checkin{background:linear-gradient(150deg,#fff7fa,#fce5ec 50%,#fff)!important}
  .employee-camera:has(#camera-placeholder:not([hidden])){background:rgba(255,255,255,.68);border:1px solid #fff;border-radius:19px;color:#462f3b}
  .employee-camera:has(#camera-placeholder:not([hidden])) .camera-placeholder{grid-template-columns:44px minmax(0,1fr);color:#462f3b;gap:5px 9px}
  .employee-camera:has(#camera-placeholder:not([hidden])) .camera-placeholder>strong{color:#2a202a;font-weight:800;overflow-wrap:anywhere}
