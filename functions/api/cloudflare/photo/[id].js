@@ -1,5 +1,4 @@
 import {sessionUser,digest} from '../../../../cloudflare/lib/auth.mjs';
-import {idPattern} from '../../../../cloudflare/lib/http.mjs';
 // Private KV photo read, authorized via D1 internal account.
 export async function onRequestGet({request,env,params}){
  const headers={'Cache-Control':'private, no-store','X-Content-Type-Options':'nosniff'};
@@ -8,7 +7,8 @@ export async function onRequestGet({request,env,params}){
  try{
  const user=await sessionUser(request,env.DB);
  if(!user)return fail(401,'Unauthorized');
- const id=String(params.id);if(!idPattern.test(id))return fail(404,'Not found');
+ // Legacy attendance IDs may not be UUIDs. Always bind the ID, never interpolate it.
+ const id=String(params.id);
  const hash=await digest('babymark-session-v1:'+request.headers.get('authorization').slice(7));
  const read=()=>env.DB.prepare(
  "SELECT t.photo_path,t.server_timestamp,i.state AS photo_state,i.expires_at AS photo_expires_at FROM attendances t LEFT JOIN photo_inventory i ON i.photo_path=t.photo_path JOIN assignments a ON a.id=t.assignment_id JOIN profiles p ON p.id=? AND p.active=1 JOIN credentials c ON c.user_id=p.id JOIN sessions s ON s.user_id=p.id AND s.credential_version=c.version AND s.token_hash=? AND s.expires_at>? WHERE t.id=? AND (t.user_id=p.id OR p.role='admin' OR (p.role='manager' AND EXISTS(SELECT 1 FROM branch_managers bm WHERE bm.user_id=p.id AND bm.branch_id=a.branch_id)))"
