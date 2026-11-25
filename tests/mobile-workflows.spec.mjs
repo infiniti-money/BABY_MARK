@@ -71,13 +71,6 @@ test('floating iOS-style dock has four touch targets, inset edges and room below
 });
 
 test('portrait dashboard reflects the assigned shift and starts the existing camera flow on demand',async({page})=>{
- await page.addInitScript(()=>{
-  window.attendanceCameraRequests=0;
-  navigator.mediaDevices.getUserMedia=async()=>{
-   window.attendanceCameraRequests++;
-   throw new DOMException('Test camera unavailable','NotAllowedError');
-  };
- });
  await page.emulateMedia({reducedMotion:'reduce'});await page.setViewportSize({width:390,height:844});
  const userResponse=page.waitForResponse(r=>r.url().endsWith('/api/auth/me')&&r.ok());
  const scheduleResponse=page.waitForResponse(r=>r.url().includes('/api/assignments?')&&r.ok());
@@ -91,6 +84,14 @@ test('portrait dashboard reflects the assigned shift and starts the existing cam
  const hm=stamp=>new Intl.DateTimeFormat('en-GB',{timeZone:'Asia/Ho_Chi_Minh',hour:'2-digit',minute:'2-digit',hourCycle:'h23'}).format(stamp);
  await expect(schedule).toContainText(hm(shift.starts_at));await expect(schedule).toContainText(hm(shift.ends_at));
  const times=attendance.locator('.ios-attendance-times');await expect(times).toBeVisible();
+ await page.evaluate(()=>{
+  window.attendanceCameraRequests=0;
+  const getUserMedia=async()=>{
+   window.attendanceCameraRequests++;
+   throw new DOMException('Test camera unavailable','NotAllowedError');
+  };
+  Object.defineProperty(navigator,'mediaDevices',{configurable:true,value:{getUserMedia}});
+ });
  const [arrival,departure]=await times.locator('strong').allTextContents();
  for(const [value,stamp] of [[arrival,shift.in_at],[departure,shift.out_at]]){
   if(stamp==null)expect(value).toMatch(/^[—–-]+:[—–-]+$/);
