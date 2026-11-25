@@ -47,9 +47,10 @@ export async function onRequestPost({request,env}){
    if(!['APPROVED','REJECTED'].includes(state)||state==='REJECTED'&&!note)invalid('Chọn quyết định; từ chối cần lý do');
    const now=Date.now(),hash=await digest('babymark-session-v1:'+request.headers.get('authorization').slice(7));
    const guard="assignment_id=? AND state='PENDING' AND EXISTS(SELECT 1 FROM assignments a JOIN sessions ss ON ss.token_hash=? AND ss.expires_at>? JOIN profiles p ON p.id=ss.user_id AND p.id=? AND p.active=1 JOIN credentials c ON c.user_id=p.id AND c.version=ss.credential_version WHERE a.id=extra_attendance.assignment_id AND a.user_id<>p.id AND (p.role='admin' OR (p.role='manager' AND EXISTS(SELECT 1 FROM branch_managers bm WHERE bm.user_id=p.id AND bm.branch_id=a.branch_id))))";
-   const res=await db.batch([db.prepare('UPDATE extra_attendance SET state=?,decided_by=?,decided_at=?,decision_note=? WHERE '+guard).bind(state,actor.id,now,note,id,hash,Date.now(),actor.id),
-    db.prepare("INSERT INTO management_audit(id,actor_id,resource,resource_id,action,details_json,created_at) SELECT ?,?,'extra-attendance',?,?,?,? WHERE changes()=1").bind(crypto.randomUUID(),actor.id,id,state,JSON.stringify({note}),now)]);
-   if(res[0].meta.changes!==1)throw new ApiError(409,'Không có quyền hoặc yêu cầu đã xử lý');
+   const args=[id,hash,Date.now(),actor.id];
+   const res=await db.batch([db.prepare("INSERT INTO management_audit(id,actor_id,resource,resource_id,action,details_json,created_at) SELECT ?,?,'extra-attendance',assignment_id,?,?,? FROM extra_attendance WHERE "+guard).bind(crypto.randomUUID(),actor.id,state,JSON.stringify({note}),now,...args),
+    db.prepare('UPDATE extra_attendance SET state=?,decided_by=?,decided_at=?,decision_note=? WHERE '+guard).bind(state,actor.id,now,note,...args)]);
+   if(res[1].meta.changes!==1)throw new ApiError(409,'Không có quyền hoặc yêu cầu đã xử lý');
    return reply({ok:true});
   }
   invalid('Thao tác không hợp lệ');

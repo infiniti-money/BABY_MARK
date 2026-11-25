@@ -769,3 +769,22 @@ test('RC.15 500 and lost response lock repeat capture; reload recovers committed
  const history=await (await request.get('/api/attendance/history?from='+dayVN(start)+'&to='+dayVN(end),{headers:auth(token)})).json();
  expect(history.attendances.filter(a=>a.type==='IN')).toHaveLength(1);
 });
+
+test('employee CV is editable by admin, private and visible to the employee',async({page,request})=>{
+ const admin=await apiToken(request,'admin'),employee=await disposableAccount(request,admin,'test-cv');
+ await login(page);await page.getByRole('button',{name:'Quản trị',exact:true}).click();
+ const row=page.getByRole('row').filter({hasText:employee.employee_code});await expect(row).toBeVisible();
+ await row.getByRole('button',{name:'Hồ sơ CV',exact:true}).click();
+ await page.getByLabel('Vị trí công việc',{exact:true}).fill('Tư vấn bán hàng');
+ await page.getByLabel('Kỹ năng chuyên môn',{exact:true}).fill('<script>CV test</script>');
+ await page.getByRole('button',{name:'Lưu hồ sơ CV',exact:true}).click();
+ await expect(page.locator('#notice')).toContainText('Đã lưu hồ sơ CV');
+ await expect(page.getByLabel('Vị trí công việc',{exact:true})).toHaveValue('Tư vấn bán hàng');
+ await page.getByRole('button',{name:'Đóng',exact:true}).click();
+ await page.getByRole('button',{name:'Đăng xuất tài khoản',exact:true}).click();
+ await loginAccount(page,employee.username,employee.secret);
+ await page.getByRole('button',{name:'Hồ sơ của tôi',exact:true}).click();
+ await expect(page.getByRole('dialog')).toContainText('Tư vấn bán hàng');
+ await expect(page.getByRole('dialog')).toContainText('<script>CV test</script>');
+ await expect(page.getByRole('button',{name:'Lưu hồ sơ CV',exact:true})).toHaveCount(0);
+});

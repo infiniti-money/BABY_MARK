@@ -641,3 +641,6 @@ td,th{overflow-wrap:anywhere}
  @keyframes bm-upload-pulse{0%,100%{transform:scale(.94)}50%{transform:scale(1.05)}}
  @keyframes bm-upload-confirm{from{transform:scale(.84);opacity:.7}to{transform:none;opacity:1}}
 }
+
+/* Private CV detail panel. */
+.cv-header{display:flex;gap:14px;align-items:center;margin-bottom:14px}.cv-header .avatar{flex:0 0 48px;width:48px;height:48px}.cv-fields{margin:14px 0}.cv-read-field{min-width:0;overflow-wrap:anywhere}.cv-read-field small{display:block;font-weight:600;color:var(--muted)}.cv-read-field p{white-space:pre-wrap;margin:4px 0 12px}.cv-fields textarea{resize:vertical;min-height:80px}
