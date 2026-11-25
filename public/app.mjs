@@ -22,7 +22,7 @@ function scheduleChat(id,delay=chatDelay()){
   chatTimer=null;
   if(id!==state.renderId||state.view!=='messages'||document.hidden)return;
   if(!chatBusy&&!modal.open&&!$('#chat-before')?.dataset.expanded){
-   try{chatIdle=(await refreshChat(id,true))?0:Math.min(2,chatIdle+1);}catch{chatIdle=Math.min(2,chatIdle+1);}
+   try{const changed=await refreshChat(id,true);if(id===state.renderId)chatIdle=changed?0:Math.min(2,chatIdle+1);}catch{if(id===state.renderId)chatIdle=Math.min(2,chatIdle+1);}
   }
   if(id===state.renderId)scheduleChat(id);
  },delay);
@@ -245,7 +245,7 @@ async function refreshChat(id=state.renderId,poll=false){
 }
 async function loadChatRoom(id,rebuild,poll=false){
  const selected=chatSelection;if(!selected){$('#chat-room').innerHTML=empty('Chọn cuộc trò chuyện.');return false;}
- const known=poll&&chatPage?.latest!==undefined?chatPage.latest:null;
+ const known=poll&&chatPage?.latest!==undefined&&(chatPage.latest===0||chatPage.read===chatPage.latest)?chatPage.latest:null;
  const data=await api('/api/messages?'+query({thread:selected,known}),{timeout:15000});if(id!==state.renderId||selected!==chatSelection||!chatPage)return false;
  if(data.unchanged)return false;
  const latest=data.messages.at(-1)?.id||0,changed=rebuild||chatPage.latest!==latest;
