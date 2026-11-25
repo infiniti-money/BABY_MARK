@@ -663,3 +663,5 @@ td,th{overflow-wrap:anywhere}
  .admin-active-filter input{width:18px;height:18px;flex:0 0 18px}
  @media(max-width:620px){.overview-kpi .kpi-link{font-size:10px}}
 }
+
+.cv-print{font-size:12px;overflow-wrap:anywhere}.cv-print header img{object-fit:contain}.cv-print h3{margin:12px 0 5px}.cv-print-field{margin:4px 0 8px;border-bottom:1px solid #ddd;padding:3px 0;break-inside:avoid}.cv-print-field p{white-space:pre-wrap;margin:2px 0 4px}@page babymark-cv{size:A4 portrait;margin:12mm}@media print{#print-document .cv-print{page:babymark-cv}}

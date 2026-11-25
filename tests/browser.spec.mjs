@@ -818,3 +818,22 @@ test('overview KPI shortcuts open active directories and filter attendance witho
  await page.setViewportSize({width:390,height:844});
  expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBeTruthy();
 });
+
+test('HR contract expiry dashboard and private saved CV print',async({page,request})=>{
+ const admin=await apiToken(request,'admin'),employee=await disposableAccount(request,admin,'test-hr');
+ const today=dayVN(Date.now());
+ const saved=await request.post('/api/employee-cv',{headers:auth(admin),data:{user_id:employee.id,expected_revision:0,cv:{contract_start:today,contract_end:today,performance:'<script>HR fixture</script>'}}});
+ expect(saved.status()).toBe(201);
+ await login(page);await page.locator('.overview-kpi[data-id="employees"]').click();
+ await page.getByRole('button',{name:'Thời hạn hợp đồng / thử việc',exact:true}).click();
+ const dialog=page.getByRole('dialog');await expect(dialog).toContainText(employee.employee_code);
+ await dialog.locator('.operation-row').filter({hasText:employee.employee_code}).getByRole('button',{name:'Mở hồ sơ',exact:true}).click();
+ await expect(page.getByLabel('Ngày bắt đầu hợp đồng',{exact:true})).toHaveValue(today);
+ await page.evaluate(()=>{window.print=()=>{window.__cvPrinted=true;}});
+ await page.getByRole('button',{name:'In / lưu PDF hồ sơ đã lưu',exact:true}).click();
+ await expect.poll(()=>page.evaluate(()=>window.__cvPrinted)).toBe(true);
+ await expect(page.locator('#print-document')).toContainText('HỒ SƠ NHÂN SỰ / CV');
+ await expect(page.locator('#print-document')).toContainText('<script>HR fixture</script>');
+ await page.evaluate(()=>window.dispatchEvent(new Event('afterprint')));
+ await expect(page.locator('#print-document')).toBeEmpty();
+});

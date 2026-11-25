@@ -1,7 +1,7 @@
 import {actorFor,ApiError,apiFailure,identifier,invalid,validDay,dayVN} from '../../cloudflare/lib/access.mjs';
 import {reply,digest} from '../../cloudflare/lib/auth.mjs';
 import {jsonLimited} from '../../cloudflare/lib/http.mjs';
-import {cvFields} from '../../public/employee-cv.mjs';
+import {cvFields,hrDeadlines} from '../../public/employee-cv.mjs';
 const ready=async db=>!!await db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='employee_cv'").first();
 const canRead=(actor,id)=>actor.role==='admin'||actor.id===id;
 function clean(value){
@@ -10,14 +10,27 @@ function clean(value){
  const out={};for(const [key,label,type,max] of cvFields){
   const v=value[key]??'';if(typeof v!=='string'||v.length>max||/[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]/.test(v))invalid(label+' không hợp lệ');
   out[key]=v.trim();
-  if(type==='date'&&out[key]&&(!validDay(out[key])||out[key]>dayVN()||out[key]<'1900-01-01'))invalid('Ngày sinh không hợp lệ');
+  if(type==='date'&&out[key]&&(!validDay(out[key])||out[key]<'1900-01-01'||out[key]>'2199-12-31'||key==='birth_date'&&out[key]>dayVN()))invalid(label+' không hợp lệ');
   if(type==='email'&&out[key]&&!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(out[key]))invalid('Email không hợp lệ');
+ }
+ for(const [start,end,label] of [['contract_start','contract_end','Hợp đồng'],['probation_start','probation_end','Thử việc']]){
+  if(out[end]&&!out[start])invalid(label+': cần ngày bắt đầu');
+  if(out[start]&&out[end]&&out[end]<out[start])invalid(label+': ngày kết thúc phải từ ngày bắt đầu');
  }
  if(new TextEncoder().encode(JSON.stringify(out)).length>24000)invalid('CV vượt dung lượng cho phép');
  return out;
 }
 export async function onRequestGet({request,env}){try{
- const actor=await actorFor(request,env),db=env.DB,id=identifier(new URL(request.url).searchParams.get('user_id')||actor.id);
+ const actor=await actorFor(request,env),db=env.DB,u=new URL(request.url);
+ if(u.searchParams.get('view')==='deadlines'){
+  if(actor.role!=='admin')throw new ApiError(403,'Chỉ Admin được xem thời hạn hồ sơ');
+  if(!await ready(db))return reply({available:false});
+  const day=dayVN(),rows=(await db.prepare("SELECT p.id,p.employee_code,p.full_name,json_extract(c.data_json,'$.contract_end') AS contract_end,json_extract(c.data_json,'$.probation_end') AS probation_end,CASE WHEN length(trim(COALESCE(json_extract(c.data_json,'$.probation_result'),'')))>0 THEN 'recorded' ELSE '' END AS probation_result FROM profiles p JOIN employee_cv c ON c.user_id=p.id WHERE p.active=1 AND p.role<>'admin' ORDER BY p.employee_code LIMIT 51").all()).results;
+  await actorFor(request,env,{admin:true});
+  const items=rows.slice(0,50).flatMap(({id,employee_code,full_name,...cv})=>hrDeadlines(cv,day).map(x=>({id,employee_code,full_name,...x}))).sort((a,b)=>a.end.localeCompare(b.end)||a.employee_code.localeCompare(b.employee_code));
+  return reply({available:true,day,window_days:30,items,truncated:rows.length>50});
+ }
+ const id=identifier(u.searchParams.get('user_id')||actor.id);
  if(!canRead(actor,id))throw new ApiError(404,'Không tìm thấy hồ sơ');
  if(!await ready(db))return reply({available:false});
  const hash=await digest('babymark-session-v1:'+request.headers.get('authorization').slice(7));

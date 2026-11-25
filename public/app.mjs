@@ -1,4 +1,5 @@
-import {cvFields} from './employee-cv.mjs';
+import {cvFields,hrFields,hrDeadlines} from './employee-cv.mjs';
+import {cvPrint} from './cv-print.mjs';
 import {observeMotion,stopMotion} from './motion.mjs';
 import {todayAssignments,captureEligible} from './attendance-window.mjs';
 import {calendarRange,calendarDays} from './schedule-calendar.mjs';
@@ -422,7 +423,7 @@ async function renderAdmin(id) {
  const rows=state.admin[tab[0]]||[],special=['settings','operations','rosters'].includes(tab[0]);
  const count=special?'':`<span class="admin-count">${rows.length} bản ghi</span>`;
  const add=special?'':`<button class="btn" data-action="admin-add" ${tab[0]==='branches'&&rows.filter(b=>b.active!==0).length>=state.admin.settings.branch_limit?'disabled title="Đã đạt giới hạn cửa hàng"':''}>${icon('plus')} ${tab[0]==='employees'?'Cấp tài khoản':'Thêm mới'}</button>`;
- const controls=tab[0]==='branches'?'<div class="card-body admin-tools"><button class="btn secondary" data-action="radius-all">Cài đặt bán kính cho phép</button></div>':tab[0]==='assignments'?filterBar()+'<div class="card-body admin-tools"><button class="btn secondary" data-action="bulk-assign">Phân ca hàng loạt</button><button class="btn" data-action="event-assign">Phân ca chương trình · 2 công</button></div>':tab[0]==='shifts'?'<div class="card-body admin-tools"><button class="btn secondary" data-action="all-day-preset">Bổ sung ca làm cả ngày (2 công)</button></div>':'';
+ const controls=tab[0]==='employees'?'<div class="card-body admin-tools"><button class="btn secondary" data-action="hr-deadlines">Thời hạn hợp đồng / thử việc</button></div>':tab[0]==='branches'?'<div class="card-body admin-tools"><button class="btn secondary" data-action="radius-all">Cài đặt bán kính cho phép</button></div>':tab[0]==='assignments'?filterBar()+'<div class="card-body admin-tools"><button class="btn secondary" data-action="bulk-assign">Phân ca hàng loạt</button><button class="btn" data-action="event-assign">Phân ca chương trình · 2 công</button></div>':tab[0]==='shifts'?'<div class="card-body admin-tools"><button class="btn secondary" data-action="all-day-preset">Bổ sung ca làm cả ngày (2 công)</button></div>':'';
  $('#admin-work').innerHTML=`<section class="card admin-panel"><div class="card-head"><div><p class="eyebrow">BABY MARK · QUẢN TRỊ</p><h2>${tab[2]}</h2><p class="muted">${tab[3]} · Quản trị viên</p></div>${count}${add}<button class="btn quiet small" data-action="refresh" aria-label="Làm mới dữ liệu" title="Làm mới">${icon('refresh')}</button></div>${controls}${special?(tab[0]==='settings'?settingsForm():tab[0]==='operations'?operationsPanel():rosterPanel()):`<div class="admin-search"><label>Tìm kiếm<input type="search" id="admin-search" placeholder="Tìm theo tên, mã hoặc thông tin" value="${esc(adminList.search)}" autocomplete="off"></label>${['employees','branches'].includes(tab[0])?`<label class="admin-active-filter"><input type="checkbox" id="admin-active-only" ${adminList.activeOnly?'checked':''}> Chỉ đang hoạt động${tab[0]==='employees'?' (không gồm Admin)':''}</label>`:''}</div><div id="admin-list"></div>`}</section>`;
  if(!special)renderAdminList();
 }
@@ -665,11 +666,14 @@ async function showEmployeeCV(id=state.user?.id){
  const d=await api('/api/employee-cv?'+query({user_id:id}));
  if(epoch!==state.sessionEpoch||render!==state.renderId)return;
  if(!d.available){showModal('Hồ sơ CV','<p class="hint">Cần migration 0021 để mở hồ sơ nhân sự. Dữ liệu chấm công hiện tại không bị ảnh hưởng.</p>');return;}
- const p=d.profile,cv=d.cv||{},fields=cvFields.map(([key,label,type,max])=>d.can_edit?`<label class="${type==='textarea'?'full':''}">${esc(label)}${type==='textarea'?`<textarea name="${key}" maxlength="${max}" rows="3">${esc(cv[key]||'')}</textarea>`:`<input name="${key}" type="${type}" maxlength="${max}" value="${esc(cv[key]||'')}" ${type==='date'?'max="'+today()+'"':''} autocomplete="off">`}</label>`:`<div class="cv-read-field"><small>${esc(label)}</small><p>${esc(cv[key]||'Chưa cập nhật')}</p></div>`).join('');
+ const p=d.profile,cv=d.cv||{},renderFields=items=>items.map(([key,label,type,max])=>d.can_edit?`<label class="${type==='textarea'?'full':''}">${esc(label)}${type==='textarea'?`<textarea name="${key}" maxlength="${max}" rows="3">${esc(cv[key]||'')}</textarea>`:`<input name="${key}" type="${type}" maxlength="${max}" value="${esc(cv[key]||'')}" ${key==='birth_date'?'max="'+today()+'"':''} autocomplete="off">`}</label>`:`<div class="cv-read-field"><small>${esc(label)}</small><p>${esc(cv[key]||'Chưa cập nhật')}</p></div>`).join('');
+ const hrKeys=new Set(hrFields.map(f=>f[0])),fields=renderFields(cvFields.filter(f=>!hrKeys.has(f[0]))),hr=renderFields(hrFields);
+ const deadline=hrDeadlines(cv,today()).map(x=>'<p class="hint">'+esc(x.label)+' · '+esc(dateVN(x.end))+' · '+(x.status==='expired'?'Đã quá ngày ghi nhận':x.status==='today'?'Đến hạn hôm nay':'Trong 30 ngày')+'</p>').join('');
+ const sections='<h3>Thông tin cá nhân và năng lực</h3><div class="form-grid cv-fields">'+fields+'</div><h3>Hợp đồng, thử việc và phát triển</h3><p class="hint">Chỉ ghi dữ liệu đã xác nhận. Không tự gia hạn hợp đồng, khóa tài khoản, thay đổi công hoặc lương.</p>'+deadline+'<div class="form-grid cv-fields">'+hr+'</div>';
  const periods=d.periods.map(x=>`<li>${esc(dateVN(x.start_date))} – ${x.end_date?esc(dateVN(x.end_date)):'Đang mở'}</li>`).join('');
  const header=`<div class="cv-header"><span class="avatar">${esc(p.full_name.split(/\s+/).map(x=>x[0]).slice(-2).join('').toUpperCase())}</span><div><h3>${esc(p.full_name)}</h3><p class="muted">${esc(p.employee_code)} · ${esc(roles[p.role]||p.role)} · ${esc(p.department||'Chưa có bộ phận')}</p><span class="tag">${p.active?'Tài khoản hoạt động':'Tài khoản đã khóa'}</span></div></div><p class="hint">Thông tin riêng: chỉ Admin và chính nhân viên được xem. Không nhập CCCD, mật khẩu, số tài khoản ngân hàng hoặc dữ liệu sức khỏe. Các mục đều không bắt buộc.</p>`;
  const history=`<h3>Quá trình làm việc tại BABY MARK</h3>${periods?'<ul>'+periods+'</ul>':'<p class="hint">Chưa xác nhận giai đoạn làm việc.</p>'}${d.periods_truncated?'<p class="hint">Hiển thị tối đa 100 giai đoạn.</p>':''}<h3>Cửa hàng từng được phân ca</h3><p>${esc(d.branches.map(x=>x.code+' · '+x.name).join('; ')||'Chưa có lịch phân ca')}</p><p class="hint">Lịch phân ca không chứng minh đã làm việc thực tế. Ngày vào/nghỉ việc lấy từ lịch sử đã xác nhận, không tự suy đoán.</p><p class="hint">Phiên bản ${esc(d.revision)} · ${d.updated_at?esc(dt(d.updated_at)):'Chưa lưu CV'}</p>`;
- showModal('Hồ sơ CV nhân viên',header+(d.can_edit?`<form class="form-stack" data-form="employee-cv" data-id="${esc(id)}" data-revision="${esc(d.revision)}"><div class="form-grid cv-fields">${fields}</div><p data-form-error class="error-text" role="alert" hidden></p><div class="modal-actions"><button type="submit" class="btn">Lưu hồ sơ CV</button></div></form>`:`<div class="form-grid cv-fields">${fields}</div>`)+history);
+ showModal('Hồ sơ CV nhân viên',header+(d.can_edit?`<form class="form-stack" data-form="employee-cv" data-id="${esc(id)}" data-revision="${esc(d.revision)}">${sections}<p data-form-error class="error-text" role="alert" hidden></p><div class="modal-actions"><button type="submit" class="btn">Lưu hồ sơ CV</button></div></form>`:sections)+history+`<div class="modal-actions"><button class="btn secondary" data-action="cv-print" data-id="${esc(id)}">In / lưu PDF hồ sơ đã lưu</button></div><p class="hint">Xuất bản đã lưu trên máy chủ, không bao gồm sửa đổi chưa lưu. Chỉ lưu PDF trên thiết bị được phép.</p>`);
 }
 async function showPhoto(id) {
   const epoch=state.sessionEpoch,ticket=showModal('Ảnh chấm công',loading());
@@ -951,6 +955,20 @@ document.addEventListener('click',async event=>{
       showModal('Xóa cửa hàng chưa sử dụng',`<p>Chỉ xóa được cửa hàng <strong>${esc(branch.name)}</strong> chưa có lịch phân công và chưa được giao cho quản lý. Cửa hàng có lịch sử sẽ bị từ chối; không xóa bảng công hoặc ảnh.</p><form data-form="branch-remove" data-id="${esc(branch.id)}"><p class="error-text inline-error" data-form-error hidden></p><div class="modal-actions"><button class="btn secondary" type="button" data-action="close-modal">Hủy</button><button class="btn danger" type="submit">Xác nhận xóa</button></div></form>`);return;
     }
     const employee=state.admin.employees?.find(r=>r.id===button.dataset.id);
+    if(action==='hr-deadlines'){
+      if(state.user?.role!=='admin')return;button.disabled=true;
+      const epoch=state.sessionEpoch,render=state.renderId;
+      const d=await api('/api/employee-cv?view=deadlines',{timeout:15000});
+      if(epoch!==state.sessionEpoch||render!==state.renderId)return;
+      showModal('Thời hạn hợp đồng và thử việc',d.available?'<p class="hint">Đã quá hạn hoặc đến hạn trong 30 ngày · chỉ tài khoản đang hoạt động · cần kiểm tra hồ sơ thực tế.</p>'+(d.items.map(x=>`<article class="operation-row"><div><strong>${esc(x.employee_code+' · '+x.full_name)}</strong><p>${esc(x.label)} · ${esc(dateVN(x.end))} · ${x.status==='expired'?'Quá hạn':x.status==='today'?'Hôm nay':'Sắp đến hạn'}</p></div><button class="btn secondary small" data-action="employee-cv" data-id="${esc(x.id)}">Mở hồ sơ</button></article>`).join('')||'<p>Không có thời hạn cần kiểm tra trong dữ liệu đã nhập.</p>')+(d.truncated?'<p class="hint">Giới hạn 50 hồ sơ.</p>':''):'<p>Cần migration 0021.</p>');return;
+    }
+    if(action==='cv-print'){
+      const epoch=state.sessionEpoch,render=state.renderId,ticket=modalTicket;button.disabled=true;
+      const d=await api('/api/employee-cv?'+query({user_id:button.dataset.id}),{timeout:15000});
+      if(epoch!==state.sessionEpoch||render!==state.renderId||ticket!==modalTicket||!modal.open)return;
+      const root=$('#print-document');root.innerHTML=cvPrint(d);document.body.classList.add('printing-document');
+      try{window.print();}catch(e){document.body.classList.remove('printing-document');root.innerHTML='';throw e;}return;
+    }
     if(action==='employee-cv')return await showEmployeeCV(button.dataset.id||state.user.id);
     if(action==='employment-history'){
       const employee=state.admin.employees.find(e=>e.id===button.dataset.id);if(!employee)return;
