@@ -6,9 +6,9 @@ import {componentsReady,validateComponents} from '../../../cloudflare/lib/payrol
 import {componentFields,salaryModes} from '../../../public/payroll-components.mjs';
 const ready=async db=>!!await db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='payroll_closings'").first();
 const snapshots=(db,m)=>db.prepare('SELECT revision,created_at,reason FROM payroll_closings WHERE month=? ORDER BY revision DESC').bind(m).all();
-function csv(d){
- const columns=['Mã NV','Nhân viên','Bộ phận','Ngày công','Ca đủ công','Công quy đổi','Làm thêm sau ca (phút)','Phút dự kiến','Phút thực tế','Phút trong ca','Phút ngoài ca','Ca nghỉ duyệt','Ca vắng','Ca cần kiểm tra','Đơn giá giờ VND','Tiền giờ trong ca','Khoản cộng','Khoản trừ','Tổng dự kiến','Ghi chú','Cách tính','Đơn giá công','Lương tháng đã đối soát','Phút làm thêm duyệt','Đơn giá làm thêm','Tiền làm thêm','Cộng khác','Trừ khác',...componentFields.map(([,label])=>label)];
- const rows=d.rows.map(r=>[r.employee_code,r.full_name,r.department,r.days,r.shifts,r.work_units??null,r.overtime_minutes??null,r.planned_minutes,r.worked_minutes,r.regular_minutes,r.extra_minutes,r.leave_shifts,r.absence_shifts,r.issues,r.hourly_rate,r.base,r.additions,r.deductions,r.estimated_total,r.note,salaryModes[r.components?.salary_mode]??'',r.components?.unit_rate,r.components?.monthly_base,r.overtime_paid_minutes,r.components?.overtime_rate,r.overtime_pay,r.additions_other,r.deductions_other,...componentFields.map(([k])=>r.components?.[k])]);
+function csv(d,revision){
+ const columns=['Mã NV','Nhân viên','Bộ phận','Ngày công','Ca đủ công','Công quy đổi','Làm thêm sau ca (phút)','Phút dự kiến','Phút thực tế','Phút trong ca','Phút ngoài ca','Ca nghỉ duyệt','Ca vắng','Ca cần kiểm tra','Ca chờ duyệt','Đơn giá giờ VND','Tiền giờ trong ca','Khoản cộng','Khoản trừ','Tổng dự kiến','Ghi chú','Cách tính','Đơn giá công','Lương tháng đã đối soát','Phút làm thêm duyệt','Đơn giá làm thêm','Tiền làm thêm','Cộng khác','Trừ khác',...componentFields.map(([,label])=>label),'Tháng','Phiên bản','Phiên bản nguồn'];
+ const rows=d.rows.map(r=>[r.employee_code,r.full_name,r.department,r.days,r.shifts,r.work_units??null,r.overtime_minutes??null,r.planned_minutes,r.worked_minutes,r.regular_minutes,r.extra_minutes,r.leave_shifts,r.absence_shifts,r.issues,r.pending,r.hourly_rate,r.base,r.additions,r.deductions,r.estimated_total,r.note,salaryModes[r.components?.salary_mode]??'',r.components?.unit_rate,r.components?.monthly_base,r.overtime_paid_minutes,r.components?.overtime_rate,r.overtime_pay,r.additions_other,r.deductions_other,...componentFields.map(([k])=>r.components?.[k]),d.month,revision===null?'Dự thảo':'Bản chốt #'+revision,d.source_version??'']);
  return new Response('\uFEFF'+[columns,...rows].map(r=>r.map(csvCell).join(',')).join('\r\n'),{headers:{'Content-Type':'text/csv; charset=utf-8','Cache-Control':'private, no-store','Content-Disposition':'attachment; filename="BABY_MARK_PAYROLL_'+d.month+'.csv"'}});
 }
 export async function onRequestGet({request,env}){
@@ -22,7 +22,7 @@ export async function onRequestGet({request,env}){
   const row=await db.prepare('SELECT snapshot_json FROM payroll_closings WHERE month=? AND revision=?').bind(month,Number(revision)).first();
   if(!row)throw new ApiError(404,'Không có bản chốt');data=JSON.parse(row.snapshot_json);
  }else data=await payrollDraft(db,actor,month);
- if(u.searchParams.get('format')==='csv')return csv(data);
+ if(u.searchParams.get('format')==='csv')return csv(data,revision);
  return reply({available:true,data,revisions:(await snapshots(db,month)).results,selected_revision:revision===null?null:Number(revision)});
  }catch(e){return apiFailure(e)}
 }
@@ -58,6 +58,7 @@ export async function onRequestPost({request,env}){
   if(!draft.month_ended||draft.pending||draft.missing_rates||!draft.rows.length)throw new ApiError(409,'Chỉ chốt tháng đã kết thúc, đủ đơn giá và không có yêu cầu chờ duyệt');
   if(draft.source_version===null)throw new ApiError(409,'Cần migration 0017 để chốt lương an toàn');
   if(b.expected_source_version!==draft.source_version)throw new ApiError(409,'Dữ liệu đã đổi sau khi xem bảng lương; tải lại và đối soát');
+  if(draft.overlap_count)throw new ApiError(409,'Có khoảng giờ chấm công trùng nhau; đối soát giờ vào/ra trước khi chốt lương');
   if(draft.issues)throw new ApiError(409,'Còn ca bất thường chưa được xử lý; không thể chốt lương');
   if(draft.overtime_review_count)throw new ApiError(409,'Thời gian làm thêm đã thay đổi, cần đối soát lại số phút duyệt');
   if(draft.rows.some(r=>r.estimated_total<0))throw new ApiError(409,'Có tổng âm, kiểm tra khoản điều chỉnh');

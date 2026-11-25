@@ -14,6 +14,7 @@ export function payrollSheets(data,rows,title,subtitle,headers,values){
  ...totalKeys.map((k,i)=>[totalLabels[i],sum(rows,k),rows.some(r=>!numeric(r[k]))?'Chỉ cộng dữ liệu đã ghi nhận; có thể chưa đầy đủ':'']),
  ['Tổng quỹ lương đã tính',sum(known,'estimated_total'),missing?'Chưa bao gồm '+missing+' nhân viên thiếu đơn giá':'Đã có số liệu cho tất cả nhân viên'],
  ['Quy tắc','Cơ bản + làm thêm đã duyệt + cộng - trừ','Thuế, bảo hiểm, đơn giá làm thêm do Admin đối soát'],
+ ['Giờ chấm công trùng',d.overlap_count??null,d.overlap_count?'Dự thảo chưa loại giờ trùng; không được chốt trước khi đối soát':d.overlap_count==null?'Bản cũ chưa có kiểm tra này':'Không phát hiện trong phạm vi kiểm tra'],
  ['Chi tiết công',d.attendance_detail?.version===1?'Có dữ liệu tại thời điểm tính/chốt':unknown,'Bản cũ giữ nguyên; không lấy dữ liệu công mới để bổ sung bản chốt cũ']
  ]},{name:'Bảng lương đầy đủ',title,subtitle,headers,rows:rows.map(values),freezeCols:3}];
  const groups=new Map();for(const r of rows){const k=r.department||'Chưa phân bộ phận';if(!groups.has(k))groups.set(k,[]);groups.get(k).push(r);}
