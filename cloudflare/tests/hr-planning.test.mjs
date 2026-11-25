@@ -26,6 +26,7 @@ test('opt-in scheduler respects weekdays, keeps existing slots and creates futur
  assert.equal((await f.db.prepare("SELECT COUNT(*) AS n FROM workforce_requests WHERE user_id=? AND kind='LEAVE' AND state='PENDING'").bind(f.ids.staff).first()).n,10);
  assert.equal((await call({...config,enabled:false})).status,200);
  assert.deepEqual((await (await run()).json()).branches,[]);
+ assert.equal((await run('?branch_id=BM-001')).status,409);
  }finally{f.close()}
 });
 test('payroll uses explicit rate, regular time and immutable revisions',async()=>{

@@ -9,6 +9,7 @@ concurrency:
   cancel-in-progress: false
 jobs:
   roster:
+    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     timeout-minutes: 5
     env:
@@ -19,8 +20,8 @@ jobs:
         run: |
           set -euo pipefail
           if [[ -z "${ROSTER_SECRET:-}" ]]; then
-            echo "Skipped: scheduler secret not configured."
-            exit 0
+            echo "::error::Scheduler secret not configured."
+            exit 1
           fi
           response="$(mktemp)"
           trap 'rm -f "$response"' EXIT
@@ -32,7 +33,7 @@ jobs:
             if ! [[ "$branch" =~ ^[a-zA-Z0-9._-]{1,64}$ ]]; then exit 1; fi
             if curl --fail --silent --show-error --max-time 30 --output "$response" --request POST --header "Authorization: Bearer $ROSTER_SECRET" "https://babymark.pages.dev/api/maintenance/rosters?branch_id=$branch"; then
               jq '{created,skipped,failed}' "$response"
-              if ! jq -e '.failed == 0' "$response" >/dev/null; then failed=1; fi
+              if ! jq -e '.failed == 0 and (.results | length == 1)' "$response" >/dev/null; then failed=1; fi
             else failed=1; fi
           done
           exit "$failed"

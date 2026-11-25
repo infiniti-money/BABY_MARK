@@ -16,3 +16,14 @@ test('v1.2 schema and diagnostics are read-only, admin-scoped, and detect 0016',
   const h=await (await f.call(health,null,{method:'GET'})).json();assert.equal(h.payroll_components_ready,false);assert.equal(h.schema_ready,false);
  }finally{f.close()}
 });
+
+test('diagnostics detects stale and ineligible individual roster configurations despite a recent run',async()=>{
+ const f=await appFixture();try{
+  const now=Date.now();
+  await f.db.prepare("INSERT INTO roster_automation(branch_id,weekday_mask,enabled,updated_by,updated_at,last_run_at,last_status) VALUES('BM-001',31,1,?,?,?,'OK')").bind(f.ids.admin,now,now).run();
+  await f.db.prepare("INSERT INTO roster_automation(branch_id,weekday_mask,enabled,updated_by,updated_at,last_run_at,last_status) VALUES('BM-002',31,1,?,?,?,'OK')").bind(f.ids.admin,now,now-40*3600000).run();
+  const r=await f.call(diagnostic,'admin',{method:'GET'});assert.equal(r.status,200);
+  const d=await r.json();assert.equal(d.roster.stale,true);assert.equal(d.roster.ineligible,2);assert.equal(d.roster.branches.find(b=>b.branch_id==='BM-002').stale,true);
+  assert.ok(d.issues.some(i=>i.code==='ROSTER_INELIGIBLE'));
+ }finally{f.close()}
+});
