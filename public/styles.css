@@ -475,3 +475,25 @@ td,th{overflow-wrap:anywhere}
  .login-mobile-brand img{animation:bm-logo-in 300ms var(--motion-ease) both}
  @media(max-width:360px){.brand-intro-emblem{width:146px;height:146px}.brand-logo-assembly{width:112px;height:112px}}
 }
+
+
+/* RC.12 — official supplied BABY MARK identity, not an AI-redrawn logo. */
+@media screen{
+ :root{--brand-red:#D2282F;--wine:var(--brand-red);--wine-dark:#A81F25;--pink:#FFF0F1}
+ .brand .brand-wordmark,.login-brand .brand-wordmark{display:block;width:clamp(94px,10vw,140px);height:auto;border-radius:0;object-fit:contain}
+ .login-brand .brand-wordmark{width:clamp(145px,17vw,215px)}
+ .brand>img,.login-brand>img,.mobile-brand-logo,.login-mobile-brand img,.boot img{object-fit:contain;border-radius:0}
+ .welcome-brand-name,.login-mobile-brand p,.topbar-path .mobile-brand-name{color:var(--brand-red)}
+ .login-story{background:radial-gradient(ellipse at 80% 85%,#F7D9DB 0,transparent 55%),#FFF2F2}
+ .login-story h1{color:#A81F25}
+ .brand-intro-name{position:relative;display:block;width:min(242px,76vw);height:auto;aspect-ratio:2018/428;overflow:hidden}
+ .brand-intro-name img{position:absolute;inset:0;width:100%;height:100%;object-fit:contain}
+ .brand-intro-lockup .brand-intro-slogan{color:var(--brand-red)}
+ .brand-intro:not([hidden]){background:radial-gradient(ellipse at 50% 46%,#fff 0%,#fff9f9 46%,#fae4e5 100%)}
+ .brand-intro-ring{border-color:#e8b2b4;background:conic-gradient(from 45deg,#d2282f00,#d2282f20,#d2282f00 68%)}
+ .scroll-progress{background:linear-gradient(90deg,#D2282F,#EB8084,#F2B8BA)}
+}
+@media screen and (prefers-reduced-motion:no-preference){
+ .intro-wordmark-left{clip-path:inset(0 50% 0 0);animation:bm-intro-left 400ms 320ms var(--motion-ease) both}
+ .intro-wordmark-right{clip-path:inset(0 0 0 50%);animation:bm-intro-right 400ms 320ms var(--motion-ease) both}
+}
