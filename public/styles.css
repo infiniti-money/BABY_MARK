@@ -651,3 +651,15 @@ td,th{overflow-wrap:anywhere}
  .topbar,.sidebar,.login-box,dialog{-webkit-backdrop-filter:none;backdrop-filter:none;background:var(--glass-solid)}
  .card,.stat{box-shadow:0 4px 12px rgba(112,37,53,.06)}
 }
+
+/* Direct overview KPI navigation: keep existing glass layout and icon set. */
+@media screen{
+ .overview-kpi{font:inherit;color:inherit;text-align:left;cursor:pointer;display:flex;flex-direction:column;align-items:stretch;justify-content:flex-start;min-width:0;width:100%;appearance:none;-webkit-appearance:none}
+ .overview-kpi .kpi-link{display:block;font-size:10px;font-weight:650;color:var(--wine);margin-top:auto;padding-top:7px;line-height:1.4}
+ .overview-kpi:hover,.overview-kpi[aria-pressed="true"]{border-color:var(--wine);box-shadow:0 0 0 1px var(--wine)}
+ .overview-kpi:focus-visible,.overview-attendance:focus-visible{outline:2px solid var(--wine);outline-offset:2px}
+ .overview-attendance{scroll-margin-top:90px}
+ .admin-active-filter{display:flex;align-items:center;gap:8px;flex-direction:row;justify-content:flex-start}
+ .admin-active-filter input{width:18px;height:18px;flex:0 0 18px}
+ @media(max-width:620px){.overview-kpi .kpi-link{font-size:10px}}
+}
