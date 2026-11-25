@@ -497,3 +497,11 @@ td,th{overflow-wrap:anywhere}
  .intro-wordmark-left{clip-path:inset(0 50% 0 0);animation:bm-intro-left 400ms 320ms var(--motion-ease) both}
  .intro-wordmark-right{clip-path:inset(0 0 0 50%);animation:bm-intro-right 400ms 320ms var(--motion-ease) both}
 }
+
+/* RC.13 — distinct functional icons, consistent 24px geometry, no icon-only actions. */
+@media screen{
+ .nav button .icon,.admin-nav button .icon,.quick-actions .icon,.overview-kpis .icon{stroke-width:1.8}
+ .quick-actions .btn{gap:6px;justify-content:flex-start;text-align:left}
+ .quick-actions .btn .icon{width:18px;height:18px;flex:0 0 18px;color:var(--wine)}
+ @media(max-width:360px){.quick-actions .btn .icon{width:16px;height:16px;flex-basis:16px}.quick-actions .btn{gap:4px;font-size:11px}}
+}

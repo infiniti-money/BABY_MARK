@@ -29,7 +29,7 @@ for(const file of (await readdir(resolve(root,'cloudflare/d1'))).filter(x=>x.end
  for(const statement of statements(sql))await db.prepare(statement).run();
 }
 if(demo){const d=await seedDemo(db,cronSecret);console.log('\n=== CHỈ DỮ LIỆU DEMO LOCAL ===\nTên đăng nhập: demo-admin / demo-ql-01 / demo-ql-02 / demo-01-a ... demo-14-b\nMã truy cập tạm thời cho các tài khoản DEMO: '+d.secret+'\nTháng đối soát: '+d.prevMonth+'\nCa tương lai đã tạo: '+d.created+'\nDữ liệu sẽ mất khi dừng máy chủ. Không dùng mã này trên production.\n');}else await seedApp(db);
-const mime={'.html':'text/html; charset=utf-8','.mjs':'text/javascript; charset=utf-8','.js':'text/javascript; charset=utf-8','.css':'text/css; charset=utf-8','.png':'image/png','.json':'application/json','.webmanifest':'application/manifest+json; charset=utf-8'};
+const mime={'.html':'text/html; charset=utf-8','.mjs':'text/javascript; charset=utf-8','.js':'text/javascript; charset=utf-8','.css':'text/css; charset=utf-8','.png':'image/png','.svg':'image/svg+xml','.ico':'image/x-icon','.webp':'image/webp','.json':'application/json','.webmanifest':'application/manifest+json; charset=utf-8'};
 const assetRoot=resolve(root,'dist');
 // Apply the global and exact-path Cloudflare header rules separately. Otherwise
 // /apple-touch-icon.png's Content-Type overwrites every HTML and JS response.

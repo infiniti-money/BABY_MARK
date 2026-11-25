@@ -675,3 +675,18 @@ test('RC.12 official wordmark, transparent symbol and install icons load locally
  await login(page,'staff');
  await expect(page.locator('.sidebar .brand-wordmark')).toBeVisible();
 });
+
+test('RC.13 admin navigation, settings tabs, KPI and quick actions have distinct functional SVGs',async({page})=>{
+ await page.emulateMedia({reducedMotion:'reduce'});await page.setViewportSize({width:1440,height:900});await login(page);
+ const unique=async selector=>{const icons=await page.locator(selector).evaluateAll(nodes=>nodes.map(n=>({name:n.dataset.icon,shape:n.innerHTML})));expect(icons.length).toBeGreaterThan(1);expect(icons.every(x=>x.name&&x.shape)).toBeTruthy();expect(new Set(icons.map(x=>x.name)).size).toBe(icons.length);expect(new Set(icons.map(x=>x.shape)).size).toBe(icons.length);};
+ await unique('#main-nav button[data-view] svg[data-icon]');
+ await unique('.overview-kpis svg[data-icon]');
+ await unique('.quick-actions svg[data-icon]');
+ await page.getByRole('button',{name:'Quản trị',exact:true}).click();
+ await expect(page.getByRole('tab',{name:'Cài đặt',exact:true})).toBeVisible();
+ await expect(page.locator('.admin-nav button[role=tab] svg[data-icon]')).toHaveCount(7);
+ await unique('.admin-nav button[role=tab] svg[data-icon]');
+ await page.getByRole('tab',{name:'Vận hành',exact:true}).click();
+ await expect(page.getByRole('tab',{name:'Vận hành',exact:true})).toHaveAttribute('aria-selected','true');
+ for(const width of [320,390,768,1440]){await page.setViewportSize({width,height:844});expect(await page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth)).toBeTruthy();}
+});
