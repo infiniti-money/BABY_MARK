@@ -1,7 +1,9 @@
-# BABY MARK v1.1.0 — HR Management
+# BABY MARK v1.2.0 RC — HR Management
 Hệ thống quản lý nhân sự nội bộ cho chuỗi cửa hàng. Nền tảng đang hoạt động: `public/` + `functions/` trên **Cloudflare Pages + D1 + KV**. Không sử dụng API trả phí mới, không tự nâng cấp gói. Các thư mục Next.js/Expo/Supabase cũ chỉ là nguồn lịch sử, không nằm trong build Pages.
 
-**Production:** https://babymark.pages.dev/  
+**Candidate:** [v1.2.0 RC — scope and release gates](docs/releases/v1.2.0-rc.md). Not yet approved for production.
+
+**Production (existing):** https://babymark.pages.dev/  
 **Bản phát hành:** [v1.1.0 — chức năng, kiểm thử và giới hạn](docs/releases/v1.1.0.md).
 
 ## Chức năng chính

@@ -3,6 +3,10 @@ import {HttpError} from '../../../cloudflare/lib/http.mjs';
 const validText=(v,n)=>typeof v==='string'&&v.trim().length>0&&v.length<=n;
 const uuid=v=>typeof v==='string'&&/^[0-9a-f-]{36}$/i.test(v);
 const HOURS=8, REMEMBER_HOURS=30*24;
+const sessionHandle=hash=>digest('babymark-session-handle-v1:'+hash);
+async function ownSessions(db,user,now){
+ return (await db.prepare('SELECT s.token_hash,s.created_at,s.expires_at FROM sessions s JOIN credentials c ON c.user_id=s.user_id AND c.version=s.credential_version WHERE s.user_id=? AND s.expires_at>? ORDER BY s.created_at DESC,s.token_hash LIMIT 100').bind(user,now).all()).results;
+}
 async function issuedCredential(b){
  if(b.password_key===undefined&&b.password_salt===undefined)return generateCredential();
  if(!validPasswordKey(b.password_key)||!validPasswordSalt(b.password_salt))return null;
@@ -18,6 +22,11 @@ export async function onRequestGet({request,env,params}){
   const hash=await digest('babymark-session-v1:'+request.headers.get('authorization').slice(7));
   const row=await env.DB.prepare('SELECT COUNT(*) AS total,MAX(CASE WHEN s.token_hash=? THEN s.expires_at END) AS current_expires_at FROM sessions s JOIN credentials c ON c.user_id=s.user_id AND c.version=s.credential_version WHERE s.user_id=? AND s.expires_at>?').bind(hash,actor.id,Date.now()).first();
   return reply({total:row.total,other:Math.max(0,row.total-1),current_expires_at:row.current_expires_at});
+ }
+ if(params.action==='devices'){
+  const current=await digest('babymark-session-v1:'+request.headers.get('authorization').slice(7));
+  const rows=await ownSessions(env.DB,actor.id,Date.now());
+  return reply({sessions:await Promise.all(rows.map(async r=>({id:await sessionHandle(r.token_hash),created_at:r.created_at,expires_at:r.expires_at,current:r.token_hash===current}))),limit:100});
  }
  if(params.action==='self-salt'&&actor.role!=='admin'){
   const c=await env.DB.prepare('SELECT salt FROM credentials WHERE user_id=?').bind(actor.id).first();
@@ -58,6 +67,16 @@ export async function onRequestPost({request,env,params}){
  return reply({token,expires_at:expires,remember});
  }
  const actor=await sessionUser(request,db);if(!actor)return reply({error:'Chưa đăng nhập'},401);
+ if(action==='revoke-device'){
+  if(typeof b.id!=='string'||!/^[0-9a-f]{64}$/.test(b.id))return reply({error:'Phiên không hợp lệ'},400);
+  const current=await digest('babymark-session-v1:'+request.headers.get('authorization').slice(7));
+  const rows=await ownSessions(db,actor.id,now);
+  const handles=await Promise.all(rows.map(r=>sessionHandle(r.token_hash)));
+  const target=rows[handles.findIndex(h=>equalHash(h,b.id))];
+  if(!target||target.token_hash===current)return reply({error:'Không tìm thấy phiên khác của tài khoản'},404);
+  const result=await db.prepare('DELETE FROM sessions WHERE user_id=? AND token_hash=? AND token_hash<>? AND EXISTS(SELECT 1 FROM sessions s JOIN credentials c ON c.user_id=s.user_id AND c.version=s.credential_version JOIN profiles p ON p.id=s.user_id AND p.active=1 WHERE s.token_hash=? AND s.user_id=? AND s.expires_at>?)').bind(actor.id,target.token_hash,current,current,actor.id,Date.now()).run();
+  return reply({ok:result.meta.changes===1,revoked:result.meta.changes},result.meta.changes===1?200:409);
+ }
  if(action==='revoke-other-sessions'){
  const hash=await digest('babymark-session-v1:'+request.headers.get('authorization').slice(7));
  const result=await db.prepare('DELETE FROM sessions WHERE user_id=? AND token_hash<>? AND EXISTS(SELECT 1 FROM sessions current JOIN credentials c ON c.user_id=current.user_id AND c.version=current.credential_version JOIN profiles p ON p.id=current.user_id AND p.active=1 WHERE current.token_hash=? AND current.user_id=? AND current.expires_at>?)').bind(actor.id,hash,hash,actor.id,Date.now()).run();
@@ -94,6 +113,20 @@ export async function onRequestPost({request,env,params}){
  }
  if(actor.role!=='admin')return reply({error:'Không có quyền'},403);
  const audit=(id,action)=>db.prepare('INSERT INTO auth_audit(id,actor_id,target_id,action,created_at) VALUES(?,?,?,?,?)').bind(crypto.randomUUID(),actor.id,id,action,now);
+ if(action==='rename-username'){
+  const username=usernameOf(b.username);
+  if(!uuid(b.user_id)||!validUsername(username))return reply({error:'Tên đăng nhập hoặc tài khoản không hợp lệ'},400);
+  const current=await digest('babymark-session-v1:'+request.headers.get('authorization').slice(7));
+  const target=await db.prepare("SELECT c.username,c.version FROM credentials c JOIN profiles p ON p.id=c.user_id WHERE c.user_id=? AND p.role<>'admin'").bind(b.user_id).first();
+  if(!target)return reply({error:'Chỉ đổi tên tài khoản nhân viên hoặc quản lý'},403);
+  if(target.username===username)return reply({ok:true,username,unchanged:true});
+  const result=await db.batch([
+   db.prepare("UPDATE credentials SET username=?,updated_at=? WHERE user_id=? AND username=? AND version=? AND EXISTS(SELECT 1 FROM profiles p WHERE p.id=credentials.user_id AND p.role<>'admin') AND EXISTS(SELECT 1 FROM sessions s JOIN credentials c ON c.user_id=s.user_id AND c.version=s.credential_version JOIN profiles p ON p.id=s.user_id AND p.active=1 AND p.role='admin' WHERE s.token_hash=? AND s.user_id=? AND s.expires_at>?)").bind(username,now,b.user_id,target.username,target.version,current,actor.id,Date.now()),
+   db.prepare("INSERT INTO management_audit(id,actor_id,resource,resource_id,action,details_json,created_at) SELECT ?,?,'credentials',?,'RENAME_USERNAME','{}',? WHERE changes()=1").bind(crypto.randomUUID(),actor.id,b.user_id,now)
+  ]);
+  if(result[0].meta.changes!==1)return reply({error:'Phiên hoặc tài khoản đã thay đổi'},409);
+  return reply({ok:true,username});
+ }
  if(action==='create'){
  const username=usernameOf(b.username);
  if(!validUsername(username)||!validText(b.employee_code,40)||!validText(b.full_name,120)||!['staff','manager'].includes(b.role)||typeof b.department!=='string'||b.department.length>100)return reply({error:'Thông tin tài khoản không hợp lệ'},400);
