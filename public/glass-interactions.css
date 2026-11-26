@@ -48,15 +48,15 @@
  }
 }
 @media screen and (prefers-reduced-motion:no-preference){
- .motion-revealed[data-motion-side=left]{animation:bm-reveal-left 420ms var(--motion-ease) both}
- .motion-revealed[data-motion-side=right]{animation:bm-reveal-right 420ms var(--motion-ease) both}
- .pull-refresh[data-state=refreshing] .pull-piece{display:block;animation-duration:380ms;animation-timing-function:var(--motion-ease);animation-fill-mode:both}
+ .motion-revealed[data-motion-side=left]{animation:bm-reveal-left 850ms cubic-bezier(.22,.75,.25,1) both}
+ .motion-revealed[data-motion-side=right]{animation:bm-reveal-right 850ms cubic-bezier(.22,.75,.25,1) both}
+ .pull-refresh[data-state=refreshing] .pull-piece{display:block;animation-duration:700ms;animation-timing-function:var(--motion-ease);animation-fill-mode:both}
  .pull-refresh[data-state=refreshing] .pull-piece.tl{clip-path:inset(0 50% 50% 0);animation-name:bm-piece-tl}
  .pull-refresh[data-state=refreshing] .pull-piece.tr{clip-path:inset(0 0 50% 50%);animation-name:bm-piece-tr}
  .pull-refresh[data-state=refreshing] .pull-piece.bl{clip-path:inset(50% 50% 0 0);animation-name:bm-piece-bl}
  .pull-refresh[data-state=refreshing] .pull-piece.br{clip-path:inset(50% 0 0 50%);animation-name:bm-piece-br}
- .pull-refresh[data-state=refreshing] .pull-complete{animation:bm-logo-complete 90ms 350ms both}
- .pull-refresh[data-state=refreshing] .pull-refresh-wordmark{animation:bm-reveal-right 380ms var(--motion-ease) both}
+ .pull-refresh[data-state=refreshing] .pull-complete{animation:bm-logo-complete 180ms 650ms both}
+ .pull-refresh[data-state=refreshing] .pull-refresh-wordmark{animation:bm-refresh-brand-in 550ms 450ms cubic-bezier(.22,.75,.25,1) both}
 }
 @media screen and (prefers-reduced-transparency:reduce),screen and (forced-colors:active){
  :root{--bm-frost-panel:#fff;--bm-frost-control:#faf7fc;--bm-frost-modal:#fff}
@@ -129,4 +129,49 @@
 }
 @media screen and (max-width:900px) and (orientation:landscape) and (max-height:500px){
  .shell .sidebar .nav :is(.primary-nav,.mobile-more)>.icon{width:36px;height:36px;flex-basis:36px;padding:7px}
+}
+
+/* Keep the small pull hint while dragging; after release center the brand
+   in a viewport-sized frosted layer. No layout shift or blocked input. */
+@media screen{
+ .pull-refresh[data-state=refreshing]{
+  position:fixed;inset:0;display:grid;place-items:center;transform:none;
+  width:100%;height:100%;max-width:none;max-height:none;box-sizing:border-box;
+  padding:max(20px,env(safe-area-inset-top)) max(20px,env(safe-area-inset-right)) max(20px,env(safe-area-inset-bottom)) max(20px,env(safe-area-inset-left));
+  border:0;border-radius:0;background:rgba(252,245,250,.93);box-shadow:none;
+ }
+ .pull-refresh[data-state=refreshing] .pull-refresh-brand{
+  display:grid;justify-items:center;text-align:center;gap:18px;
+  width:min(100%,440px);min-width:0;
+ }
+ .pull-refresh[data-state=refreshing] .pull-refresh-logo{
+  width:clamp(132px,44vw,200px);height:auto;aspect-ratio:632/697;
+ }
+ .pull-refresh[data-state=refreshing] .pull-refresh-wordmark{justify-items:center;gap:8px;width:100%}
+ .pull-refresh[data-state=refreshing] .pull-refresh-wordmark img{width:min(100%,280px)}
+ .pull-refresh[data-state=refreshing] .pull-refresh-wordmark strong{font-size:clamp(16px,4.8vw,21px);font-weight:750;color:#a61b37}
+ .pull-refresh[data-state=refreshing] .pull-refresh-wordmark small{font-size:13px;color:#514657}
+ @supports (backdrop-filter:blur(1px)) or (-webkit-backdrop-filter:blur(1px)){
+  .pull-refresh[data-state=refreshing]{
+   background:radial-gradient(ellipse at center,rgba(255,250,253,.88),rgba(239,225,241,.62));
+   -webkit-backdrop-filter:blur(18px) saturate(125%);backdrop-filter:blur(18px) saturate(125%);
+  }
+ }
+}
+@media screen and (max-height:500px) and (orientation:landscape){
+ .pull-refresh[data-state=refreshing] .pull-refresh-logo{width:clamp(92px,32dvh,132px)}
+ .pull-refresh[data-state=refreshing] .pull-refresh-brand{gap:8px}
+ .pull-refresh[data-state=refreshing] .pull-refresh-wordmark img{width:min(100%,220px)}
+}
+@media screen and (prefers-reduced-motion:no-preference){
+ @keyframes bm-refresh-brand-in{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:none}}
+ .pull-refresh[data-state=refreshing]{animation:bm-refresh-overlay-in 240ms ease-out both}
+ @keyframes bm-refresh-overlay-in{from{opacity:0}to{opacity:1}}
+}
+@media screen and (prefers-reduced-transparency:reduce),screen and (forced-colors:active){
+ .pull-refresh[data-state=refreshing]{background:#fff;-webkit-backdrop-filter:none;backdrop-filter:none}
+}
+@media screen and (forced-colors:active){
+ .pull-refresh[data-state=refreshing]{background:Canvas}
+ .pull-refresh[data-state=refreshing] .pull-refresh-wordmark strong,.pull-refresh[data-state=refreshing] .pull-refresh-wordmark small{color:CanvasText}
 }

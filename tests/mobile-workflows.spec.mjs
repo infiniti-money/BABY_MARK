@@ -160,7 +160,7 @@ test('rounded controls and floating audit modal preserve accepted filters; pull 
  await day.fill(original);await day.blur();
  await gesture(25);await expect(page.locator('#pull-refresh')).toBeHidden();expect(reads).toBe(0);
  let release;const pending=new Promise(resolve=>release=resolve);await page.route('**/api/admin/overview?*',async route=>{await pending;await route.continue();});
- try{await gesture(150);await expect(page.locator('#pull-refresh')).toBeVisible();await expect(page.locator('#pull-refresh')).toHaveAttribute('data-state','refreshing');await expect(page.locator('#pull-refresh strong')).toHaveText('Thấu hiểu điều mẹ muốn');await gesture(150);await expect.poll(()=>reads).toBe(1);}finally{release();}
+ try{await gesture(150);await expect(page.locator('#pull-refresh')).toBeVisible();await expect(page.locator('#pull-refresh')).toHaveAttribute('data-state','refreshing');await expect(page.locator('#pull-refresh strong')).toHaveText('Thấu hiểu điều mẹ muốn');const overlay=await page.locator('#pull-refresh').evaluate(el=>{const b=el.getBoundingClientRect(),logo=el.querySelector('.pull-refresh-logo').getBoundingClientRect(),brand=el.querySelector('.pull-refresh-brand').getBoundingClientRect(),s=getComputedStyle(el);return {full:Math.abs(b.width-innerWidth)<=1&&Math.abs(b.height-innerHeight)<=1,center:Math.abs(brand.x+brand.width/2-innerWidth/2)<=2&&Math.abs(brand.y+brand.height/2-innerHeight/2)<=2,logo:logo.width,blur:s.backdropFilter||s.webkitBackdropFilter};});expect(overlay.full).toBe(true);expect(overlay.center).toBe(true);expect(overlay.logo).toBeGreaterThanOrEqual(132);expect(overlay.blur).toContain('blur(18px)');await gesture(150);await expect.poll(()=>reads).toBe(1);}finally{release();}
  await expect(page.locator('#pull-refresh')).toBeHidden();await expect(page.locator('#pull-refresh-status')).toHaveText('Đã làm mới dữ liệu.');expect(writes).toBe(0);await expect(form.locator('[name=day]')).toHaveValue(original);
 });
 
@@ -182,4 +182,12 @@ test('shared icon scale and compact labels reach all roles and tables without lo
   const cells=page.locator('.table-wrap .responsive-table td[data-label]');
   if(await cells.count())await expect(cells.first()).toHaveCSS('font-size','13px');
  }
+});
+
+test('scroll text reveals slowly from both sides and respects reduced motion',async({page})=>{
+ await page.emulateMedia({reducedMotion:'no-preference'});await page.setViewportSize({width:390,height:844});await login(page,'admin');
+ const left=page.locator('#content [data-motion-side="left"]').first(),right=page.locator('#content [data-motion-side="right"]').last();
+ await left.scrollIntoViewIfNeeded();await expect(left).toHaveClass(/motion-revealed/);await expect(left).toHaveCSS('animation-duration','0.85s');await expect(left).toHaveCSS('animation-name','bm-reveal-left');
+ await right.scrollIntoViewIfNeeded();await expect(right).toHaveClass(/motion-revealed/);await expect(right).toHaveCSS('animation-duration','0.85s');await expect(right).toHaveCSS('animation-name','bm-reveal-right');
+ await page.emulateMedia({reducedMotion:'reduce'});await expect(left).toHaveCSS('animation-name','none');await expect(right).toHaveCSS('animation-name','none');
 });
