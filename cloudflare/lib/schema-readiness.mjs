@@ -117,7 +117,9 @@ export const checks=[
  ["0018","","","attendance_no_rejected_extra",""],
  ["0019","push_queue","push_queue_pending","",""],
  ["0020","work_unit_reviews","work_unit_reviews_assignment","work_unit_reviews_immutable_update work_unit_reviews_immutable_delete payroll_epoch_work_unit_reviews_insert",""],
- ["0021","employee_cv","","employee_cv_audit_insert employee_cv_audit_update",""]
+ ["0021","employee_cv","","employee_cv_audit_insert employee_cv_audit_update",""],
+ ["0022","","assignment_report_date request_report_choice","",""],
+ ["0023","","","attendance_assignment_user_guard_insert attendance_assignment_user_guard_update auth_audit_append_only_update auth_audit_append_only_delete management_audit_append_only_update management_audit_append_only_delete",""]
 ];
 export async function schemaReadiness(db){
  const {results}=await db.prepare("SELECT name,type FROM sqlite_master WHERE type IN ('table','index','trigger')").all();
@@ -133,7 +135,7 @@ export async function schemaReadiness(db){
   const missing=[];
   for(const [kind,names] of [['table',tables],['index',indexes],['trigger',triggers]])for(const name of names.split(' ').filter(Boolean))if(present.get(name)!==kind)missing.push(kind+':'+name);
   for(const pair of cols.split(' ').filter(Boolean)){const [table,column]=pair.split('.');if(!columns.get(table)?.has(column))missing.push('column:'+pair);}
-  return {id,status:id==='0002'?'manual':missing.length?'missing':'present',missing};
+  return {id,required:id!=='0002'&&id!=='0022',status:id==='0002'?'manual':missing.length?(id==='0022'?'optional_missing':'missing'):'present',missing};
  });
- return {target:'0021',ready:migrations.every(m=>m.status!=='missing'),migrations,proof:'catalog_only'};
+ return {target:'0023',ready:migrations.every(m=>m.status!=='missing'),migrations,proof:'catalog_only'};
 }

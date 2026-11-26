@@ -19,7 +19,7 @@ test('CV access is owner or admin; only admin edits employee; version conflict a
  const audits=(await f.db.prepare("SELECT details_json FROM management_audit WHERE resource='employee-cv'").all()).results;
  assert.equal(audits.length,2);assert.ok(audits.every(a=>Object.keys(JSON.parse(a.details_json)).join()==='revision'));
  assert.equal((await f.db.prepare('SELECT COUNT(*) AS n FROM attendances').first()).n,0);
- assert.equal((await schemaReadiness(f.db)).target,'0021');assert.equal((await schemaReadiness(f.db)).ready,true);
+ assert.equal((await schemaReadiness(f.db)).target,'0023');assert.equal((await schemaReadiness(f.db)).ready,true);
  }finally{f.close()}});
 test('CV refuses revoked admin write at SQL boundary and degrades when migration missing',async()=>{const f=await appFixture();try{
  const prepare=f.db.prepare.bind(f.db);
@@ -41,5 +41,5 @@ test('HR metadata, deadline scope, valid future dates and print-safe text withou
  const data=await (await deadline('admin')).json();assert.equal(data.items.length,1);assert.equal(data.items[0].key,'contract_end');assert.equal(data.items[0].status,'today');assert.ok(!JSON.stringify(data).includes('private'));
  const mine=await (await f.call(cv,'staff',{method:'GET'})).json();assert.equal(mine.cv.performance,'<script>private</script>');
  const {cvPrint}=await import('../../public/cv-print.mjs');const html=cvPrint(mine);assert.ok(html.includes('&lt;script&gt;private&lt;/script&gt;'));assert.ok(!html.includes('<script>'));
- assert.equal((await schemaReadiness(f.db)).target,'0021');
+ assert.equal((await schemaReadiness(f.db)).target,'0023');
  }finally{f.close()}});

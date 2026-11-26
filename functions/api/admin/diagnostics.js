@@ -1,3 +1,4 @@
+import {appVersion} from '../../../cloudflare/lib/app-version.mjs';
 import {actorFor,apiFailure} from '../../../cloudflare/lib/access.mjs';
 import {reply} from '../../../cloudflare/lib/auth.mjs';
 import {schemaReadiness} from '../../../cloudflare/lib/schema-readiness.mjs';
@@ -10,7 +11,7 @@ export async function onRequestGet({request,env}){
   await actorFor(request,env,{admin:true});const db=env.DB,now=Date.now();
   const started=performance.now(),schema=await schemaReadiness(db),issues=[],probes={};
   const add=(code,severity,count=null)=>issues.push({code,severity,count});
-  for(const m of schema.migrations.filter(m=>m.status==='missing'))add('MIGRATION_'+m.id,'blocking',m.missing.length);
+  for(const m of schema.migrations.filter(m=>m.status==='missing'||m.status==='optional_missing'))add('MIGRATION_'+m.id,m.required?'blocking':'review',m.missing.length);
   const check=async(code,fn)=>{const at=performance.now();try{const value=await fn();probes[code]={ok:true,ms:Math.round(performance.now()-at)};return value}catch{probes[code]={ok:false,ms:Math.round(performance.now()-at)};add(code,'unknown');return null}};
   const kv=await check('KV_READ_FAILED',async()=>{if(!env.TIMEMARKS)throw Error();await env.TIMEMARKS.get('_health_probe_nonexistent','arrayBuffer');return true});
   const recovery=await check('RECOVERY_SCHEMA_UNAVAILABLE',async()=>{
@@ -52,6 +53,6 @@ export async function onRequestGet({request,env}){
    return {queue_ready:queueReady,queue,queue_count_cap:101,oldest_pending_deadline:oldest?.expires_at??null,schema_ready:s.available,enabled:s.enabled,vapid_ready:v.ready,cron_secret_ready:cron,recent_receipts:recent.length,failed,uncertain,receipt_sample_limit:100,last_receipt_at:receipts[0]?.claimed_at??null};
   });
   const retention=await check('RETENTION_UNAVAILABLE',async()=>{const p=await policy(env);return {attendance_enabled:p.attendance_retention,photo_eviction_enabled:p.photo_eviction}});
-  return reply({version:'1.2.0-rc',generated_at:now,diagnostic_ms:Math.round(performance.now()-started),probes,schema,kv_read_ready:kv===true,recovery,roster,push,retention,issues,backup:{status:'manual_verification_required',restore_mode:'isolated_environment_only',offline_tool:'npm run backup:local',kv_included:false}});
+  return reply({version:appVersion,generated_at:now,diagnostic_ms:Math.round(performance.now()-started),probes,schema,kv_read_ready:kv===true,recovery,roster,push,retention,issues,backup:{status:'manual_verification_required',restore_mode:'isolated_environment_only',offline_tool:'npm run backup:local',kv_included:false}});
  }catch(e){return apiFailure(e)}
 }

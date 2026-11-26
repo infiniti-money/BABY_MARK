@@ -491,8 +491,8 @@ test('admin overview and role navigation do not duplicate primary modules',async
 test('v1.2 admin opens diagnostics from overview; staff is denied',async({page,request})=>{
  await login(page);
  await page.getByRole('button',{name:'Sức khỏe và phục hồi',exact:true}).click();
- await expect(page.getByRole('heading',{name:'Sức khỏe hệ thống · v1.2.0 RC',exact:true})).toBeVisible();
- await expect(page.getByRole('heading',{name:'Migration đến 0021',exact:true})).toBeVisible();
+ await expect(page.getByRole('heading',{name:/^Sức khỏe hệ thống · \d+\.\d+\.\d+$/})).toBeVisible();
+ await expect(page.getByRole('heading',{name:'Migration đến 0023',exact:true})).toBeVisible();
  await expect(page.getByText('0016 · Có dấu hiệu schema',{exact:true})).toBeVisible();
  await expect(page.getByRole('heading',{name:'Sao lưu và phục hồi',exact:true})).toBeVisible();
  const staff=await apiToken(request,'staff');
@@ -576,7 +576,7 @@ test('RC.8 motion follows scroll and accessibility preferences without delaying 
  await expect(page.locator('.scroll-progress')).toBeHidden();
  await page.getByRole('button',{name:'Sức khỏe và phục hồi',exact:true}).click();
  await expect(page.getByRole('dialog')).toHaveCSS('animation-name','none');
- await expect(page.getByRole('heading',{name:'Migration đến 0021',exact:true})).toBeVisible();
+ await expect(page.getByRole('heading',{name:'Migration đến 0023',exact:true})).toBeVisible();
 });
 
 

@@ -191,3 +191,14 @@ test('scroll text reveals slowly from both sides and respects reduced motion',as
  await right.scrollIntoViewIfNeeded();await expect(right).toHaveClass(/motion-revealed/);await expect(right).toHaveCSS('animation-duration','0.85s');await expect(right).toHaveCSS('animation-name','bm-reveal-right');
  await page.emulateMedia({reducedMotion:'reduce'});await expect(left).toHaveCSS('animation-name','none');await expect(right).toHaveCSS('animation-name','none');
 });
+
+test('keyboard focus remains visible on compact controls and screen reader labels remain present',async({page})=>{
+ await page.emulateMedia({reducedMotion:'reduce'});await page.setViewportSize({width:390,height:844});await login(page,'admin');
+ const button=page.locator('[data-form="overview-filter"] button[type=submit]');
+ await page.keyboard.press('Tab');await button.focus();
+ await expect(button).toBeFocused();await expect(button).toHaveCSS('outline-style','solid');await expect(button).toHaveCSS('outline-width','3px');
+ await expect(button).toHaveAccessibleName(/.+/);
+ expect(await button.evaluate(el=>el.getBoundingClientRect().height)).toBeGreaterThanOrEqual(44);
+ await page.locator('[data-action="audit-open"]').click();
+ const dialog=page.getByRole('dialog');await expect(dialog).toHaveAccessibleName(/Nhật ký/);await page.keyboard.press('Escape');await expect(dialog).toBeHidden();
+});
