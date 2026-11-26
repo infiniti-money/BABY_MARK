@@ -1,6 +1,6 @@
 // Progressive enhancement only. Never hide content or postpone network/capture work.
 const preference=window.matchMedia('(prefers-reduced-motion: reduce)');
-const targets='.card-head h2,.stat strong,.employee-metrics strong,.overview-store>strong,.assignment-card h3,.calendar-day>strong';
+const targets='.card-head h2,.card-head .muted,.stat strong,.employee-metrics strong,.overview-store>strong,.assignment-card h3,.assignment-card>strong,.operation-row>div>strong,.calendar-day>strong,.dashboard-attendance h2,.dashboard-shift h2,.dashboard-notices h2';
 let observer=null;
 const observed=new Set();
 const seen=new WeakSet();
@@ -27,7 +27,7 @@ export function observeMotion(root){
  // Only small text elements, no video, buttons, or layout containers.
  const nodes=[...root.querySelectorAll(targets)].filter(node=>!node.closest('.employee-checkin,.camera-frame,dialog')).slice(0,80);
  for(const [index,node] of nodes.entries()){
-  if(seen.has(node))continue;
+  if(seen.has(node)||observed.has(node))continue;
   if(!node.dataset.motionSide)node.dataset.motionSide=index%2===0?'left':'right';
   observer.observe(node);
   observed.add(node);

@@ -1,4 +1,5 @@
 import {observeMotion,stopMotion} from './motion.mjs';
+import {installPullRefresh,hasEditedControls} from './pull-refresh.mjs';
 import {todayAssignments,captureEligible} from './attendance-window.mjs';
 import {calendarRange,calendarDays} from './schedule-calendar.mjs';
 import {currentPosition} from './gps.mjs';
@@ -469,7 +470,7 @@ async function renderToday(id) {
     <section class="card employee-tools" tabindex="-1"><div class="card-head"><h2>Tiện ích của tôi</h2></div><div class="card-body employee-tool-grid"><button class="btn secondary" data-view="extra">${icon('calendar')} Ngoài lịch / thay ca</button><button type="button" class="btn secondary" data-action="my-decisions">${icon('check')} Kết quả duyệt của tôi</button><button class="btn secondary" data-view="requests">${icon('file')} Xin nghỉ / điều chỉnh</button><button class="btn secondary" data-view="handover">${icon('file')} Đọc lời nhắn ca trước / bàn giao ca</button><button class="btn secondary" data-view="messages">${icon('people')} Tin nhắn nội bộ</button><button class="btn secondary" data-view="push">${icon('shield')} Thiết lập quyền thiết bị</button></div></section>
     <section class="card employee-guidance"><details class="employee-policy"><summary>${icon('pin')} Để chấm công chính xác</summary><p>Cho phép camera và vị trí chính xác. GPS cần sai số tối đa 50 m. Thời gian công lấy từ máy chủ; ngoài vùng được ghi cờ để quản lý xem xét.</p></details><div data-handover-preview class="employee-handover-preview"></div></section>
   </div>`;
-  if(captureRows.length===1)$('#capture-assignment').value=captureRows[0].id;
+  if(captureRows.length===1){const select=$('#capture-assignment');for(const option of select.options)option.defaultSelected=option.value===captureRows[0].id;select.value=captureRows[0].id;}
   const branch=$('[data-dashboard-branch]');
   if(branch&&dayRows.length&&dayRows.every(a=>a.branch_id===dayRows[0].branch_id)&&dayRows[0].branch_name)branch.textContent=dayRows[0].branch_name;
   void loadDashboardNotices(id);
@@ -1402,4 +1403,9 @@ async function boot(){
   try{return await run.promise;}finally{if(bootRun===run)bootRun=null;}
 }
 window.addEventListener('storage',event=>{if(event.key!==SESSION_KEY&&event.key!==null)return;if(!state.token)return;let old=null;try{old=JSON.parse(event.oldValue||'null');}catch{}if(event.key!==null&&old?.token!==state.token)return;recentApiErrors=[];abortRequests();state.user=null;stopCamera();closeModal();resetChat();reportPaging=null;recoveryBusy=null;state.sessionEpoch++;state.renderId++;state.token=null;overviewDay='';overviewBranch='';overviewStatus='';state.overview=null;state.assignments=[];state.attendances=[];state.admin={};state.reports=[];state.reportData=null;state.requests=[];state.handover=null;state.extra=null;state.payrollData=null;state.payrollMonth=null;state.payrollRevision=null;viewFilters={};requestFilter='ALL';state.filters=defaultFilters('today');state.adminTab='employees';try{sessionStorage.removeItem(SESSION_KEY)}catch{}renderLogin('Phiên trên thiết bị đã thay đổi. Vui lòng mở lại ứng dụng hoặc đăng nhập.');});
+// Refresh only the current view; never reload the document or interrupt writes.
+installPullRefresh({
+ canRefresh:()=>!!state.user&&navigator.onLine!==false&&!document.hidden&&!modal.open&&!navigationMenu.open&&!documentPreview&&!state.stream&&!cameraOpening&&!pendingCapture&&!recoveryBusy&&!(captureAbort&&!captureAbort.signal.aborted)&&![...apiRequests].some(r=>r.method!=='GET')&&!document.querySelector('form[data-submitting="true"],#content .loading')&&!hasEditedControls($('#content')),
+ refresh:async()=>{const epoch=state.sessionEpoch;await navigate();if(epoch!==state.sessionEpoch||!state.user)throw Error('Phiên đăng nhập đã thay đổi.');if($('#content .table-error'))throw Error('Không thể tải dữ liệu.');}
+});
 await boot();
