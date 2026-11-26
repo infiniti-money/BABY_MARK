@@ -111,3 +111,18 @@ test('D1 active employee guard atomically caps staff plus managers at fifty, inc
   assert.equal(f.s.prepare("SELECT COUNT(*) AS n FROM profiles WHERE active=1 AND role<>'admin'").get().n,50);
  }finally{f.close()}
 });
+
+test('retention preserves pending supplemental shifts and recently decided or reviewed old assignments',async()=>{
+ const f=await fixture();try{
+  for(const [i,id] of ['pending-extra','recent-extra','recent-handover','recent-review','old-extra'].entries())f.addAssignment(id,i+1);
+  const extra=f.s.prepare("INSERT INTO extra_attendance(assignment_id,kind,reason,state,created_at,decided_by,decided_at) VALUES(?,'EXTRA','Ca bổ sung kiểm thử',?,?,?,?)");
+  extra.run('pending-extra','PENDING',f.cutoff-DAY,null,null);
+  extra.run('recent-extra','APPROVED',f.cutoff-DAY,'admin',f.cutoff+1);
+  extra.run('old-extra','APPROVED',f.cutoff-10*DAY,'admin',f.cutoff-9*DAY);
+  f.s.prepare("INSERT INTO shift_handover(assignment_id,message,created_at) VALUES('recent-handover','Ghi chú mới',?)").run(f.cutoff+1);
+  f.s.prepare("INSERT INTO work_unit_reviews(assignment_id,evidence,units,reason,reviewed_by,reviewed_at) VALUES('recent-review','[]',1,'Đối soát mới','admin',?)").run(f.cutoff+1);
+  const result=await pruneAttendance(f.db,f.now);assert.equal(result.assignments_removed,1);
+  assert.deepEqual(f.s.prepare('SELECT id FROM assignments ORDER BY id').all().map(r=>r.id),['pending-extra','recent-extra','recent-handover','recent-review']);
+  assert.equal(f.s.prepare("SELECT state FROM extra_attendance WHERE assignment_id='pending-extra'").get().state,'PENDING');
+ }finally{f.close()}
+});
