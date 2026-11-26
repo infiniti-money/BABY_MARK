@@ -10,3 +10,10 @@
 **/*.ipa
 **/AppIcon.appiconset/AppIcon.png
 **/drawable-nodpi/babymark.png
+
+**/*.apk
+**/*.aab
+**/*.pfx
+**/*.p12
+**/keystore.properties
+**/signing.properties
