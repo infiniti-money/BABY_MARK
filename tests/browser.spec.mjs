@@ -417,7 +417,7 @@ test('responsive admin navigation, readable records and forms at narrow, tablet 
 test('mobile employee can reach own password settings without sideways scrolling',async({page})=>{
  await page.setViewportSize({width:390,height:844});
  await login(page,'staff');
- await page.getByRole('button',{name:'Thêm',exact:true}).click();
+ await page.getByRole('button',{name:'Tiện ích',exact:true}).click();
  await page.getByRole('button',{name:'Đổi mật khẩu',exact:true}).click();
  await expect(page.getByRole('dialog',{name:'Đổi mật khẩu của bạn'})).toBeVisible();
  expect(await page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth)).toBeTruthy();
@@ -608,7 +608,7 @@ test('RC.10 phone-first employee layout, tablet expansion and desktop navigation
  for(const width of [320,360,390,430]){
   await page.setViewportSize({width,height:844});
   expect(await fits()).toBeTruthy();
-  await expect(page.locator('.mobile-brand-logo')).toBeVisible();
+  await expect(page.locator('.dashboard-wordmark .dashboard-icon')).toBeVisible();
   await expect(more).toBeVisible();
   for(const id of ['attendance-in','attendance-out']){
    const b=await work.getByTestId(id).boundingBox();expect(b.height).toBeGreaterThanOrEqual(44);
@@ -713,6 +713,13 @@ test('RC.14 frosted surfaces keep navigation, camera and print readable',async({
  await expect(page.locator('.admin-nav')).toBeVisible();
  await page.setViewportSize({width:390,height:844});
  await expect(page.locator('.admin-nav')).toHaveCSS('backdrop-filter','none');
+ if(supports){
+  await expect(page.locator('.sidebar')).toHaveCSS('backdrop-filter',/blur\(/);
+  await expect(page.locator('.admin-panel')).toHaveCSS('backdrop-filter',/blur\(9px\)/);
+  const row=page.locator('.admin-panel .responsive-table tbody tr').first();
+  await expect(row).toHaveCSS('background-color',/^rgba\(/);
+  await expect(row).toHaveCSS('backdrop-filter','none');
+ }
  expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBeTruthy();
  await page.emulateMedia({media:'print'});
  expect(await page.evaluate(()=>getComputedStyle(document.documentElement).getPropertyValue('--glass-panel').trim())).toBe('');

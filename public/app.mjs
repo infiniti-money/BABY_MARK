@@ -215,7 +215,31 @@ function showModal(title,body) {
   return modalTicket;
 }
 function renderLogin(error='') {
-  mobileMenu(false);stopMotion();app.innerHTML=`<div class="login"><aside class="login-story"><div><div class="login-brand"><img src="/brand/logo.png" alt="BABY MARK"><div><img class="brand-wordmark" src="/brand/wordmark.svg" alt="BABY MARK"><p class="muted">MOM & BABY</p></div></div><h1>Thấu hiểu<br>điều mẹ muốn</h1><p class="intro">Không gian chấm công và quản lý ca làm dành riêng cho đội ngũ BABY MARK.</p><div class="login-values"><div><strong>14</strong><span>Cửa hàng kết nối</span></div><div><strong>01</strong><span>Đội ngũ đồng hành</span></div></div></div><div class="login-foot">BABY MARK · Cổng nội bộ dành cho nhân viên được cấp tài khoản</div></aside><main id="main" class="login-panel"><section class="login-box welcome-login"><div class="login-mobile-brand"><img src="/brand/logo.png" alt="BABY MARK" width="76" height="76"><p>Thấu hiểu điều mẹ muốn</p></div><p class="eyebrow">KHÔNG GIAN LÀM VIỆC</p><h2>Chào mừng bạn đến với ngôi nhà <span class="welcome-brand-name">BABY MARK</span></h2><p class="muted welcome-subtitle">Đăng nhập để bắt đầu làm việc cùng BabyMark</p><form data-form="login" class="form-stack"><label>Tên đăng nhập<input name="username" autocomplete="username" required minlength="3" maxlength="64" placeholder="Ví dụ: bm001" autocapitalize="none" spellcheck="false"></label><label>Mật khẩu hoặc mã truy cập<input name="secret" type="password" autocomplete="current-password" required maxlength="128" placeholder="Mật khẩu hoặc mã 48 ký tự"></label><p id="login-error" class="error-text" role="alert" ${error?'':'hidden'}>${esc(error)}</p><label class="remember-device"><input type="checkbox" name="remember" checked> Ghi nhớ đăng nhập trên thiết bị này</label><p class="hint">Chỉ chọn trên thiết bị cá nhân. Nhân viên/quản lý: tối đa 30 ngày; Admin: tối đa 8 giờ. Không lưu mật khẩu.</p><button class="btn wide" type="submit" data-testid="login-submit">Đăng nhập ${icon('arrow')}</button></form><div class="login-note">${icon('shield')}<span>Tài khoản được cấp nội bộ. Nếu quên mật khẩu hoặc chưa có tài khoản, hãy liên hệ quản trị viên cửa hàng.</span></div><p class="hint">Camera và GPS cần HTTPS hoặc localhost. Trang chỉ xin quyền khi bạn bắt đầu chấm công.</p></section></main></div>`;
+  mobileMenu(false);stopMotion();app.innerHTML=`<div class="login">
+    <aside class="login-story">
+      <div class="login-brand"><img src="/brand/logo.png" alt="" width="632" height="697"><img class="brand-wordmark" src="/brand/wordmark.svg" alt="BABY MARK" width="2018" height="428"></div>
+      <p class="intro">Không gian chấm công và quản lý ca làm</p>
+    </aside>
+    <main id="main" class="login-panel">
+      <section class="login-box welcome-login">
+        <div class="login-mobile-brand"><img src="/brand/logo.png" alt="BABY MARK" width="632" height="697"><span aria-hidden="true"></span></div>
+        <h1>Chào mừng bạn đến với ngôi nhà <span class="welcome-brand-name">BABY MARK</span></h1>
+        <p class="muted welcome-subtitle">Đăng nhập để bắt đầu làm việc cùng BabyMark</p>
+        <form data-form="login" class="form-stack">
+          <label>Tên đăng nhập<input name="username" autocomplete="username" required minlength="3" maxlength="64" placeholder="Ví dụ: bm001" autocapitalize="none" spellcheck="false"></label>
+          <label>Mật khẩu hoặc mã truy cập<input name="secret" type="password" autocomplete="current-password" required maxlength="128" placeholder="Mật khẩu hoặc mã 48 ký tự"></label>
+          <p id="login-error" class="error-text" role="alert" ${error?'':'hidden'}>${esc(error)}</p>
+          <div class="login-preference">
+            <label class="remember-device"><input type="checkbox" name="remember" aria-describedby="login-remember-hint" checked> Ghi nhớ đăng nhập trên thiết bị này</label>
+            <p id="login-remember-hint" class="hint">Chỉ chọn trên thiết bị cá nhân. Nhân viên/quản lý: tối đa 30 ngày; Admin: tối đa 8 giờ. Không lưu mật khẩu.</p>
+          </div>
+          <button class="btn wide" type="submit" data-testid="login-submit">Đăng nhập</button>
+        </form>
+        <div class="login-note">${icon('shield')}<span>Tài khoản được cấp nội bộ. Nếu quên mật khẩu hoặc chưa có tài khoản, hãy liên hệ quản trị viên cửa hàng.</span></div>
+        <p class="hint">Camera và GPS cần HTTPS hoặc localhost. Trang chỉ xin quyền khi bạn bắt đầu chấm công.</p>
+      </section>
+    </main>
+  </div>`;
 }
 const titles={messages:'Tin nhắn nội bộ',overview:'Tổng quan quản trị',today:'Chấm công hôm nay',history:'Lịch sử chấm công',schedule:'Lịch làm việc',requests:'Yêu cầu công',extra:'Ca bổ sung và thay ca',handover:'Sổ bàn giao ca',admin:'Quản trị hệ thống',reports:'Báo cáo chấm công',alerts:'Cảnh báo chấm công',push:'Thiết bị và thông báo',sessions:'Phiên đăng nhập',payroll:'Bảng công và lương tháng'};
 const descriptions={messages:'Trò chuyện riêng, nhóm và thông báo toàn hệ thống.',overview:'Theo dõi tình hình nhân sự, lịch ca và việc cần xử lý.',today:'Chụp ảnh trực tiếp, kiểm tra GPS và xác nhận chấm công.',history:'Tra cứu lượt vào / ra, ảnh Timemark và GPS đã ghi.',schedule:'Xem lịch ca được phân công, không chỉnh sửa lịch tại đây.',requests:'Xin nghỉ, điều chỉnh công và xử lý ca bổ sung.',extra:'Khai báo và duyệt ca ngoài lịch hoặc thay ca.',handover:'Đọc và ghi lời nhắn bàn giao giữa các ca.',admin:'Cấu hình nhân viên, cửa hàng, lịch và chính sách hệ thống.',reports:'Đối soát công theo từng ca và xuất CSV.',alerts:'Kiểm tra nhân viên đi muộn hoặc chưa vào ca.',push:'Kiểm tra quyền camera, GPS và thông báo trên thiết bị.',sessions:'Quản lý các phiên đăng nhập của tài khoản.',payroll:'Tổng hợp và chốt bản công, lương dự kiến theo tháng.'};
@@ -230,10 +254,29 @@ function navGroups(role){
 const navItems=()=>navGroups(state.user.role).flatMap(g=>g[1]);
 const activeView=()=>state.view==='extra'?'requests':state.view;
 const landing=()=>state.user?.role==='admin'?'overview':'today';
+const dashboardIcon=(name,className='dashboard-icon')=>`<svg class="${className}" viewBox="${name==='baby'?'0 0 54 52':'0 0 24 24'}" aria-hidden="true" focusable="false"><use href="/brand/dashboard-icons.svg#${name}"></use></svg>`;
+const dashboardDockIcon=name=>`<span class="dashboard-dock-icon">${dashboardIcon(name)}</span>`;
 function shell() {
  const name=state.user.full_name,admin=state.user.role==='admin',primary=primaryViews(state.user.role);
+ const initials=esc(name.trim().split(/\s+/).map(part=>part[0]).slice(-2).join('').toUpperCase());
+ const home=state.view==='today',messages=state.view==='messages';
  const groups=navGroups(state.user.role).map(([label,items])=>`<div class="nav-group"><p class="nav-group-label">${label}</p>${items.map(([id,ic,text])=>`<button data-view="${id}" class="${activeView()===id?'active':''} ${primary.includes(id)?'primary-nav':'extra-nav'}" data-nav-order="${primary.indexOf(id)}" ${activeView()===id?'aria-current="page"':''}>${icon(ic)}<span>${text}</span></button>`).join('')}</div>`).join('');
- app.innerHTML=`<div class="shell" data-role="${esc(state.user.role)}"><aside class="sidebar"><div class="brand"><img src="/brand/logo.png" alt="BABY MARK"><div><img class="brand-wordmark" src="/brand/wordmark.svg" alt="BABY MARK"><span>KHÔNG GIAN LÀM VIỆC</span></div></div><div class="nav-label">${esc(roles[state.user.role])}</div><nav id="main-nav" class="nav" aria-label="Điều hướng chính">${groups}<button type="button" class="mobile-more ${primary.includes(activeView())?'':'active'}" data-action="mobile-menu" aria-expanded="false" aria-controls="navigation-menu" aria-haspopup="dialog"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h16"/></svg><span>Thêm</span></button></nav><div class="sidebar-bottom">${!admin?'<button class="logout" data-action="employee-cv">Hồ sơ của tôi</button>':''}${!admin?'<button class="logout" data-action="self-password">Đổi mật khẩu</button>':''}<button class="logout" data-action="logout">Đăng xuất tài khoản</button></div></aside><div class="workspace"><header class="topbar"><div class="topbar-path"><img class="mobile-brand-logo" src="/brand/logo.png" alt="" width="32" height="32"><div class="topbar-path-text"><span class="desktop-path">Không gian làm việc / </span><span class="mobile-brand-name">BABY MARK</span><span class="current-page">${titles[state.view]}</span></div></div><div class="profile"><div class="avatar">${esc(name.split(/\s+/).map(s=>s[0]).slice(-2).join('').toUpperCase())}</div><div><strong>${esc(name)}</strong><small>${esc(state.user.employee_code)} · ${roles[state.user.role]}</small></div><button class="btn quiet small mobile-logout" data-action="logout" aria-label="Đăng xuất">${icon('logout')}</button></div></header><main id="main" class="main"><div class="page-head"><div>${state.view==='today'?`<div class="ios-welcome"><span>Xin chào,</span><strong>${esc(name)}</strong><small>${esc(roles[state.user.role])} · ${esc(state.user.employee_code)}</small></div>`:''}<p class="eyebrow">${admin?'QUẢN TRỊ BABY MARK':state.user.role==='manager'?'QUẢN LÝ CỬA HÀNG':'KHÔNG GIAN NHÂN VIÊN'}</p><h1>${titles[state.view]}</h1><p class="muted">${descriptions[state.view]||''}</p></div><div class="date-chip">${icon('calendar')} ${new Intl.DateTimeFormat('vi-VN',{timeZone:tz,weekday:'long',day:'2-digit',month:'2-digit',year:'numeric'}).format(Date.now())}</div></div><div id="content" aria-live="polite" data-screen="${esc(state.view)}">${loading()}</div><p class="footer-note"><span>BABY MARK · UTC+7</span><span>Dữ liệu nội bộ theo phân quyền</span></p></main></div></div>`;
+ const mobileDock=admin?'':`
+  <button type="button" class="dashboard-dock-button" data-dashboard-dock="home" data-view="today"${home?' aria-current="page"':''}>${dashboardDockIcon('home')}<span>Trang chủ</span></button>
+  <button type="button" class="dashboard-dock-button" data-dashboard-dock="attendance" data-action="attendance-start">${dashboardDockIcon('calendar')}<span>Chấm công</span></button>`;
+ const mobileMore=admin?'':`${dashboardDockIcon('grid')}<span class="dashboard-dock-utilities">Tiện ích</span>`;
+ const mobileProfile=admin?'':`
+  <button type="button" class="dashboard-dock-button" data-dashboard-dock="profile" data-action="employee-cv" aria-haspopup="dialog">${dashboardDockIcon('user')}<span>Cá nhân</span></button>`;
+ const mobileHeader=admin?'':`
+  <div class="dashboard-topbar">
+   <div class="dashboard-wordmark">${dashboardIcon('baby')}<span>BABY_MARK</span></div>
+   <div class="dashboard-topbar-actions">
+    <button type="button" class="dashboard-bell" aria-label="Thông báo" data-view="messages"${messages?' aria-current="page"':''}>${dashboardIcon('bell')}<span class="dashboard-bell-count" data-dashboard-bell-count hidden></span></button>
+    <button type="button" class="dashboard-avatar" data-action="employee-cv" aria-label="Hồ sơ của tôi" aria-haspopup="dialog">${initials}</button>
+   </div>
+  </div>`;
+ const welcome=home?`<div class="ios-welcome"><span>Xin chào,</span><strong>${esc(name)}</strong><small>${esc(roles[state.user.role])} · <span data-dashboard-branch>${esc(state.user.employee_code)}</span></small></div>`:'';
+ app.innerHTML=`<div class="shell" data-role="${esc(state.user.role)}"><aside class="sidebar"><div class="brand">${dashboardIcon('baby','sidebar-brand-symbol')}<img class="brand-wordmark" src="/brand/wordmark.svg" alt="BABY MARK"></div><div class="nav-label">${esc(roles[state.user.role])}</div><nav id="main-nav" class="nav" aria-label="Điều hướng chính">${groups}${mobileDock}<button type="button" class="mobile-more ${primary.includes(activeView())?'':'active'}" data-dashboard-dock="utilities"${!home&&!messages?' data-dashboard-dock-active':''} data-action="mobile-menu" aria-expanded="false" aria-controls="navigation-menu" aria-haspopup="dialog"><svg class="icon dashboard-dock-legacy" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="/brand/dashboard-icons.svg#grid"></use></svg><span class="dashboard-dock-legacy">Thêm</span>${mobileMore}</button>${mobileProfile}</nav><div class="sidebar-bottom">${!admin?'<button class="logout" data-action="employee-cv">Hồ sơ của tôi</button>':''}${!admin?'<button class="logout" data-action="self-password">Đổi mật khẩu</button>':''}<button class="logout" data-action="logout">Đăng xuất tài khoản</button></div></aside><div class="workspace"><header class="topbar"><div class="topbar-path">${dashboardIcon('baby','mobile-brand-logo')}<div class="topbar-path-text"><span class="desktop-path">Không gian làm việc / </span><span class="mobile-brand-name">BABY_MARK</span><span class="current-page">${titles[state.view]}</span></div></div><div class="profile"><div class="avatar">${initials}</div><div><strong>${esc(name)}</strong><small>${esc(state.user.employee_code)} · ${roles[state.user.role]}</small></div><button class="btn quiet small mobile-logout" data-action="logout" aria-label="Đăng xuất">${icon('logout')}</button></div>${mobileHeader}</header><main id="main" class="main"><div class="page-head"><div>${welcome}<p class="eyebrow">${admin?'QUẢN TRỊ BABY MARK':state.user.role==='manager'?'QUẢN LÝ CỬA HÀNG':'KHÔNG GIAN NHÂN VIÊN'}</p><h1>${titles[state.view]}</h1><p class="muted">${descriptions[state.view]||''}</p></div><div class="date-chip">${icon('calendar')} ${new Intl.DateTimeFormat('vi-VN',{timeZone:tz,weekday:'long',day:'2-digit',month:'2-digit',year:'numeric'}).format(Date.now())}</div></div><div id="content" aria-live="polite" data-screen="${esc(state.view)}">${loading()}</div><p class="footer-note"><span>BABY MARK · UTC+7</span><span>Dữ liệu nội bộ theo phân quyền</span></p></main></div></div>`;
 }
 function chatTitle(t){return t.kind==='DIRECT'?(t.peer_name||'Trò chuyện riêng'):t.title;}
 function chatThreadList(data){return data.threads.map(t=>`<button type="button" class="chat-thread ${chatSelection===t.id?'active':''}" data-action="chat-open" data-id="${esc(t.id)}"><strong>${esc(chatTitle(t))}</strong><small>${t.kind==='SYSTEM'?'Hệ thống':t.kind==='GROUP'?'Nhóm':'Riêng tư'}${t.unread?' · Chưa đọc':''}</small><span>${esc((t.latest_body||'Chưa có tin nhắn').slice(0,100))}</span></button>`).join('');}
@@ -316,7 +359,7 @@ function overviewDistribution(t){
 function overviewKpi(label,value,note,ic,key){
  const target=['branches','employees'].includes(key)?'Mở danh sách đang hoạt động':'Xem chi tiết ca';
  const selected=overviewStatus===key;
- return `<button type="button" class="stat overview-kpi" data-action="overview-kpi" data-id="${key}" aria-label="${esc(label+': '+value+' · '+target)}" ${['branches','employees'].includes(key)?'':'aria-pressed="'+selected+'"'}><span class="label">${esc(label)}${icon(ic)}</span><strong>${esc(value)}</strong><small>${esc(note)}</small><span class="kpi-link">${target}<span aria-hidden="true"> ↗</span></span></button>`;
+ return `<button type="button" class="stat overview-kpi" data-action="overview-kpi" data-id="${key}" aria-label="${esc(label+': '+value+' · '+target)}" ${['branches','employees'].includes(key)?'':'aria-pressed="'+selected+'"'}><span class="label">${esc(label)}${icon(ic)}</span><strong>${esc(value)}</strong><small>${esc(note)}</small><span class="kpi-link">${target}</span></button>`;
 }
 function stat(label,value,note,ic) { return `<article class="stat"><div class="label">${label}${icon(ic)}</div><strong>${esc(value)}</strong><small>${esc(note)}</small></article>`; }
 function filterBar({reports=false,action='filter'}={}) {
@@ -325,6 +368,79 @@ function filterBar({reports=false,action='filter'}={}) {
 function assignmentCards(rows) {
   return rows.length ? rows.map(a=>`<article class="assignment-card"><div class="assignment-details">${badge(a.summary?.status||(a.in_id&&a.out_id?'COMPLETE':a.in_id?'IN_PROGRESS':'SCHEDULED'))}<span>${dateVN(a.work_date)}</span></div><h3>${esc(a.branch_name)}</h3><div class="assignment-details"><span>${icon('clock')} ${hm(a.starts_at)} – ${hm(a.ends_at)}${dayString(a.starts_at)!==dayString(a.ends_at)?' (+1 ngày)':''}</span><span>${esc(a.shift_name)}${a.shift_id==='BM-ALLDAY'?' · 2 công':''}</span></div>${a.summary?.overtime_minutes?`<p class="hint">Làm thêm sau ca: ${a.summary.overtime_minutes} phút (cần đối soát)</p>`:''}${a.extra_state?`<p class="hint">Ca bổ sung · ${esc(statusNames[a.extra_state]||a.extra_state)}${a.replaced_name?' · Thay '+esc(a.replaced_name):''}</p>`:''}${state.user.role!=='staff'?`<p class="hint">${esc(a.full_name)} · ${esc(a.employee_code)}</p>`:''}<div class="assignment-footer"><span>Vào ca <strong>${hm(a.in_at)}</strong></span><span>Tan ca <strong>${hm(a.out_at)}</strong></span></div></article>`).join('') : empty('Bạn chưa được phân ca trong ngày. Liên hệ quản lý để kiểm tra lịch.');
 }
+const dashboardViewport=window.matchMedia('(max-width:620px) and (orientation:portrait)');
+let dashboardNoticesRender=0;
+function dashboardToday(rows,date,canCapture){
+ const scheduled=rows.filter(a=>!a.extra_state||a.extra_state==='APPROVED');
+ const working=scheduled.filter(a=>!(a.request_kind==='LEAVE'&&a.request_state==='APPROVED'));
+ const shift=working.find(a=>a.in_id&&!a.out_id)||working.find(a=>!a.out_id)||working[0]||scheduled[0];
+ const leave=shift&&!working.length;
+ const recorded=working.length>0&&working.every(a=>a.in_id&&a.out_id);
+ const started=shift?.in_id&&!shift.out_id;
+ const status=leave?'Nghỉ đã duyệt':recorded?'Đã hoàn tất chấm công':started?'Đã ghi nhận vào ca':shift?'Bạn chưa chấm công':'Hôm nay chưa có ca';
+ const description=leave?'Xem lịch làm việc để kiểm tra ca đã được duyệt nghỉ.':recorded?'Xem các lượt vào ca và ra ca đã ghi nhận.':started?'Khi kết thúc ca, hãy ghi nhận giờ ra ca.':shift?'Hãy chấm công để ghi nhận thời gian làm việc hôm nay.':'Xem lịch làm việc để kiểm tra các ca được phân công.';
+ const time=type=>scheduled.length>1?'Nhiều ca':shift?.[type+'_at']==null?'--:--':hm(shift[type+'_at']);
+ const manager=state.user.role==='manager';
+ const shortcuts=[['requests','calendar-check','Đơn xin nghỉ'],['schedule','clock','Lịch làm việc'],['history','receipt','Bảng công'],[manager?'reports':'','chart','Báo cáo']];
+ const dateLabel=`${date[0].toLocaleUpperCase('vi-VN')}${date.slice(1)}`;
+ return `<div class="mobile-today-dashboard">
+  <section class="dashboard-attendance" aria-labelledby="dashboard-attendance-title">
+   <svg class="dashboard-alarm" viewBox="0 0 112 110" fill="none" aria-hidden="true">
+    <path d="M34 89l-7 13m51-13 8 13M54 15l4-9m-9 0h18" stroke="currentColor" stroke-width="6" stroke-linecap="round"/>
+    <circle cx="57" cy="55" r="39" fill="#fff5f6" stroke="currentColor" stroke-width="7"/>
+    <path d="M12 30a20 20 0 0 1 24-24L12 30Zm70-23a20 20 0 0 1 24 24L82 7Z" fill="currentColor"/>
+    <path d="M57 25v6m30 24h-6M57 85v-6M27 55h6m24 0-13-12m13 12 18-8" stroke="currentColor" stroke-width="4" stroke-linecap="round"/>
+    <circle cx="57" cy="55" r="4" fill="currentColor"/>
+   </svg>
+   <div class="dashboard-attendance-copy">
+    <span class="dashboard-attendance-icon">${dashboardIcon('calendar-check')}</span>
+    <div><p class="dashboard-date">${esc(dateLabel)}</p><h2 id="dashboard-attendance-title">${status}</h2><p class="dashboard-subtext">${description}</p></div>
+   </div>
+   <button class="btn dashboard-attendance-button" type="button" data-action="attendance-start">${dashboardIcon('fingerprint')} ${canCapture?'Chấm công ngay':'Xem chấm công'}</button>
+   <div class="ios-attendance-times" aria-label="Giờ chấm công đã ghi nhận">
+    <div><span class="ios-time-icon">${dashboardIcon('login')}</span><div><small>Vào ca</small><strong>${esc(time('in'))}</strong></div></div>
+    <div><span class="ios-time-icon">${dashboardIcon('logout')}</span><div><small>Ra ca</small><strong>${esc(time('out'))}</strong></div></div>
+   </div>
+  </section>
+  <section class="dashboard-shift" aria-labelledby="dashboard-shift-title">
+   <div class="dashboard-shift-head">
+    <span class="dashboard-shift-icon">${dashboardIcon('calendar-check')}</span>
+    <div><h2 id="dashboard-shift-title">Lịch làm việc</h2><p>${scheduled.length>1?`${scheduled.length} ca hôm nay`:'Hôm nay'}</p></div>
+    ${shift?`<span class="dashboard-shift-name">${esc(shift.shift_name)}</span>`:''}
+   </div>
+   <div class="dashboard-shift-hours">
+    <div>${dashboardIcon('clock')} <strong>${shift?`${hm(shift.starts_at)} – ${hm(shift.ends_at)}${dayString(shift.starts_at)!==dayString(shift.ends_at)?' (+1 ngày)':''}`:'Chưa có lịch ca'}</strong></div>
+    ${shift?`<div>${dashboardIcon('pin')} <span><small>Cửa hàng</small>${esc(shift.branch_name)}</span></div>`:''}
+   </div>
+  </section>
+  <section class="dashboard-shortcuts" aria-labelledby="dashboard-shortcuts-title">
+   <div class="dashboard-section-heading"><h2 id="dashboard-shortcuts-title">Thao tác nhanh</h2><button type="button" class="dashboard-text-button" data-action="dashboard-tools" aria-label="Xem tất cả tiện ích">Xem tất cả ${dashboardIcon('chevron')}</button></div>
+   <div class="dashboard-shortcut-list">${shortcuts.map(([view,symbol,label])=>`<button type="button" ${view?`data-view="${view}"`:'data-action="dashboard-summary"'}><span class="dashboard-shortcut-icon">${dashboardIcon(symbol)}</span><span>${label}</span></button>`).join('')}</div>
+  </section>
+  <section class="dashboard-notices" aria-labelledby="dashboard-notices-title">
+   <div class="dashboard-section-heading">${dashboardIcon('megaphone')}<h2 id="dashboard-notices-title">Thông báo mới</h2><span class="dashboard-notice-count" hidden></span><button type="button" class="dashboard-text-button" data-view="messages" aria-label="Xem tất cả thông báo">Xem tất cả ${dashboardIcon('chevron')}</button></div>
+   <p class="dashboard-notice-copy" data-dashboard-notice hidden></p>
+  </section>
+ </div>`;
+}
+async function loadDashboardNotices(id){
+ if(!dashboardViewport.matches||!$('[data-dashboard-notice]')||dashboardNoticesRender===id)return;
+ dashboardNoticesRender=id;
+ try{
+  const data=await api('/api/messages?compact=1',{timeout:5000});
+  if(id!==state.renderId||!data.available)return;
+  const threads=data.threads||[], unread=threads.filter(thread=>thread.unread);
+  const system=threads.find(thread=>thread.kind==='SYSTEM'&&thread.unread);
+  const bell=$('[data-dashboard-bell-count]'), count=$('.dashboard-notice-count'), preview=$('[data-dashboard-notice]');
+  if(bell&&unread.length){
+   bell.textContent=unread.length;bell.hidden=false;
+   bell.parentElement.setAttribute('aria-description',`${unread.length} cuộc trò chuyện chưa đọc`);
+  }
+  if(count&&system){count.textContent='1';count.hidden=false;}
+  if(preview){preview.textContent=system?.latest_body||'Bạn không có thông báo hệ thống mới.';preview.hidden=false;}
+ }catch{/* Messages are optional on the attendance home screen. */}
+}
+dashboardViewport.addEventListener('change',()=>{if(state.view==='today')void loadDashboardNotices(state.renderId);});
 async function renderToday(id) {
   const yesterday=dayString(Date.now()-2*86400000);
   const data=await api(`/api/assignments?${query({from:yesterday,to:today()})}`);
@@ -334,27 +450,29 @@ async function renderToday(id) {
   const dayRows=todayAssignments(own,today(),Date.now()),captureRows=dayRows.filter(a=>captureEligible(a,Date.now()));
   const complete=dayRows.filter(a=>a.in_id&&a.out_id).length;
   const started=dayRows.filter(a=>a.in_id).length,overtime=dayRows.reduce((n,a)=>n+(a.summary?.overtime_minutes||0),0);
-  const singleShift=dayRows.length===1?dayRows[0]:null;
-  const attendanceTime=(type)=>singleShift?(singleShift[type+'_at']==null?'—:—':hm(singleShift[type+'_at'])):dayRows.length>1?'Nhiều ca':'—:—';
   const todayLabel=new Intl.DateTimeFormat('vi-VN',{timeZone:tz,weekday:'long',day:'2-digit',month:'2-digit'}).format(Date.now());
-  $('#content').innerHTML=`<div class="employee-workspace">
-    <section class="card employee-checkin"><div class="card-head"><div><h2>Ghi nhận chấm công</h2><p class="muted">${esc(todayLabel)} · Camera · GPS · Giờ máy chủ</p></div><span class="tag">TIMEMARK</span></div><div class="card-body employee-checkin-body">
+  const longDate=new Intl.DateTimeFormat('vi-VN',{timeZone:tz,weekday:'long',day:'2-digit',month:'2-digit',year:'numeric'}).format(Date.now());
+  const canCapture=captureRows.some(a=>!a.in_id||!a.out_id);
+  $('#content').innerHTML=`${dashboardToday(dayRows,longDate,canCapture)}<div class="employee-workspace">
+    <section class="card employee-checkin" id="attendance-workspace" tabindex="-1"><div class="card-head"><div><h2>Ghi nhận chấm công</h2><p class="muted">${esc(todayLabel)} · Camera · GPS · Giờ máy chủ</p></div><span class="tag">TIMEMARK</span></div><div class="card-body employee-checkin-body">
      <label class="assignment-select">Chọn ca làm<select id="capture-assignment" ${!captureRows.length?'disabled':''}><option value="">Chọn ca được phân công</option>${captureRows.map(a=>`<option value="${esc(a.id)}">${esc(a.branch_name)} · ${dateVN(a.work_date)} ${hm(a.starts_at)}–${hm(a.ends_at)}</option>`).join('')}</select></label>
      ${!captureRows.length?'<p class="hint employee-no-shift">Không có ca trong thời hạn chấm công. Xem lịch hoặc liên hệ quản lý.</p>':''}
      <div class="camera-frame employee-camera"><video id="camera" autoplay muted playsinline aria-label="Camera chấm công"></video><div id="camera-placeholder" class="camera-placeholder">${icon('camera')}<strong>Camera chưa bật</strong><p>Bật camera và giữ rõ khuôn mặt trước khi chụp.</p><button class="btn" data-action="camera-start">${icon('camera')} Bật camera</button></div><span class="camera-corner tl"></span><span class="camera-corner br"></span><span id="camera-live" class="camera-live" hidden><span class="dot"></span>CAMERA TRỰC TIẾP</span></div>
      <div class="camera-toolbar"><span id="camera-facing" class="camera-facing" aria-live="polite">${cameraFacing==='environment'?'Camera sau':'Camera trước'}</span><button type="button" class="btn secondary small" data-action="camera-switch">${icon('refresh')} Đổi camera</button><button type="button" class="btn quiet small" data-action="camera-stop" hidden>Tắt camera</button></div>
      <div class="camera-actions employee-capture-actions"><button class="btn" data-action="capture" data-type="IN" data-testid="attendance-in" ${!captureRows.length?'disabled':''}>${icon('camera')} Chụp vào ca</button><button class="btn secondary" data-action="capture" data-type="OUT" data-testid="attendance-out" ${!captureRows.length?'disabled':''}>${icon('camera')} Chụp tan ca</button></div>
-     <div class="ios-attendance-times" aria-label="Giờ chấm công đã ghi nhận"><div><span class="ios-time-icon">${icon('check')}</span><div><small>Giờ vào ca</small><strong>${esc(attendanceTime('in'))}</strong></div></div><div><span class="ios-time-icon">${icon('clock')}</span><div><small>Giờ tan ca</small><strong>${esc(attendanceTime('out'))}</strong></div></div></div>
      <div class="error-text" data-capture-recovery hidden></div><p id="capture-guidance" class="hint capture-guidance" role="status"></p><p id="capture-status" class="hint" role="status" aria-live="polite"></p><p class="camera-note">${icon('shield')}<span>Ảnh Timemark được ghép trên thiết bị từ thông tin máy chủ. Giờ đóng dấu được cấp trước lúc lưu tối đa 90 giây. Máy chủ xác thực bản ghi; ảnh và GPS không chứng minh tuyệt đối sự hiện diện.</span></p>
     </div></section>
-    <section class="card employee-summary"><div class="card-head"><h2>Tình hình ca của bạn</h2><span class="tag">${esc(dateVN(today()))}</span></div><div class="employee-metrics">
+    <section class="card employee-summary" tabindex="-1"><div class="card-head"><h2>Tình hình ca của bạn</h2><span class="tag">${esc(dateVN(today()))}</span></div><div class="employee-metrics">
      <div><span>Ca có lịch</span><strong>${dayRows.length}</strong></div><div><span>Đã vào ca</span><strong>${started}</strong></div><div><span>Đủ hai lượt</span><strong>${complete}</strong></div><div><span>Chưa đủ lượt</span><strong>${dayRows.length-complete}</strong></div><div><span>Làm thêm</span><strong>${overtime}<small> phút</small></strong></div>
     </div><p class="hint employee-summary-note">Chỉ tính các ca đang hiển thị, gồm ca qua đêm gần đây. Giờ làm thêm cần đối soát; đủ hai lượt không đồng nghĩa đủ công.</p></section>
     <section class="card employee-shifts"><div class="card-head"><div><h2>Ca làm của bạn</h2><p class="muted">Ca hôm nay và ca qua đêm gần đây</p></div><button class="btn quiet small" data-view="schedule">Xem lịch</button></div><div class="card-body employee-shift-list">${assignmentCards(dayRows)}</div></section>
-    <section class="card employee-tools"><div class="card-head"><h2>Tiện ích của tôi</h2></div><div class="card-body employee-tool-grid"><button class="btn secondary" data-view="extra">${icon('calendar')} Ngoài lịch / thay ca</button><button type="button" class="btn secondary" data-action="my-decisions">${icon('check')} Kết quả duyệt của tôi</button><button class="btn secondary" data-view="requests">${icon('file')} Xin nghỉ / điều chỉnh</button><button class="btn secondary" data-view="handover">${icon('file')} Đọc lời nhắn ca trước / bàn giao ca</button><button class="btn secondary" data-view="messages">${icon('people')} Tin nhắn nội bộ</button><button class="btn secondary" data-view="push">${icon('shield')} Thiết lập quyền thiết bị</button></div></section>
+    <section class="card employee-tools" tabindex="-1"><div class="card-head"><h2>Tiện ích của tôi</h2></div><div class="card-body employee-tool-grid"><button class="btn secondary" data-view="extra">${icon('calendar')} Ngoài lịch / thay ca</button><button type="button" class="btn secondary" data-action="my-decisions">${icon('check')} Kết quả duyệt của tôi</button><button class="btn secondary" data-view="requests">${icon('file')} Xin nghỉ / điều chỉnh</button><button class="btn secondary" data-view="handover">${icon('file')} Đọc lời nhắn ca trước / bàn giao ca</button><button class="btn secondary" data-view="messages">${icon('people')} Tin nhắn nội bộ</button><button class="btn secondary" data-view="push">${icon('shield')} Thiết lập quyền thiết bị</button></div></section>
     <section class="card employee-guidance"><details class="employee-policy"><summary>${icon('pin')} Để chấm công chính xác</summary><p>Cho phép camera và vị trí chính xác. GPS cần sai số tối đa 50 m. Thời gian công lấy từ máy chủ; ngoài vùng được ghi cờ để quản lý xem xét.</p></details><div data-handover-preview class="employee-handover-preview"></div></section>
   </div>`;
   if(captureRows.length===1)$('#capture-assignment').value=captureRows[0].id;
+  const branch=$('[data-dashboard-branch]');
+  if(branch&&dayRows.length&&dayRows.every(a=>a.branch_id===dayRows[0].branch_id)&&dayRows[0].branch_name)branch.textContent=dayRows[0].branch_name;
+  void loadDashboardNotices(id);
   drawRecovery();
   try{const h=await api('/api/handover?'+query({from:dayString(Date.now()-2*86400000),to:today()}));if(id===state.renderId&&h.available){state.handover=h;const panel=$('[data-handover-preview]');if(panel)panel.innerHTML=handoverCards(h.rows.filter(r=>dayRows.some(a=>a.branch_id===r.branch_id&&a.id!==r.assignment_id&&a.starts_at>r.starts_at)).slice(0,5));}}catch{/* Attendance remains usable if optional handover unavailable. */}
 }
@@ -808,10 +926,28 @@ async function exportReports() {
 
 document.addEventListener('click',async event=>{
   const button=event.target.closest('button');if(!button||button.disabled)return;
+  if(button.dataset.dashboardDock==='home'&&state.view==='today'){
+    window.scrollTo({top:0,left:0,behavior:'instant'});
+    return;
+  }
   if(button.dataset.view)return void navigate(button.dataset.view);
   if(button.dataset.adminTab){state.adminTab=button.dataset.adminTab;adminList={tab:state.adminTab,search:'',page:1};return void navigate('admin');}
   const action=button.dataset.action;if(!action)return;
   try {
+    if(action==='attendance-start'||action==='dashboard-tools'||action==='dashboard-summary'){
+      if(action==='attendance-start'&&state.view!=='today')await navigate('today');
+      const target=$(action==='attendance-start'?'#attendance-workspace':action==='dashboard-tools'?'.employee-tools':'.employee-summary');
+      if(!target)return;
+      target.focus({preventScroll:true});
+      target.scrollIntoView({block:'start',behavior:'instant'});
+      if(action==='attendance-start'&&!state.stream&&!recoveryRecord()){
+        const select=$('#capture-assignment'),assignment=state.assignments.find(a=>a.id===select?.value);
+        if(!assignment&&select?.options.length>1)select.focus({preventScroll:true});
+        const {inDisabled,outDisabled}=captureControls(assignment,{ready:true});
+        if(!inDisabled||!outDisabled)await startCamera();
+      }
+      return;
+    }
     if(action==='chat-list'){saveChatDraft();chatPane='list';$('.chat-layout')?.setAttribute('data-pane','list');return;}
     if(action==='chat-open'){saveChatDraft();chatSelection=button.dataset.id;chatPane='room';return await navigate('messages');}
     if(action==='chat-refresh'){if($('#chat-before')?.dataset.expanded)return await navigate('messages');return await refreshChat();}
@@ -1261,7 +1397,7 @@ async function boot(){
   const run={epoch};bootRun=run;
   run.promise=(async()=>{
    try{const data=await api('/api/auth/me');if(epoch!==state.sessionEpoch)return;state.user=data.user;await navigate(landing());}
-   catch(e){if(epoch!==state.sessionEpoch)return;if(e.status===401||e.status===403){setSession(null);renderLogin(e.message);}else{app.innerHTML='<main class="login-panel"><section class="login-box"><h2>Chưa thể kết nối BABY MARK</h2><p class="muted">Phiên đã lưu chưa bị xóa. Kiểm tra mạng và thử lại.</p><button class="btn" data-action="session-retry">Thử lại</button><button class="btn secondary" data-action="logout">Đăng xuất</button></section></main>';}}
+   catch(e){if(epoch!==state.sessionEpoch)return;if(e.status===401||e.status===403){setSession(null);renderLogin(e.message);}else{app.innerHTML='<main id="main" class="login-panel"><section class="login-box login-recovery"><h1>Chưa thể kết nối BABY MARK</h1><p class="muted">Phiên đã lưu chưa bị xóa. Kiểm tra mạng và thử lại.</p><div class="login-recovery-actions"><button class="btn" data-action="session-retry">Thử lại</button><button class="btn secondary" data-action="logout">Đăng xuất</button></div></section></main>';}}
   })();
   try{return await run.promise;}finally{if(bootRun===run)bootRun=null;}
 }

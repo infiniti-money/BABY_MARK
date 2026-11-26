@@ -5,7 +5,7 @@ async function login(page){
 }
 test('portrait, landscape and reduced height keep profile close control reachable',async({page},testInfo)=>{
  await page.emulateMedia({reducedMotion:'reduce'});
- await login(page);await page.getByRole('button',{name:'Thêm',exact:true}).click();await page.getByRole('button',{name:'Hồ sơ của tôi',exact:true}).click();await expect(page.getByRole('dialog')).toBeVisible();
+ await login(page);await page.getByRole('button',{name:'Tiện ích',exact:true}).click();await page.locator('#navigation-menu').getByRole('button',{name:'Hồ sơ của tôi',exact:true}).click();await expect(page.getByRole('dialog')).toBeVisible();
  for(const viewport of [{width:390,height:844},{width:844,height:390},{width:390,height:360}]){
   await page.setViewportSize(viewport);const button=page.getByRole('button',{name:'Đóng',exact:true});await expect(button).toBeVisible();
   const box=await button.boundingBox();expect(box.width).toBeGreaterThanOrEqual(44);expect(box.height).toBeGreaterThanOrEqual(44);expect(box.y).toBeGreaterThanOrEqual(0);expect(box.y+box.height).toBeLessThanOrEqual(viewport.height);
