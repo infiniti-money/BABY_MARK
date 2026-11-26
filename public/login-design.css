@@ -19,10 +19,12 @@
     justify-content: center;
     gap: 24px;
     padding: clamp(24px, 4vw, 48px);
-    border: 1px solid var(--bm-edge);
+    border: 1px solid var(--bm-frost-edge);
     border-radius: var(--bm-radius);
-    background: var(--bm-hero);
-    box-shadow: var(--bm-shadow);
+    background: var(--bm-frost-hero);
+    box-shadow: var(--bm-frost-shadow);
+    -webkit-backdrop-filter: var(--bm-frost-filter);
+    backdrop-filter: var(--bm-frost-filter);
   }
 
   .login-story::before,
@@ -82,10 +84,10 @@
   .login-panel .login-box {
     max-width: 480px;
     padding: clamp(20px, 3vw, 36px);
-    border: 1px solid var(--bm-edge);
+    border: 1px solid var(--bm-frost-edge);
     border-radius: var(--bm-radius);
-    background: var(--bm-surface);
-    box-shadow: var(--bm-shadow);
+    background: var(--bm-frost-panel);
+    box-shadow: var(--bm-frost-shadow);
   }
 
   .login-box h1 {
@@ -127,7 +129,7 @@
     padding: 10px 12px;
     border: 1px solid var(--bm-control-border);
     border-radius: var(--bm-radius-small);
-    background: #fff;
+    background: var(--bm-frost-control);
     color: var(--bm-ink);
     font-size: 16px;
     font-weight: 400;
@@ -162,15 +164,15 @@
     min-height: 48px;
     border: 1px solid #c32040;
     border-radius: 999px;
-    background: var(--bm-action);
-    box-shadow: 0 5px 12px #b9193730, inset 0 1px 0 #ffffff66;
+    background: var(--bm-frost-action);
+    box-shadow: 0 5px 14px #b9193740, inset 0 1px 2px #ffffff73;
     color: #fff;
     font-size: 16px;
     font-weight: 750;
   }
 
   .login-box .btn:not(.secondary):hover:not(:disabled) {
-    background: var(--bm-action-hover);
+    background: var(--bm-frost-action-hover);
   }
 
   .login-box .login-note {
@@ -180,7 +182,7 @@
     padding: 11px 12px;
     border: 1px solid var(--bm-border);
     border-radius: var(--bm-radius-small);
-    background: var(--bm-inset);
+    background: var(--bm-frost-inset);
     color: var(--bm-muted);
     font-size: 13px;
     line-height: 1.45;
@@ -265,5 +267,10 @@
   .login-story::before,
   .login-story::after {
     content: none;
+  }
+
+  .login-box input:not([type="checkbox"]),
+  .login-box .login-note {
+    background: Canvas;
   }
 }

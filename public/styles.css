@@ -517,7 +517,6 @@ td,th{overflow-wrap:anywhere}
   --glass-inset:rgba(255,255,255,.66);
   --glass-edge:rgba(255,255,255,.92);
   --glass-shadow:0 8px 24px rgba(112,37,53,.08),inset 0 1px 0 rgba(255,255,255,.95);
-  --glass-blur:14px;
   --line:#e3cfd5;
   --muted:#65525c;
   --shadow:var(--glass-shadow);
@@ -577,10 +576,6 @@ td,th{overflow-wrap:anywhere}
    border-color:var(--glass-edge);
   }
   .sidebar,.topbar{background:var(--glass-nav)}
-  .sidebar,.topbar,.login-box,dialog,.admin-nav,#content>.card,.overview-grid>.card,.overview-kpis>.stat,.employee-workspace>.card {
-   -webkit-backdrop-filter:blur(var(--glass-blur)) saturate(120%);
-   backdrop-filter:blur(var(--glass-blur)) saturate(120%);
-  }
   .assignment-card,.overview-store,.operation-row,.calendar-day,.overview-tasks>div,.overview-queue,
   .employee-metrics>div,.privacy-note,.login-note,.date-chip,.checklist,.credential,.chat-thread,.chat-message {
    background:var(--glass-inset);
@@ -590,12 +585,7 @@ td,th{overflow-wrap:anywhere}
   input[readonly]{background:#f6eef2}
  }
  @media(max-width:900px) {
-  :root{--glass-blur:8px}
   .sidebar{border-top:1px solid var(--line)}
-  /* The scrolling workspace remains lightweight on phones. */
-  #content>.card,.overview-grid>.card,.overview-kpis>.stat,.employee-workspace>.card,.admin-nav {
-   -webkit-backdrop-filter:none;backdrop-filter:none;
-  }
  }
  @media(max-width:620px) {
   .login-box{padding:14px;max-width:100%}
@@ -644,13 +634,6 @@ td,th{overflow-wrap:anywhere}
 
 /* Private CV detail panel. */
 .cv-header{display:flex;gap:14px;align-items:center;margin-bottom:14px}.cv-header .avatar{flex:0 0 48px;width:48px;height:48px}.cv-fields{margin:14px 0}.cv-read-field{min-width:0;overflow-wrap:anywhere}.cv-read-field small{display:block;font-weight:600;color:var(--muted)}.cv-read-field p{white-space:pre-wrap;margin:4px 0 12px}.cv-fields textarea{resize:vertical;min-height:80px}
-
-/* RC.18: preserve glass tint but reduce compositor cost on touch devices.
-   Browser still renders original brand and stationary navigation. */
-@media screen and (pointer:coarse) and (max-width:900px){
- .topbar,.sidebar,.login-box,dialog{-webkit-backdrop-filter:none;backdrop-filter:none;background:var(--glass-solid)}
- .card,.stat{box-shadow:0 4px 12px rgba(112,37,53,.06)}
-}
 
 /* Direct overview KPI navigation: keep existing glass layout and icon set. */
 @media screen{

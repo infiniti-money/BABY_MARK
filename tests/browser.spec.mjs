@@ -713,6 +713,13 @@ test('RC.14 frosted surfaces keep navigation, camera and print readable',async({
  await expect(page.locator('.admin-nav')).toBeVisible();
  await page.setViewportSize({width:390,height:844});
  await expect(page.locator('.admin-nav')).toHaveCSS('backdrop-filter','none');
+ if(supports){
+  await expect(page.locator('.sidebar')).toHaveCSS('backdrop-filter',/blur\(/);
+  await expect(page.locator('.admin-panel')).toHaveCSS('backdrop-filter',/blur\(9px\)/);
+  const row=page.locator('.admin-panel .responsive-table tbody tr').first();
+  await expect(row).toHaveCSS('background-color',/^rgba\(/);
+  await expect(row).toHaveCSS('backdrop-filter','none');
+ }
  expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBeTruthy();
  await page.emulateMedia({media:'print'});
  expect(await page.evaluate(()=>getComputedStyle(document.documentElement).getPropertyValue('--glass-panel').trim())).toBe('');
