@@ -1,0 +1,67 @@
+name: Publish BABY MARK v1.2.2
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'docs/releases/v1.2.2.md'
+  workflow_dispatch:
+permissions:
+  contents: read
+  checks: read
+concurrency:
+  group: babymark-release-v1-2-2
+  cancel-in-progress: false
+jobs:
+  gate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - name: Check version consistency
+        run: node -e "const p=require('./package.json'),l=require('./package-lock.json');if([p.version,l.version,l.packages[''].version].some(v=>v!=='1.2.2'))process.exit(1)"
+      - name: Require Verify and Pages deployment on exact release commit
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          for attempt in $(seq 1 80); do
+            test "$(gh api "repos/$GITHUB_REPOSITORY/branches/main" --jq .commit.sha)" = "$GITHUB_SHA"
+            checks="$(gh api "repos/$GITHUB_REPOSITORY/commits/$GITHUB_SHA/check-runs?per_page=100&filter=latest")"
+            if jq -e '[.check_runs[] | select(.name == "cloudflare" or .name == "Cloudflare Pages")] | any(.status == "completed" and .conclusion != "success")' <<< "$checks" >/dev/null; then
+              echo "Required CI or Pages deployment did not succeed"
+              exit 1
+            fi
+            if jq -e '["cloudflare","Cloudflare Pages"] as $required | .check_runs as $runs | all($required[]; . as $name | any($runs[]; .name == $name and .status == "completed" and .conclusion == "success"))' <<< "$checks" >/dev/null; then
+              echo "Verified exact commit and Pages deployment: $GITHUB_SHA"
+              exit 0
+            fi
+            sleep 20
+          done
+          echo "Required checks not confirmed before timeout"
+          exit 1
+  release:
+    needs: gate
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - name: Publish verified commit without replacing existing releases
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(node -p "require('./package.json').version")" = "1.2.2"
+          test "$(gh api "repos/$GITHUB_REPOSITORY/branches/main" --jq .commit.sha)" = "$GITHUB_SHA"
+          if gh release view v1.2.2 >/dev/null 2>&1; then
+            echo "Release already exists; not modifying."
+            exit 0
+          fi
+          if gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/v1.2.2" >/dev/null 2>&1; then
+            echo "Tag exists without release; manual review required."
+            exit 1
+          fi
+          gh release create v1.2.2 --target "$GITHUB_SHA" --title "BABY MARK v1.2.2 Stable — HR Management" --notes-file docs/releases/v1.2.2.md --latest
