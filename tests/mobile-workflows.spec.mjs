@@ -202,3 +202,22 @@ test('keyboard focus remains visible on compact controls and screen reader label
  await page.locator('[data-action="audit-open"]').click();
  const dialog=page.getByRole('dialog');await expect(dialog).toHaveAccessibleName(/Nhật ký/);await page.keyboard.press('Escape');await expect(dialog).toBeHidden();
 });
+
+test('P2 skip link and screen navigation expose a focusable landmark and concise loading status',async({page})=>{
+ await page.emulateMedia({reducedMotion:'reduce'});await page.setViewportSize({width:390,height:844});await login(page,'staff');
+ await page.keyboard.press('Tab');await page.locator('.skip-link').focus();await page.keyboard.press('Enter');await expect(page.locator('#main')).toBeFocused();
+ await expect(page.locator('#content')).not.toHaveAttribute('aria-live','polite');
+ await page.locator('[data-action="mobile-menu"]').click();const menu=page.locator('#navigation-menu');
+ await expect(menu.locator('#navigation-title')).toBeFocused();await page.keyboard.press('Escape');await expect(menu).toBeHidden();await expect(page.locator('[data-action="mobile-menu"]')).toBeFocused();
+ await open(page,'schedule');await expect(page.locator('.page-head h1')).toBeFocused();await expect(page.locator('#content')).not.toHaveAttribute('aria-busy','true');
+ await expect(page.locator('#navigation-status')).toContainText('Đã tải');await expect(page).toHaveTitle(/Lịch làm việc.*BABY MARK/);
+});
+test('P2 admin tabs use manual keyboard activation, a linked panel and one tab stop',async({page})=>{
+ await page.emulateMedia({reducedMotion:'reduce'});await page.setViewportSize({width:390,height:844});await login(page,'admin');await open(page,'admin');
+ const group=page.getByRole('tablist',{name:'Trung tâm quản trị'}),tabs=group.getByRole('tab');await expect(group).toBeVisible();
+ const selected=group.locator('[aria-selected=true]');await selected.focus();const previous=await selected.getAttribute('id');await page.keyboard.press('End');
+ const last=tabs.last();await expect(last).toBeFocused();await expect(selected).toHaveAttribute('id',previous);expect(await group.locator('[tabindex="0"]').count()).toBe(1);
+ await page.keyboard.press('Enter');await expect(page.locator('#content .loading')).toHaveCount(0);await expect(last).toHaveAttribute('aria-selected','true');await expect(last).toBeFocused();
+ await expect(page.getByRole('tabpanel')).toHaveAttribute('aria-labelledby',await last.getAttribute('id'));await expect(last).toHaveAttribute('aria-controls','admin-work');
+ await page.keyboard.press('Home');await expect(tabs.first()).toBeFocused();
+});
