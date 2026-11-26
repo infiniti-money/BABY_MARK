@@ -175,3 +175,15 @@
  .pull-refresh[data-state=refreshing]{background:Canvas}
  .pull-refresh[data-state=refreshing] .pull-refresh-wordmark strong,.pull-refresh[data-state=refreshing] .pull-refresh-wordmark small{color:CanvasText}
 }
+
+/* Visible keyboard focus independent of glass transparency. */
+@media screen {
+ :is(button,a,input,select,textarea,summary,[tabindex]):focus-visible {
+  outline:3px solid #5935a5;outline-offset:3px;
+ }
+ .table-wrap :is(button,a):focus-visible,.shell .sidebar .nav button:focus-visible {outline-offset:-3px}
+ .skip-link:focus-visible{z-index:9999}
+}
+@media screen and (forced-colors:active){
+ :is(button,a,input,select,textarea,summary,[tabindex]):focus-visible{outline-color:Highlight}
+}

@@ -20,3 +20,9 @@ Baseline main 717e669336e98d4625d24ce53532fc24064021f4; stable v1.2.3 tag target
 - Release workflow checks exact commit and Pages. Add full dependency audit/report, CI cancellation for superseded PRs, accessibility and performance regression tests, repeatable version/release checklist. Never overwrite existing stable tags.
 
 Evidence: code and tests on pinned baseline, GitHub Actions checks. Production health endpoint unavailable to review tool; no private D1/KV access, real-device Android, backup verification, production p95 or full dependency advisory scan. This PR only implements the first safety/readiness changes with regression tests. CI must pass before merge.
+
+## Implementation follow-up
+- Payroll input, closing and work-unit review revalidate active admin session in SQL at write time; revoke-race tests verify no mutation or misleading audit. Overtime inputs with an available payroll epoch are bound to the validated version. Payroll reads revalidate before returning private results.
+- Add visible keyboard focus styles (including forced colors), baseline JS/CSS byte budgets and development dependency audit (report-only pending advisory review). Cancel superseded PR Verify runs, not main runs.
+- Fix old CI expectations for migration 0023 and versioned diagnostic heading. Preview build failure reason not available; verify new build before merging.
+- These are partial P1–P4 safeguards, not complete leave-policy/shift-swap implementation, device acceptance, D1 optimization or dependency upgrades. No automatic changes to company payroll/leave policies, live schema or data.

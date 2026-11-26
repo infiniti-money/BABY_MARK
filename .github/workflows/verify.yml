@@ -6,6 +6,9 @@ on:
   workflow_dispatch:
 permissions:
   contents: read
+concurrency:
+  group: verify-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 jobs:
   cloudflare:
     runs-on: ubuntu-latest
@@ -21,6 +24,9 @@ jobs:
       - run: npm ci
       - name: Audit production dependencies
         run: npm audit --omit=dev --audit-level=high
+      - name: Audit development dependencies (report only)
+        continue-on-error: true
+        run: npm audit --include=dev --audit-level=high
       - run: npm test
       - run: npm run check:runtime
       - run: npx playwright install --with-deps chromium webkit
