@@ -23,3 +23,14 @@ backups/
 *.db
 *.db-wal
 *.db-shm
+
+# Never commit mobile signing materials or local binaries
+*.keystore
+*.p12
+*.pfx
+*.mobileprovision
+*.apk
+*.aab
+*.ipa
+keystore.properties
+signing.properties
