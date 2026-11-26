@@ -213,6 +213,8 @@ function closeModal() { modalAbort.abort();modal.removeAttribute('aria-busy');cl
 function showModal(title,body) {
   closeModal();modalAbort=new AbortController(); modal.innerHTML=`<div class="modal-head"><h2 id="modal-title">${esc(title)}</h2><button class="close" data-action="close-modal" aria-label="Đóng">×</button></div><div class="modal-body">${body}</div>`;
   modal.showModal();
+  const heading=modal.querySelector('#modal-title');
+  if(heading){heading.tabIndex=-1;heading.focus({preventScroll:true});}
   return modalTicket;
 }
 function renderLogin(error='') {
@@ -231,7 +233,7 @@ function renderLogin(error='') {
           <label>Mật khẩu hoặc mã truy cập<input name="secret" type="password" autocomplete="current-password" required maxlength="128" placeholder="Mật khẩu hoặc mã 48 ký tự"></label>
           <p id="login-error" class="error-text" role="alert" ${error?'':'hidden'}>${esc(error)}</p>
           <div class="login-preference">
-            <label class="remember-device"><input type="checkbox" name="remember" aria-describedby="login-remember-hint" checked> Ghi nhớ đăng nhập trên thiết bị này</label>
+            <label class="remember-device"><input type="checkbox" name="remember" aria-describedby="login-remember-hint"> Ghi nhớ đăng nhập trên thiết bị này</label>
             <p id="login-remember-hint" class="hint">Chỉ chọn trên thiết bị cá nhân. Nhân viên/quản lý: tối đa 30 ngày; Admin: tối đa 8 giờ. Không lưu mật khẩu.</p>
           </div>
           <button class="btn wide" type="submit" data-testid="login-submit">Đăng nhập</button>
@@ -1390,6 +1392,10 @@ window.addEventListener('online',()=>{
 });
 
 let bootRun=null;
+async function registerAppServiceWorker(){
+ if(!('serviceWorker' in navigator))return;
+ try{await navigator.serviceWorker.register('/sw.js',{scope:'/'});}catch{if(navigator.onLine!==false)console.warn('BABY MARK service worker registration failed');}
+}
 compactChat.addEventListener('change',()=>{if(!compactChat.matches&&state.view==='messages'&&chatPage)void loadChatRoom(state.renderId,true).catch(e=>notify(e.message,true));});
 
 async function boot(){
@@ -1408,4 +1414,5 @@ installPullRefresh({
  canRefresh:()=>!!state.user&&navigator.onLine!==false&&!document.hidden&&!modal.open&&!navigationMenu.open&&!documentPreview&&!state.stream&&!cameraOpening&&!pendingCapture&&!recoveryBusy&&!(captureAbort&&!captureAbort.signal.aborted)&&![...apiRequests].some(r=>r.method!=='GET')&&!document.querySelector('form[data-submitting="true"],#content .loading')&&!hasEditedControls($('#content')),
  refresh:async()=>{const epoch=state.sessionEpoch;await navigate();if(epoch!==state.sessionEpoch||!state.user)throw Error('Phiên đăng nhập đã thay đổi.');if($('#content .table-error'))throw Error('Không thể tải dữ liệu.');}
 });
+void registerAppServiceWorker();
 await boot();

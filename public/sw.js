@@ -1,4 +1,4 @@
-// No caching of private data or API responses.
+// Registered at app startup. Network-only is intentional: never cache private data or API responses.
 self.addEventListener('install',event=>event.waitUntil(self.skipWaiting()));
 self.addEventListener('activate',event=>event.waitUntil(self.clients.claim()));
 self.addEventListener('push',event=>{

@@ -14,9 +14,11 @@ export default defineConfig({
     viewport:{width:1440,height:1080},
     timezoneId:'Asia/Ho_Chi_Minh',
     locale:'vi-VN',
-    permissions:['camera','geolocation'],
-    geolocation:{latitude:20,longitude:106,accuracy:5},
-    // One-time issued fixture codes are exercised by account-control tests.
+	permissions:['camera','geolocation'],
+	geolocation:{latitude:20,longitude:106,accuracy:5},
+	// API mocks must remain page-interceptable; PWA behavior is validated separately.
+	serviceWorkers:'block',
+	// One-time issued fixture codes are exercised by account-control tests.
     // Capture only explicit, credential-free screenshots in the test itself.
     trace:'off',
     screenshot:'off',

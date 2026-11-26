@@ -21,6 +21,6 @@
     "@playwright/test": "1.65.1",
     "esbuild": "0.28.2",
     "miniflare": "5.20261123.0-beta",
-    "wrangler": "4.167.0"
+    "wrangler": "4.168.0"
   }
 }

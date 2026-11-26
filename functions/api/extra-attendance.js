@@ -28,12 +28,16 @@ export async function onRequestPost({request,env}){
    if(reason.length<5)invalid('Lý do cần ít nhất 5 ký tự');
    const br=await db.prepare('SELECT id FROM branches WHERE id=? AND active=1 AND latitude IS NOT NULL AND longitude IS NOT NULL').bind(branch).first(),shift=await db.prepare('SELECT * FROM shifts WHERE id=?').bind(shiftId).first();
    if(!br||!shift)invalid('Cửa hàng chưa có GPS hoặc mẫu ca không hợp lệ');
+   if(actor.role==='manager'&&!await db.prepare('SELECT 1 FROM branch_managers WHERE user_id=? AND branch_id=?').bind(actor.id,branch).first())throw new ApiError(403,'Bạn không có quyền khai báo ca tại cửa hàng này');
    const now=Date.now(),today=dayVN(now),yesterday=dayVN(now-86400000);
    const date=b.work_date;
    if(date!==today&&date!==yesterday)invalid('Chỉ khai báo ca đang diễn ra hôm nay hoặc ca qua đêm hôm qua');
    const interval=shiftInterval(date,shift.start_time,shift.end_time);
    if(date===yesterday&&interval.ends_at<=now)invalid('Ca hôm qua đã kết thúc');
    if(now<interval.starts_at-4*3600000||now>=interval.ends_at)invalid('Ca chưa đến thời gian vào hoặc đã kết thúc; chọn mẫu ca đang làm');
+   const overlap=await db.prepare(`SELECT a.id FROM assignments a LEFT JOIN extra_attendance x ON x.assignment_id=a.id
+    WHERE a.user_id=? AND a.starts_at<? AND a.ends_at>? AND (x.assignment_id IS NULL OR x.state<>'REJECTED') LIMIT 1`).bind(actor.id,interval.ends_at,interval.starts_at).first();
+   if(overlap)throw new ApiError(409,'Ca bổ sung đang chồng với một ca khác của bạn');
    const id=crypto.randomUUID();
    const rate=await db.prepare('SELECT COUNT(*) AS n FROM extra_attendance x JOIN assignments a ON a.id=x.assignment_id WHERE a.user_id=? AND x.created_at>?').bind(actor.id,now-86400000).first();
    if(rate.n>=6)throw new ApiError(429,'Đã tạo quá nhiều ca bổ sung trong 24 giờ');

@@ -445,9 +445,12 @@ test('device permission setup explicitly checks camera and GPS without uploading
  expect(requests).toEqual([]);
 });
 
-test('remembered staff session survives closing the tab',async({page,context})=>{
- await page.goto('/');await expect(page.locator('input[name="remember"]')).toBeChecked();
- await login(page,'staff');
+test('opt-in remembered staff session survives closing the tab',async({page,context})=>{
+ await page.goto('/');const remember=page.locator('input[name="remember"]');await expect(remember).not.toBeChecked();await remember.check();
+ await page.getByLabel('Tên đăng nhập',{exact:true}).fill(username.staff);
+ await page.getByLabel('Mật khẩu hoặc mã truy cập',{exact:true}).fill(secret);
+ await page.getByTestId('login-submit').click();
+ await expect(page.getByRole('heading',{name:'Chấm công hôm nay',exact:true})).toBeVisible();
  const expiry=await page.evaluate(()=>JSON.parse(localStorage.getItem('babymark-session')||'null')?.expires_at);
  expect(expiry-Date.now()).toBeGreaterThan(29*86400000);
  const next=await context.newPage();await next.goto('/');await expect(next.getByRole('button',{name:'Chấm công',exact:true})).toBeVisible();await expect(next.locator('form[data-form="login"]')).toHaveCount(0);await next.close();
@@ -846,8 +849,8 @@ test('HR contract expiry dashboard and private saved CV print',async({page,reque
  await expect(page.locator('#print-document')).toBeEmpty();
 });
 
-test('remember login defaults on but can be disabled for shared devices',async({page})=>{
- await page.goto('/');const remember=page.locator('input[name="remember"]');await expect(remember).toBeChecked();await remember.uncheck();
+test('remember login defaults off for shared devices',async({page})=>{
+ await page.goto('/');const remember=page.locator('input[name="remember"]');await expect(remember).not.toBeChecked();
  await page.getByLabel('Tên đăng nhập',{exact:true}).fill(username.staff);
  await page.getByLabel('Mật khẩu hoặc mã truy cập',{exact:true}).fill(secret);
  await page.getByTestId('login-submit').click();
