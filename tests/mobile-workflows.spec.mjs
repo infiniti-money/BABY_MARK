@@ -112,3 +112,33 @@ test('portrait dashboard reflects the assigned shift and starts the existing cam
  for(const width of [320,375,390,430]){await page.setViewportSize({width,height:844});expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1)).toBe(true);}
  await page.setViewportSize({width:1440,height:900});await expect(welcome).toBeHidden();await expect(attendance).toBeHidden();await expect(capture).toBeVisible();
 });
+
+test('phone filters share one column and submit dates, calendar mode and audit source',async({page})=>{
+ await page.emulateMedia({reducedMotion:'reduce'});await page.setViewportSize({width:390,height:844});await login(page,'admin');
+ const check=async form=>{
+  await expect(form).toBeVisible();
+  const problems=await form.evaluate(el=>{
+   const controls=[...el.querySelectorAll(':scope > label > input:not([type=checkbox]), :scope > label > select, :scope > button.btn')];
+   const s=getComputedStyle(el),rect=el.getBoundingClientRect(),left=rect.left+parseFloat(s.paddingLeft)+parseFloat(s.borderLeftWidth),right=rect.right-parseFloat(s.paddingRight)-parseFloat(s.borderRightWidth);
+   const out=[];if(controls.length<2)out.push('missing controls');
+   if(s.gridTemplateColumns.trim().split(/\s+/).length!==1)out.push('not single column');
+   if(parseFloat(s.rowGap)!==12)out.push('inconsistent gap');
+   let prev=null;for(const control of controls){const b=control.getBoundingClientRect();if(Math.abs(b.left-left)>1||Math.abs(b.right-right)>1||Math.abs(b.height-56)>1)out.push(control.name+' geometry');if(prev&&b.top-prev.bottom<11)out.push('overlap or gap');prev=b;}
+   return out;
+  });expect(problems).toEqual([]);
+ };
+ const form=page.locator('[data-form="overview-filter"]');for(const width of [320,375,390,430]){await page.setViewportSize({width,height:844});await check(form);}
+ const day='2026-11-12',from='2026-11-01',to='2026-11-13';
+ const response=async(path,values,action)=>{const wait=page.waitForResponse(r=>{const u=new URL(r.url());return u.pathname===path&&Object.entries(values).every(([k,v])=>u.searchParams.get(k)===v)});await action();expect((await wait).ok()).toBe(true);};
+ await form.locator('[name=day]').fill(day);await response('/api/admin/overview',{day},()=>form.locator('[type=submit]').click());await expect(form.locator('[name=day]')).toHaveValue(day);
+ await page.locator('[data-action="audit-open"]').click();const audit=page.locator('[data-form="audit-filter"]');await check(audit);await audit.locator('[name=source]').selectOption('auth');await audit.locator('[name=from]').fill(from);await audit.locator('[name=to]').fill(to);
+ await response('/api/admin/audit-log',{source:'auth',from,to},()=>audit.locator('[type=submit]').click());await expect(audit.locator('[name=source]')).toHaveValue('auth');await expect(audit.locator('[name=to]')).toHaveValue(to);await page.locator('dialog[open] [data-action="close-modal"]').last().click();
+ await open(page,'schedule');const calendar=page.locator('[data-form="calendar-filter"]');await check(calendar);await calendar.locator('[name=day]').fill(day);await calendar.locator('[name=mode]').selectOption('month');await response('/api/assignments',{from:'2026-11-01',to:'2026-11-30'},()=>calendar.locator('[type=submit]').click());await expect(page.getByRole('heading',{name:'Lịch tháng',exact:true})).toBeVisible();await expect(page.locator('.calendar-day')).toHaveCount(30);await page.locator('dialog[open] [data-action="close-modal"]').last().click();
+ for(const [view,path] of [['schedule','/api/assignments'],['history','/api/attendance/history'],['handover','/api/handover'],['reports','/api/reports'],['requests','/api/workforce'],['alerts','/api/alerts']]){
+  if(view!=='schedule')await open(page,view);const range=page.locator('[data-form="filter"]');await check(range);
+  await range.locator('[name=from]').fill(from);await range.locator('[name=to]').fill(to);await response(path,{from,to},()=>range.locator('[type=submit]').click());await expect(range.locator('[name=from]')).toHaveValue(from);await expect(range.locator('[name=to]')).toHaveValue(to);
+  expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1)).toBe(true);
+ }
+ await open(page,'payroll');await check(page.locator('[data-form="payroll-filter"]'));
+ await page.setViewportSize({width:844,height:390});await check(page.locator('[data-form="payroll-filter"]'));
+});

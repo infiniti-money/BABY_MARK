@@ -842,3 +842,37 @@ td,th{overflow-wrap:anywhere}
  .shell .sidebar .nav button.active,.shell .sidebar .nav button.active .icon,.shell .sidebar .nav button.active::after{background:Highlight;color:HighlightText;border-color:Highlight}
  .shell .sidebar .nav button span{text-shadow:none}
 }
+
+/* One shared phone filter layout. Native date/month controls on iOS have
+   intrinsic widths; explicitly constrain both the grid item and its control.
+   Keep native picker appearance and desktop/tablet layouts unchanged. */
+@media screen and (max-width:620px), screen and (max-width:900px) and (orientation:landscape) and (max-height:500px){
+ .mobile-filter-stack{
+  --filter-height:56px;--filter-gap:12px;--filter-radius:16px;
+  display:grid;grid-template-columns:minmax(0,1fr);gap:var(--filter-gap);
+  align-items:stretch;justify-items:stretch;min-width:0;max-width:100%;
+ }
+ .mobile-filter-stack.toolbar.overview-filter{grid-template-columns:minmax(0,1fr);gap:var(--filter-gap);align-items:stretch}
+ .mobile-filter-stack>label{
+  display:grid;grid-template-columns:minmax(0,1fr);gap:7px;align-items:start;
+  width:100%;min-width:0;max-width:100%;margin:0;font-size:13px;line-height:1.4;font-weight:700;
+ }
+ .mobile-filter-stack>label>input:not([type=checkbox]):not([type=radio]),
+ .mobile-filter-stack>label>select,
+ .mobile-filter-stack>button.btn{
+  display:block;box-sizing:border-box;inline-size:100%;min-inline-size:0;max-inline-size:100%;
+  width:100%;min-width:0;max-width:100%;height:var(--filter-height);min-height:var(--filter-height);
+  padding:0 14px;margin:0;border-radius:var(--filter-radius);font-size:16px;line-height:1.25;
+ }
+ .mobile-filter-stack>label>input:is([type=date],[type=month],[type=datetime-local],[type=time]){
+  text-align:start;min-inline-size:0;max-inline-size:100%;
+ }
+ .mobile-filter-stack>label>input::-webkit-date-and-time-value{text-align:start;min-width:0;max-width:100%;margin:0}
+ .mobile-filter-stack>button.btn{
+  display:flex;align-items:center;justify-content:center;gap:8px;white-space:normal;overflow-wrap:anywhere;text-align:center;font-weight:700;
+ }
+ .mobile-filter-stack>button .icon{flex-shrink:0}
+ .mobile-filter-stack>.spacer{display:none}
+ .mobile-filter-stack>label.admin-active-filter{display:flex;align-items:center;gap:8px;min-height:44px}
+ .mobile-filter-stack>label.admin-active-filter input{width:18px;height:18px;flex:0 0 18px;margin:0}
+}
