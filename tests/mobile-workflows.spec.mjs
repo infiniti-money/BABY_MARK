@@ -163,3 +163,23 @@ test('rounded controls and floating audit modal preserve accepted filters; pull 
  try{await gesture(150);await expect(page.locator('#pull-refresh')).toBeVisible();await expect(page.locator('#pull-refresh')).toHaveAttribute('data-state','refreshing');await expect(page.locator('#pull-refresh strong')).toHaveText('Thấu hiểu điều mẹ muốn');await gesture(150);await expect.poll(()=>reads).toBe(1);}finally{release();}
  await expect(page.locator('#pull-refresh')).toBeHidden();await expect(page.locator('#pull-refresh-status')).toHaveText('Đã làm mới dữ liệu.');expect(writes).toBe(0);await expect(form.locator('[name=day]')).toHaveValue(original);
 });
+
+test('shared icon scale and compact labels reach all roles and tables without losing filter or touch geometry',async({page})=>{
+ await page.emulateMedia({reducedMotion:'reduce'});
+ await page.setViewportSize({width:390,height:844});
+ await login(page,'admin');
+ const filter=page.locator('[data-form="overview-filter"]');
+ await expect(filter.locator('[name=day]')).toHaveCSS('font-size','16px');
+ await expect(filter.locator('button[type=submit]')).toHaveCSS('height','56px');
+ await expect(filter.locator('button[type=submit]')).toHaveCSS('font-size','13px');
+ await expect(page.locator('.overview-command .quick-actions .btn .icon').first()).toHaveCSS('width','42px');
+ for(const width of [320,375,390,430]){
+  await page.setViewportSize({width,height:844});
+  expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1)).toBe(true);
+ }
+ for(const view of ['schedule','history','handover','reports','requests','alerts','payroll','admin']){
+  await open(page,view);expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1)).toBe(true);
+  const cells=page.locator('.table-wrap .responsive-table td[data-label]');
+  if(await cells.count())await expect(cells.first()).toHaveCSS('font-size','13px');
+ }
+});
