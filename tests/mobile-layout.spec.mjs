@@ -69,3 +69,29 @@ test('mobile report cells and wrapped labels never overlap; native desktop table
  await page.setViewportSize({width:1440,height:900});expect(await table.evaluate(el=>getComputedStyle(el).display)).toBe('table');
  await page.setViewportSize({width:390,height:844});const path=testInfo.outputPath('report-mobile-no-overlap.png');await page.screenshot({path,fullPage:true});await testInfo.attach('Report mobile no overlap',{path,contentType:'image/png'});
 });
+
+test('overview date stays inside its filter column on compact Safari layouts',async({page})=>{
+ await page.emulateMedia({reducedMotion:'reduce'});
+ await page.goto('/');
+ await page.getByLabel('Tên đăng nhập',{exact:true}).fill('test-admin');
+ await page.getByLabel('Mật khẩu hoặc mã truy cập',{exact:true}).fill('1'.repeat(48));
+ await page.getByTestId('login-submit').click();
+ const form=page.locator('.overview-filter');
+ await expect(form).toBeVisible();
+ for(const width of [320,375,390,430,590,768]){
+  await page.setViewportSize({width,height:844});
+  const bounds=await form.evaluate(form=>{
+   const date=form.querySelector('input[type="date"]').getBoundingClientRect();
+   const store=form.querySelector('select[name="branch"]').getBoundingClientRect();
+   const parent=form.getBoundingClientRect();
+   const label=form.querySelector('input[type="date"]').parentElement.getBoundingClientRect();
+   return {inside:date.left>=parent.left&&date.right<=parent.right+1&&date.right<=label.right+1,
+    separated:date.bottom<=store.top+1||date.right<=store.left+1};
+  });
+  expect(bounds).toEqual({inside:true,separated:true});
+ }
+ const date=form.locator('[name="day"]');
+ await date.fill('2026-11-25');
+ await form.getByRole('button',{name:'Xem tổng quan',exact:true}).click();
+ await expect(page.locator('.overview-filter [name="day"]')).toHaveValue('2026-11-25');
+});
