@@ -1,10 +1,10 @@
-# BABY MARK v1.2.2 — HR Management
+# BABY MARK v1.2.3 — HR Management
 Hệ thống quản lý nhân sự nội bộ cho chuỗi cửa hàng. Nền tảng đang hoạt động: `public/` + `functions/` trên **Cloudflare Pages + D1 + KV**. Không sử dụng API trả phí mới, không tự nâng cấp gói. Các thư mục Next.js/Expo/Supabase cũ chỉ là nguồn lịch sử, không nằm trong build Pages.
 
-**Phiên bản mã nguồn:** v1.2.2. [Ghi chú phát hành và phạm vi nghiệm thu](docs/releases/v1.2.2.md). GitHub Release chỉ được công bố sau kiểm thử commit phát hành.
+**Phiên bản mã nguồn:** v1.2.3. [Ghi chú phát hành và phạm vi nghiệm thu](docs/releases/v1.2.3.md). GitHub Release chỉ được công bố sau kiểm thử commit phát hành.
 
 **Production:** https://babymark.pages.dev/  
-**Lịch sử:** [v1.2.1](https://github.com/infiniti-money/BABY_MARK/releases/tag/v1.2.1) · [v1.2.0](docs/releases/v1.2.0.md) · [v1.1.0](docs/releases/v1.1.0.md) · [v1.2.0 RC](docs/releases/v1.2.0-rc.md).
+**Lịch sử:** [v1.2.2](docs/releases/v1.2.2.md) · [v1.2.1](https://github.com/infiniti-money/BABY_MARK/releases/tag/v1.2.1) · [v1.2.0](docs/releases/v1.2.0.md) · [v1.1.0](docs/releases/v1.1.0.md) · [v1.2.0 RC](docs/releases/v1.2.0-rc.md).
 
 ## Chức năng chính
 - Quản trị theo vai trò, 14 cửa hàng, 50 nhân viên/quản lý hoạt động, tài khoản và phiên đăng nhập.
