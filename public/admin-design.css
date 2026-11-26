@@ -51,6 +51,7 @@
 
   .overview-filter {
     background: transparent;
+    align-items: end;
   }
 
   .overview-filter :is(input, select) {
@@ -347,6 +348,10 @@
 }
 
 @media screen and (max-width: 620px) {
+  .overview-filter > label:has(input[type="date"]) {
+    grid-column: 1 / -1;
+  }
+
   .overview-command .quick-actions {
     grid-template-columns: repeat(4, minmax(0, 1fr));
     gap: 5px;

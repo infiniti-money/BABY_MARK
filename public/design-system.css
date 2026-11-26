@@ -303,6 +303,19 @@
   background: #f0ebf6;
  }
 
+ input:is([type="date"], [type="datetime-local"], [type="month"], [type="time"]) {
+  box-sizing: border-box;
+  min-width: 0;
+  max-width: 100%;
+  width: 100%;
+  min-inline-size: 0;
+ }
+
+ input:is([type="date"], [type="datetime-local"], [type="month"], [type="time"])::-webkit-date-and-time-value {
+  min-width: 0;
+  text-align: start;
+ }
+
  input::placeholder, textarea::placeholder {
   color: var(--bm-muted);
  }
