@@ -1,0 +1,81 @@
+name: Publish BABY MARK v1.2.4
+on:
+  workflow_dispatch:
+    inputs:
+      commit:
+        description: 'Exact reviewed main commit (full SHA)'
+        required: true
+        type: string
+      acceptance_confirmed:
+        description: 'Operator confirmed acceptance and reviewed remaining limitations'
+        required: true
+        type: boolean
+        default: false
+permissions:
+  contents: read
+  checks: read
+concurrency:
+  group: babymark-release-v1-2-4
+  cancel-in-progress: false
+jobs:
+  gate:
+    if: github.ref == 'refs/heads/main' && inputs.acceptance_confirmed
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      EXPECTED_SHA: ${{ inputs.commit }}
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v7.1.0
+        with:
+          node-version-file: '.node-version'
+      - name: Verify exact main, release metadata and checks
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ "$EXPECTED_SHA" =~ ^[a-f0-9]{40}$ ]]
+          test "$EXPECTED_SHA" = "$GITHUB_SHA"
+          test "$(gh api "repos/$GITHUB_REPOSITORY/branches/main" --jq .commit.sha)" = "$EXPECTED_SHA"
+          node scripts/check-release-metadata.mjs 1.2.4
+          test -s docs/releases/v1.2.4.md
+          gh api --paginate --slurp "repos/$GITHUB_REPOSITORY/commits/$EXPECTED_SHA/check-runs?per_page=100&filter=latest" > "$RUNNER_TEMP/babymark-checks.json"
+          node scripts/check-release-gate.mjs "$RUNNER_TEMP/babymark-checks.json" "$EXPECTED_SHA"
+  release:
+    needs: gate
+    if: github.ref == 'refs/heads/main' && inputs.acceptance_confirmed
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+      checks: read
+    env:
+      EXPECTED_SHA: ${{ inputs.commit }}
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v7.1.0
+        with:
+          node-version-file: '.node-version'
+      - name: Reverify and publish without replacing existing releases
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$EXPECTED_SHA" = "$GITHUB_SHA"
+          node scripts/check-release-metadata.mjs 1.2.4
+          gh api --paginate --slurp "repos/$GITHUB_REPOSITORY/commits/$EXPECTED_SHA/check-runs?per_page=100&filter=latest" > "$RUNNER_TEMP/babymark-checks.json"
+          node scripts/check-release-gate.mjs "$RUNNER_TEMP/babymark-checks.json" "$EXPECTED_SHA"
+          if gh release view v1.2.4 >/dev/null 2>&1; then
+            echo "Release already exists; not modifying."
+            exit 0
+          fi
+          if gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/v1.2.4" >/dev/null 2>&1; then
+            echo "Tag exists without release; manual review required."
+            exit 1
+          fi
+          test "$(gh api "repos/$GITHUB_REPOSITORY/branches/main" --jq .commit.sha)" = "$EXPECTED_SHA"
+          gh release create v1.2.4 --target "$EXPECTED_SHA" --title "BABY MARK v1.2.4 Stable — HR Management" --notes-file docs/releases/v1.2.4.md --latest

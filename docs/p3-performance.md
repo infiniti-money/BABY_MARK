@@ -1,0 +1,9 @@
+# P3 — D1, JavaScript and caching
+Baseline fd9b643 (P0 production checks passed). P1 #17 and P2 #18 independent; do not claim physical acceptance or bypass their gates.
+- Summary-only report projection excludes employee names, addresses, GPS detail, photo-source fields, extra reasons, etc. Keeps all exact evidence fields used by work-unit review, scope, ordering, request priority, limit and summary semantics. Detail pages, CSV, payroll and existing API contracts remain unchanged.
+- Reuse computed per-assignment summary for exceptions. Parity tests cover scopes, leave, approved correction, outside GPS, pending supplemental shifts, partial full-day manual review, indexes and response shapes.
+- Measure compact/full JSON materialization and synthetic median read duration with npm run perf:local. Optional PERF_BASE_REF can specify a locally fetched Git ref; no stale branch hard dependency. Measurements are not D1 production rows_read, CPU or p95.
+- Build uses already pinned esbuild to minify root .mjs modules without bundling or export renaming. Existing module URLs, dynamic camera/CV/Excel imports and service worker behavior retained.
+- Preserve seven linked CSS files' exact content and order in one content-hashed CSS file. Original URLs remain revalidated for compatibility. Content-hashed CSS uses one-year immutable cache; HTML, API, private reports, photos, sessions and service worker stay no-store/network-only. No new client cache of personal data.
+- Local test server now implements repository header wildcard and detach rules for accurate local cache assertions. Build emits raw/gzip JS total and CSS request/byte metrics. Source graph budgets remain active.
+- No D1 migration, dependency update, paid infrastructure or production data change. Browser and mobile tests must pass on the generated dist; verify production headers and actual latency after deployment. Route splitting and real-device Web Vitals remain future work.

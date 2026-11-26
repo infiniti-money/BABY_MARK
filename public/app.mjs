@@ -218,12 +218,12 @@ function showModal(title,body) {
   return modalTicket;
 }
 function renderLogin(error='') {
-  mobileMenu(false);stopMotion();app.innerHTML=`<div class="login">
+  mobileMenu(false);stopMotion();document.title='Đăng nhập · BABY MARK';const status=$('#navigation-status');if(status)status.textContent='';app.innerHTML=`<div class="login">
     <aside class="login-story">
       <div class="login-brand"><img src="/brand/logo.png" alt="" width="632" height="697"><img class="brand-wordmark" src="/brand/wordmark.svg" alt="BABY MARK" width="2018" height="428"></div>
       <p class="intro">Không gian chấm công và quản lý ca làm</p>
     </aside>
-    <main id="main" class="login-panel">
+    <main id="main" tabindex="-1" class="login-panel">
       <section class="login-box welcome-login">
         <div class="login-mobile-brand"><img src="/brand/logo.png" alt="BABY MARK" width="632" height="697"><span aria-hidden="true"></span></div>
         <h1>Chào mừng bạn đến với ngôi nhà <span class="welcome-brand-name">BABY MARK</span></h1>
@@ -279,7 +279,7 @@ function shell() {
    </div>
   </div>`;
  const welcome=home?`<div class="ios-welcome"><span>Xin chào,</span><strong>${esc(name)}</strong><small>${esc(roles[state.user.role])} · <span data-dashboard-branch>${esc(state.user.employee_code)}</span></small></div>`:'';
- app.innerHTML=`<div class="shell" data-role="${esc(state.user.role)}"><aside class="sidebar"><div class="brand">${dashboardIcon('baby','sidebar-brand-symbol')}<img class="brand-wordmark" src="/brand/wordmark.svg" alt="BABY MARK"></div><div class="nav-label">${esc(roles[state.user.role])}</div><nav id="main-nav" class="nav" aria-label="Điều hướng chính">${groups}${mobileDock}<button type="button" class="mobile-more ${primary.includes(activeView())?'':'active'}" data-dashboard-dock="utilities"${!home&&!messages?' data-dashboard-dock-active':''} data-action="mobile-menu" aria-expanded="false" aria-controls="navigation-menu" aria-haspopup="dialog"><svg class="icon dashboard-dock-legacy" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="/brand/dashboard-icons.svg#grid"></use></svg><span class="dashboard-dock-legacy">Thêm</span>${mobileMore}</button>${mobileProfile}</nav><div class="sidebar-bottom">${!admin?'<button class="logout" data-action="employee-cv">Hồ sơ của tôi</button>':''}${!admin?'<button class="logout" data-action="self-password">Đổi mật khẩu</button>':''}<button class="logout" data-action="logout">Đăng xuất tài khoản</button></div></aside><div class="workspace"><header class="topbar"><div class="topbar-path">${dashboardIcon('baby','mobile-brand-logo')}<div class="topbar-path-text"><span class="desktop-path">Không gian làm việc / </span><span class="mobile-brand-name">BABY_MARK</span><span class="current-page">${titles[state.view]}</span></div></div><div class="profile"><div class="avatar">${initials}</div><div><strong>${esc(name)}</strong><small>${esc(state.user.employee_code)} · ${roles[state.user.role]}</small></div><button class="btn quiet small mobile-logout" data-action="logout" aria-label="Đăng xuất">${icon('logout')}</button></div>${mobileHeader}</header><main id="main" class="main"><div class="page-head"><div>${welcome}<p class="eyebrow">${admin?'QUẢN TRỊ BABY MARK':state.user.role==='manager'?'QUẢN LÝ CỬA HÀNG':'KHÔNG GIAN NHÂN VIÊN'}</p><h1>${titles[state.view]}</h1><p class="muted">${descriptions[state.view]||''}</p></div><div class="date-chip">${icon('calendar')} ${new Intl.DateTimeFormat('vi-VN',{timeZone:tz,weekday:'long',day:'2-digit',month:'2-digit',year:'numeric'}).format(Date.now())}</div></div><div id="content" aria-live="polite" data-screen="${esc(state.view)}">${loading()}</div><p class="footer-note"><span>BABY MARK · UTC+7</span><span>Dữ liệu nội bộ theo phân quyền</span></p></main></div></div>`;
+ app.innerHTML=`<div class="shell" data-role="${esc(state.user.role)}"><aside class="sidebar"><div class="brand">${dashboardIcon('baby','sidebar-brand-symbol')}<img class="brand-wordmark" src="/brand/wordmark.svg" alt="BABY MARK"></div><div class="nav-label">${esc(roles[state.user.role])}</div><nav id="main-nav" class="nav" aria-label="Điều hướng chính">${groups}${mobileDock}<button type="button" class="mobile-more ${primary.includes(activeView())?'':'active'}" data-dashboard-dock="utilities"${!home&&!messages?' data-dashboard-dock-active':''} data-action="mobile-menu" aria-expanded="false" aria-controls="navigation-menu" aria-haspopup="dialog"><svg class="icon dashboard-dock-legacy" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="/brand/dashboard-icons.svg#grid"></use></svg><span class="dashboard-dock-legacy">Thêm</span>${mobileMore}</button>${mobileProfile}</nav><div class="sidebar-bottom">${!admin?'<button class="logout" data-action="employee-cv">Hồ sơ của tôi</button>':''}${!admin?'<button class="logout" data-action="self-password">Đổi mật khẩu</button>':''}<button class="logout" data-action="logout">Đăng xuất tài khoản</button></div></aside><div class="workspace"><header class="topbar"><div class="topbar-path">${dashboardIcon('baby','mobile-brand-logo')}<div class="topbar-path-text"><span class="desktop-path">Không gian làm việc / </span><span class="mobile-brand-name">BABY_MARK</span><span class="current-page">${titles[state.view]}</span></div></div><div class="profile"><div class="avatar">${initials}</div><div><strong>${esc(name)}</strong><small>${esc(state.user.employee_code)} · ${roles[state.user.role]}</small></div><button class="btn quiet small mobile-logout" data-action="logout" aria-label="Đăng xuất">${icon('logout')}</button></div>${mobileHeader}</header><main id="main" tabindex="-1" class="main"><div class="page-head"><div>${welcome}<p class="eyebrow">${admin?'QUẢN TRỊ BABY MARK':state.user.role==='manager'?'QUẢN LÝ CỬA HÀNG':'KHÔNG GIAN NHÂN VIÊN'}</p><h1 tabindex="-1">${titles[state.view]}</h1><p class="muted">${descriptions[state.view]||''}</p></div><div class="date-chip">${icon('calendar')} ${new Intl.DateTimeFormat('vi-VN',{timeZone:tz,weekday:'long',day:'2-digit',month:'2-digit',year:'numeric'}).format(Date.now())}</div></div><div id="content" aria-busy="true" data-screen="${esc(state.view)}">${loading()}</div><p class="footer-note"><span>BABY MARK · UTC+7</span><span>Dữ liệu nội bộ theo phân quyền</span></p></main></div></div>`;
 }
 function chatTitle(t){return t.kind==='DIRECT'?(t.peer_name||'Trò chuyện riêng'):t.title;}
 function chatThreadList(data){return data.threads.map(t=>`<button type="button" class="chat-thread ${chatSelection===t.id?'active':''}" data-action="chat-open" data-id="${esc(t.id)}"><strong>${esc(chatTitle(t))}</strong><small>${t.kind==='SYSTEM'?'Hệ thống':t.kind==='GROUP'?'Nhóm':'Riêng tư'}${t.unread?' · Chưa đọc':''}</small><span>${esc((t.latest_body||'Chưa có tin nhắn').slice(0,100))}</span></button>`).join('');}
@@ -558,8 +558,8 @@ async function renderAdmin(id) {
  if(state.user.role!=='admin')throw Error('Không có quyền quản trị.');
  const tab=ADMIN_TABS.find(t=>t[0]===state.adminTab)||ADMIN_TABS[0];state.adminTab=tab[0];
  if(adminList.tab!==tab[0])adminList={tab:tab[0],search:'',page:1};
- const groups=ADMIN_GROUPS.map(([name,tabs])=>`<div class="admin-nav-group"><span>${name}</span><div role="tablist" aria-label="${name}">${tabs.map(([key,ic,label])=>`<button role="tab" aria-selected="${tab[0]===key}" data-admin-tab="${key}" class="${tab[0]===key?'active':''}">${icon(ic)}<span>${label}</span></button>`).join('')}</div></div>`).join('');
- $('#content').innerHTML=`<div class="admin-layout"><aside class="admin-nav"><p class="eyebrow">TRUNG TÂM QUẢN TRỊ</p>${groups}</aside><div class="admin-work" id="admin-work">${loading()}</div></div>`;
+ const groups=ADMIN_GROUPS.map(([name,tabs])=>`<div class="admin-nav-group" role="presentation"><span aria-hidden="true">${name}</span><div role="presentation">${tabs.map(([key,ic,label])=>`<button type="button" role="tab" id="admin-tab-${key}" aria-controls="admin-work" aria-selected="${tab[0]===key}" tabindex="${tab[0]===key?0:-1}" data-admin-tab="${key}" class="${tab[0]===key?'active':''}">${icon(ic)}<span>${label}</span></button>`).join('')}</div></div>`).join('');
+ $('#content').innerHTML=`<div class="admin-layout"><aside class="admin-nav" role="tablist" aria-label="Trung tâm quản trị" aria-orientation="horizontal"><p class="eyebrow" aria-hidden="true">TRUNG TÂM QUẢN TRỊ</p>${groups}</aside><div class="admin-work" id="admin-work" role="tabpanel" aria-labelledby="admin-tab-${tab[0]}" tabindex="0">${loading()}</div></div>`;
  if(!await loadAdmin(ADMIN_RESOURCES[tab[0]],id)||id!==state.renderId)return;
  const rows=state.admin[tab[0]]||[],special=['settings','operations','rosters'].includes(tab[0]);
  const count=special?'':`<span class="admin-count">${rows.length} bản ghi</span>`;
@@ -721,10 +721,10 @@ function mobileMenu(open){
  const sidebar=$('.sidebar'),trigger=$('[data-action="mobile-menu"]');
  if(open&&(!state.user||modal.open))return;
  sidebar?.classList.toggle('menu-open',open);trigger?.setAttribute('aria-expanded',String(open));
- if(!open){app.inert=false;app.removeAttribute('aria-hidden');if(navigationMenu.open)navigationMenu.close();navigationMenu.replaceChildren();return;}
+ if(!open){const wasOpen=navigationMenu.open;app.inert=false;app.removeAttribute('aria-hidden');if(wasOpen)navigationMenu.close();navigationMenu.replaceChildren();if(wasOpen&&trigger?.isConnected)trigger.focus({preventScroll:true});return;}
  const groups=navGroups(state.user.role).map(([label,items])=>'<section class="navigation-group"><h3>'+esc(label)+'</h3><div>'+items.map(([view,ic,name])=>'<button class="navigation-link '+(activeView()===view?'active':'')+'" data-view="'+view+'" '+(activeView()===view?'aria-current="page"':'')+'>'+icon(ic)+'<span>'+esc(name)+'</span></button>').join('')+'</div></section>').join('');
  navigationMenu.innerHTML='<div class="modal-head"><div><h2 id="navigation-title">Chức năng</h2><p class="hint">'+esc(state.user.full_name)+' · '+esc(roles[state.user.role])+'</p></div><button class="close" data-action="mobile-menu-close" aria-label="Đóng menu">×</button></div><div class="modal-body">'+groups+'<section class="navigation-group"><h3>Tài khoản của tôi</h3><div>'+(!['admin'].includes(state.user.role)?'<button class="navigation-link" data-action="employee-cv">'+icon('people')+'<span>Hồ sơ của tôi</span></button><button class="navigation-link" data-action="self-password">'+icon('session')+'<span>Đổi mật khẩu</span></button>':'')+'<button class="navigation-link" data-action="logout">'+icon('logout')+'<span>Đăng xuất tài khoản</span></button></div></section></div>';
- if(!navigationMenu.open)navigationMenu.showModal();app.inert=true;app.setAttribute('aria-hidden','true');
+ if(!navigationMenu.open)navigationMenu.showModal();app.inert=true;app.setAttribute('aria-hidden','true');const heading=$('#navigation-title');if(heading){heading.tabIndex=-1;heading.focus({preventScroll:true});}
 }
 navigationMenu.addEventListener('cancel',event=>{event.preventDefault();mobileMenu(false);});
 navigationMenu.addEventListener('pointerdown',event=>{
@@ -753,11 +753,14 @@ async function navigate(view=state.view) {
   const changed=state.view!==view;mobileMenu(false);saveChatDraft();if(changed&&view==='messages')chatPane='list';abortRequests(true);stopChat();if(documentPreview)closeModal();stopCamera();if(pendingCapture&&!pendingCapture.sending)closeModal();
   if(changed){viewFilters[state.view]={...state.filters};state.filters={...(viewFilters[view]||defaultFilters(view))};}
   state.view=view;listState=null;reportPaging=null;state.reports=[];state.reportData=null;const id=++state.renderId;stopMotion();shell();
-  if(changed)window.scrollTo({top:0,left:0,behavior:'instant'});
+  document.title=titles[view]+' · BABY MARK';
+  if(changed){window.scrollTo({top:0,left:0,behavior:'instant'});$('.page-head h1')?.focus({preventScroll:true});}
+  const status=$('#navigation-status');if(status)status.textContent='';
   try {
     await ({overview:renderOverview,today:renderToday,history:renderHistory,schedule:renderSchedule,admin:renderAdmin,reports:renderReports,requests:renderRequests,alerts:renderAlerts,extra:renderExtra,handover:renderHandover,push:renderPush,sessions:renderSessions,payroll:renderPayroll,messages:renderMessages}[view])(id);
     if(id===state.renderId){prepareResponsiveTables();observeMotion($('#content'));}
   } catch(e) { if(id===state.renderId&&$('#content'))($('#admin-work')||$('#content')).innerHTML=errorHTML(e.message); }
+  finally{if(id===state.renderId&&$('#content')){$('#content').removeAttribute('aria-busy');const status=$('#navigation-status');if(status&&!$('#content .table-error'))status.textContent='Đã tải '+titles[view];}}
 }
 
 function cameraControls(){
@@ -927,14 +930,22 @@ async function exportReports() {
   notify('Đã xuất bảng công CSV. Bạn có thể mở tệp bằng Excel.');
 }
 
+document.addEventListener('keydown',event=>{
+ const tab=event.target.closest?.('.admin-nav [role="tab"]');
+ if(!tab||!['ArrowLeft','ArrowRight','ArrowUp','ArrowDown','Home','End'].includes(event.key))return;
+ const tabs=[...document.querySelectorAll('.admin-nav [role="tab"]')],i=tabs.indexOf(tab);if(i<0)return;
+ const next=event.key==='Home'?0:event.key==='End'?tabs.length-1:(i+(event.key==='ArrowLeft'||event.key==='ArrowUp'?-1:1)+tabs.length)%tabs.length;
+ event.preventDefault();for(const t of tabs)t.tabIndex=t===tabs[next]?0:-1;tabs[next].focus();
+});
 document.addEventListener('click',async event=>{
+  const skip=event.target.closest('.skip-link');if(skip){const main=$('#main');if(main){event.preventDefault();main.focus({preventScroll:true});main.scrollIntoView({block:'start',behavior:'instant'});}return;}
   const button=event.target.closest('button');if(!button||button.disabled)return;
   if(button.dataset.dashboardDock==='home'&&state.view==='today'){
     window.scrollTo({top:0,left:0,behavior:'instant'});
     return;
   }
   if(button.dataset.view)return void navigate(button.dataset.view);
-  if(button.dataset.adminTab){state.adminTab=button.dataset.adminTab;adminList={tab:state.adminTab,search:'',page:1};return void navigate('admin');}
+  if(button.dataset.adminTab){const key=button.dataset.adminTab,fromTab=button.getAttribute('role')==='tab';state.adminTab=key;adminList={tab:key,search:'',page:1};await navigate('admin');if(fromTab&&state.view==='admin'&&state.adminTab===key&&!modal.open&&!navigationMenu.open&&document.activeElement===document.body)$('#admin-tab-'+key)?.focus({preventScroll:true});return;}
   const action=button.dataset.action;if(!action)return;
   try {
     if(action==='attendance-start'||action==='dashboard-tools'||action==='dashboard-summary'){
@@ -1404,7 +1415,7 @@ async function boot(){
   const run={epoch};bootRun=run;
   run.promise=(async()=>{
    try{const data=await api('/api/auth/me');if(epoch!==state.sessionEpoch)return;state.user=data.user;await navigate(landing());}
-   catch(e){if(epoch!==state.sessionEpoch)return;if(e.status===401||e.status===403){setSession(null);renderLogin(e.message);}else{app.innerHTML='<main id="main" class="login-panel"><section class="login-box login-recovery"><h1>Chưa thể kết nối BABY MARK</h1><p class="muted">Phiên đã lưu chưa bị xóa. Kiểm tra mạng và thử lại.</p><div class="login-recovery-actions"><button class="btn" data-action="session-retry">Thử lại</button><button class="btn secondary" data-action="logout">Đăng xuất</button></div></section></main>';}}
+   catch(e){if(epoch!==state.sessionEpoch)return;if(e.status===401||e.status===403){setSession(null);renderLogin(e.message);}else{app.innerHTML='<main id="main" tabindex="-1" class="login-panel"><section class="login-box login-recovery"><h1>Chưa thể kết nối BABY MARK</h1><p class="muted">Phiên đã lưu chưa bị xóa. Kiểm tra mạng và thử lại.</p><div class="login-recovery-actions"><button class="btn" data-action="session-retry">Thử lại</button><button class="btn secondary" data-action="logout">Đăng xuất</button></div></section></main>';}}
   })();
   try{return await run.promise;}finally{if(bootRun===run)bootRun=null;}
 }

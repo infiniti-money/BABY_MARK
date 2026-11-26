@@ -32,3 +32,10 @@ test('API root and all API responses remain private and reject cross-origin requ
   assert.equal(denied.headers.get('Cache-Control'),'private, no-store');
  }
 });
+
+test('immutable caching applies only to generated hashed public assets',async()=>{
+ const h=await read('public/_headers'),block=h.trim().split(/\n\s*\n/).find(b=>b.split('\n').includes('/assets/immutable/*'));
+ assert.ok(block);assert.match(block,/! Cache-Control\n  Cache-Control: public, max-age=31536000, immutable/);
+ assert.equal(h.match(/immutable/g).length,2);
+ const worker=await read('public/sw.js');assert.doesNotMatch(worker,/caches\.|addEventListener\(['"]fetch/);
+});
