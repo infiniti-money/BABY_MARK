@@ -142,3 +142,24 @@ test('phone filters share one column and submit dates, calendar mode and audit s
  await open(page,'payroll');await check(page.locator('[data-form="payroll-filter"]'));
  await page.setViewportSize({width:844,height:390});await check(page.locator('[data-form="payroll-filter"]'));
 });
+
+test('rounded controls and floating audit modal preserve accepted filters; pull refresh reads once and ignores dirty form',async({page})=>{
+ await page.emulateMedia({reducedMotion:'reduce'});await page.setViewportSize({width:390,height:844});await login(page,'admin');
+ const form=page.locator('[data-form="overview-filter"]'),button=form.locator('button[type=submit]');
+ await expect(button).toHaveCSS('border-top-left-radius','16px');await expect(button).toHaveCSS('height','56px');
+ await page.locator('[data-action="audit-open"]').click();const dialog=page.locator('#modal');await expect(dialog).toBeVisible();await expect(dialog).toHaveCSS('border-top-left-radius','26px');await expect(dialog.locator('[data-form="audit-filter"] button')).toHaveCSS('height','56px');await dialog.locator('[data-action="close-modal"]').last().click();
+ const gesture=async(dy)=>page.evaluate(distance=>{
+  const target=document.querySelector('.page-head h1');
+  const fire=(name,touches)=>{const e=new Event(name,{bubbles:true,cancelable:true});Object.defineProperty(e,'touches',{value:touches});target.dispatchEvent(e);};
+  fire('touchstart',[{clientX:100,clientY:60}]);fire('touchmove',[{clientX:100,clientY:60+distance}]);fire('touchend',[]);
+ },dy);
+ let reads=0,writes=0;page.on('request',r=>{if(r.url().includes('/api/admin/overview?'))reads++;if(r.method()==='POST')writes++;});
+ await page.evaluate(()=>window.scrollTo(0,0));await expect.poll(()=>page.evaluate(()=>window.scrollY)).toBe(0);
+ const day=form.locator('[name=day]');const original=await day.inputValue();await day.fill(original==='2026-11-01'?'2026-11-02':'2026-11-01');
+ await gesture(150);await expect(page.locator('#pull-refresh')).toBeHidden();expect(reads).toBe(0);await expect(day).not.toHaveValue(original);
+ await day.fill(original);await day.blur();
+ await gesture(25);await expect(page.locator('#pull-refresh')).toBeHidden();expect(reads).toBe(0);
+ let release;const pending=new Promise(resolve=>release=resolve);await page.route('**/api/admin/overview?*',async route=>{await pending;await route.continue();});
+ try{await gesture(150);await expect(page.locator('#pull-refresh')).toBeVisible();await expect(page.locator('#pull-refresh')).toHaveAttribute('data-state','refreshing');await expect(page.locator('#pull-refresh strong')).toHaveText('Thấu hiểu điều mẹ muốn');await gesture(150);await expect.poll(()=>reads).toBe(1);}finally{release();}
+ await expect(page.locator('#pull-refresh')).toBeHidden();await expect(page.locator('#pull-refresh-status')).toHaveText('Đã làm mới dữ liệu.');expect(writes).toBe(0);await expect(form.locator('[name=day]')).toHaveValue(original);
+});

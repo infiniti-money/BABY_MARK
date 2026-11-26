@@ -1,4 +1,5 @@
 import {observeMotion,stopMotion} from './motion.mjs';
+import {installPullRefresh,hasEditedControls} from './pull-refresh.mjs';
 import {todayAssignments,captureEligible} from './attendance-window.mjs';
 import {calendarRange,calendarDays} from './schedule-calendar.mjs';
 import {currentPosition} from './gps.mjs';
@@ -1007,7 +1008,12 @@ document.addEventListener('click',async event=>{
       showModal('Đối soát công ca cả ngày',`<form data-form="payroll-review-units" data-id="${esc(r.assignment_id)}" class="form-stack"><strong>${esc(r.full_name)} · ${esc(dateVN(r.work_date))}</strong><p>Giờ ghi nhận ${hm(r.in_at)} – ${hm(r.out_at)}. Không sửa ảnh/GPS hoặc giờ chấm công. Chọn số công theo chính sách doanh nghiệp đã xác nhận; không tự khấu trừ.</p><label>Công được duyệt<select name="units" required><option value="">Chọn số công</option>${[0,0.5,1,1.5,2].map(n=>`<option value="${n}">${n} công</option>`).join('')}</select></label><label>Lý do<textarea name="reason" required minlength="5" maxlength="500"></textarea></label><label><input name="reviewed" type="checkbox" required> Tôi đã đối soát và xác nhận quyền lợi nhân viên.</label><p class="error-text" data-form-error hidden></p><button class="btn" type="submit">Lưu quyết định</button></form>`);return;
     }
     if(action==='payroll-close'){showModal('Chốt phiên bản bảng công tháng',`<form data-form="payroll-close" class="form-stack"><p>Bản chốt là ảnh chụp dữ liệu đối soát, không khóa sửa bản công gốc. Nếu điều chỉnh sau chốt, tạo phiên bản mới có lý do.</p><label>Lý do<textarea name="reason" minlength="5" maxlength="500" required></textarea></label><label><input name="reviewed" type="checkbox" required> Tôi đã kiểm tra giờ ngoài ca, nghỉ phép, ca vắng, ca bất thường và các khoản điều chỉnh.</label><p class="error-text" data-form-error hidden></p><button class="btn" type="submit">Xác nhận chốt</button></form>`);return;}
-    if(action==='session-retry')return await boot();
+    if(action==='session-retry')return // Refresh only the current view; never reload the document or interrupt writes.
+installPullRefresh({
+ canRefresh:()=>!!state.user&&navigator.onLine!==false&&!document.hidden&&!modal.open&&!navigationMenu.open&&!documentPreview&&!state.stream&&!cameraOpening&&!pendingCapture&&!recoveryBusy&&!(captureAbort&&!captureAbort.signal.aborted)&&![...apiRequests].some(r=>r.method!=='GET')&&!document.querySelector('form[data-submitting="true"],#content .loading')&&!hasEditedControls($('#content')),
+ refresh:async()=>{const epoch=state.sessionEpoch;await navigate();if(epoch!==state.sessionEpoch||!state.user)throw Error('Phiên đăng nhập đã thay đổi.');if($('#content .table-error'))throw Error('Không thể tải dữ liệu.');}
+});
+await boot();
     if(action==='close-modal'){if(!pendingCapture?.sending&&!pendingCapture?.checking&&!modalSaving()){closeModal();drawRecovery();}return;}
     if(action==='capture-status-check'||action==='capture-recover')return await checkCapture();
     if(action==='capture-cancel-ready'||action==='capture-recover-cancel')return await checkCapture(true);

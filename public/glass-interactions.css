@@ -1,0 +1,70 @@
+/* Unified rounded-square controls, floating glass and safe scroll motion.
+   Last-loaded screen-only layer; dimensions and semantics remain unchanged. */
+@media screen {
+ :root{--bm-button-radius:16px;--bm-window-radius:26px;--bm-reveal-distance:18px}
+ :is(.btn,.btn.secondary,.btn.quiet,.btn.danger,.tabs button,.subnav button,.request-statuses button,.admin-nav button,.navigation-link,.dashboard-bell,.dashboard-avatar,.modal-head .close,.login-recovery-actions button,.employee-tool-grid .btn){border-radius:var(--bm-button-radius)}
+ .dashboard-attendance .dashboard-attendance-button,.employee-camera:has(#camera-placeholder:not([hidden])) .camera-placeholder .btn{border-radius:var(--bm-button-radius)}
+ .modal-head .close{width:44px;height:44px;flex:0 0 44px}
+ :is(.card,.stat,.admin-nav,.login-box){border-radius:var(--bm-window-radius)}
+ dialog#modal,dialog#navigation-menu{border-radius:var(--bm-window-radius);border:1px solid var(--bm-frost-edge);box-shadow:0 15px 42px #35263c38,inset 0 1px 1px #fff9}
+ dialog#modal .modal-head,dialog#navigation-menu .modal-head{background:var(--bm-frost-modal)}
+ dialog:is(#modal,#navigation-menu)::backdrop{background:#2b203a45;-webkit-backdrop-filter:blur(3px);backdrop-filter:blur(3px)}
+ @supports (backdrop-filter:blur(1px)) or (-webkit-backdrop-filter:blur(1px)){
+  :root{--bm-frost-panel:linear-gradient(150deg,#ffffff86,#f5f0fc59);--bm-frost-control:linear-gradient(150deg,#ffffffb0,#f5f0fc94);--bm-frost-modal:linear-gradient(145deg,#fffefacd,#f5edfac2)}
+  dialog#modal,dialog#navigation-menu{background:var(--bm-frost-modal);-webkit-backdrop-filter:blur(20px) saturate(145%);backdrop-filter:blur(20px) saturate(145%)}
+ }
+ .pull-refresh-status{position:fixed;width:1px;height:1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap;pointer-events:none}
+ .pull-refresh{position:fixed;top:calc(env(safe-area-inset-top) + 10px);left:50%;transform:translateX(-50%);width:min(320px,calc(100% - 28px - env(safe-area-inset-left) - env(safe-area-inset-right)));padding:10px 13px;border-radius:22px;background:#fff8fb;border:1px solid #fff;box-shadow:0 8px 22px #39233828;z-index:85;pointer-events:none;color:#442836}
+ .pull-refresh-brand{display:flex;align-items:center;gap:12px}
+ .pull-refresh-logo{width:48px;height:53px;flex:0 0 48px;position:relative}
+ .pull-refresh-logo img{position:absolute;inset:0;width:100%;height:100%;object-fit:contain}
+ .pull-refresh-logo .pull-piece{display:none}
+ .pull-refresh-wordmark{display:grid;gap:3px;min-width:0}
+ .pull-refresh-wordmark img{width:112px;height:auto;max-width:100%}
+ .pull-refresh-wordmark strong{font-size:12px;color:#b91937;line-height:1.3}
+ .pull-refresh-wordmark small{font-size:11px;color:#514657;line-height:1.3}
+ .pull-refresh[data-state=ready]{border-color:#dc8093}
+ @supports (backdrop-filter:blur(1px)) or (-webkit-backdrop-filter:blur(1px)){
+  .pull-refresh{background:#fff8fbc4;-webkit-backdrop-filter:blur(16px);backdrop-filter:blur(16px)}
+ }
+}
+@media screen and (max-width:900px){
+ :root{--bm-reveal-distance:12px}
+ .shell .sidebar .nav button .icon,.shell .sidebar .nav button .dashboard-dock-icon{border-radius:var(--bm-button-radius)}
+ .shell .sidebar .nav button{border-radius:var(--bm-button-radius)}
+ dialog#navigation-menu{inset:auto max(10px,env(safe-area-inset-right)) calc(10px + env(safe-area-inset-bottom)) max(10px,env(safe-area-inset-left));width:auto;max-width:600px;margin:0 auto;max-height:calc(100dvh - 24px - env(safe-area-inset-top) - env(safe-area-inset-bottom));padding-bottom:0}
+ /* Keep filter dimensions exactly as accepted in v1.2.2. */
+ .mobile-filter-stack>label>input:not([type=checkbox]):not([type=radio]),.mobile-filter-stack>label>select,.mobile-filter-stack>button.btn{border-radius:var(--bm-button-radius)}
+}
+@media screen and (max-width:900px) and (pointer:coarse){
+ html:has(.shell){overscroll-behavior-y:none}
+}
+@media screen and (max-width:620px) and (orientation:portrait){
+ @supports (backdrop-filter:blur(1px)) or (-webkit-backdrop-filter:blur(1px)){
+  .shell:not([data-role="admin"]) .sidebar,.shell:not([data-role="admin"]) .sidebar.menu-open{background:linear-gradient(155deg,#fff9fc7d,#e3d9ed73 55%,#bfb3cc80)}
+  .shell:not([data-role="admin"]) .sidebar .nav [data-dashboard-dock]>span:not(.dashboard-dock-icon){color:#342437;text-shadow:0 1px 1px #fff,0 0 5px #fff9}
+  .shell:not([data-role="admin"]) .sidebar .nav [data-dashboard-dock]:is([aria-current=page],[data-dashboard-dock-active],[aria-expanded=true])>span:not(.dashboard-dock-icon){color:#941c35}
+ }
+}
+@media screen and (prefers-reduced-motion:no-preference){
+ .motion-revealed[data-motion-side=left]{animation:bm-reveal-left 420ms var(--motion-ease) both}
+ .motion-revealed[data-motion-side=right]{animation:bm-reveal-right 420ms var(--motion-ease) both}
+ .pull-refresh[data-state=refreshing] .pull-piece{display:block;animation-duration:380ms;animation-timing-function:var(--motion-ease);animation-fill-mode:both}
+ .pull-refresh[data-state=refreshing] .pull-piece.tl{clip-path:inset(0 50% 50% 0);animation-name:bm-piece-tl}
+ .pull-refresh[data-state=refreshing] .pull-piece.tr{clip-path:inset(0 0 50% 50%);animation-name:bm-piece-tr}
+ .pull-refresh[data-state=refreshing] .pull-piece.bl{clip-path:inset(50% 50% 0 0);animation-name:bm-piece-bl}
+ .pull-refresh[data-state=refreshing] .pull-piece.br{clip-path:inset(50% 0 0 50%);animation-name:bm-piece-br}
+ .pull-refresh[data-state=refreshing] .pull-complete{animation:bm-logo-complete 90ms 350ms both}
+ .pull-refresh[data-state=refreshing] .pull-refresh-wordmark{animation:bm-reveal-right 380ms var(--motion-ease) both}
+}
+@media screen and (prefers-reduced-transparency:reduce),screen and (forced-colors:active){
+ :root{--bm-frost-panel:#fff;--bm-frost-control:#faf7fc;--bm-frost-modal:#fff}
+ dialog#modal,dialog#navigation-menu,.pull-refresh,.shell:not([data-role="admin"]) .sidebar,.shell:not([data-role="admin"]) .sidebar.menu-open{background:#fff;-webkit-backdrop-filter:none;backdrop-filter:none}
+ dialog:is(#modal,#navigation-menu)::backdrop{-webkit-backdrop-filter:none;backdrop-filter:none}
+ .shell:not([data-role="admin"]) .sidebar .nav [data-dashboard-dock]>span:not(.dashboard-dock-icon){color:#342437;text-shadow:none}
+}
+@media screen and (forced-colors:active){
+ dialog#modal,dialog#navigation-menu,.pull-refresh,.shell:not([data-role="admin"]) .sidebar,.shell:not([data-role="admin"]) .sidebar.menu-open{background:Canvas;color:CanvasText;border-color:CanvasText;box-shadow:none}
+ .pull-refresh-wordmark strong,.pull-refresh-wordmark small,.shell:not([data-role="admin"]) .sidebar .nav [data-dashboard-dock]>span:not(.dashboard-dock-icon){color:CanvasText}
+}
+@media print{.pull-refresh,.pull-refresh-status{display:none!important}}
