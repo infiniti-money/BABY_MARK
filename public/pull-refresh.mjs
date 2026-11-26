@@ -48,9 +48,9 @@ export function installPullRefresh({canRefresh,refresh}){
   if(!start)return;
   const armed=start.armed;start=null;
   if(!armed||e.touches.length||busy||!eligible()){hide();return;}
-  busy=true;panel.hidden=false;panel.dataset.state='refreshing';caption.textContent='Đang làm mới…';status.textContent='Đang làm mới dữ liệu BABY MARK.';
+  busy=true;const began=performance.now();panel.hidden=false;panel.dataset.state='refreshing';caption.textContent='Đang làm mới…';status.textContent='Đang làm mới dữ liệu BABY MARK.';
   try{await refresh();status.textContent='Đã làm mới dữ liệu.';}catch{status.textContent='Không thể làm mới. Kiểm tra kết nối và thử lại.';}
-  finally{busy=false;hide();}
+  finally{const remaining=window.matchMedia('(prefers-reduced-motion: reduce)').matches?0:Math.max(0,500-(performance.now()-began));if(remaining)await new Promise(resolve=>setTimeout(resolve,remaining));busy=false;hide();}
  },{passive:true});
  document.addEventListener('touchcancel',cancel,{passive:true});
  window.addEventListener('pagehide',cancel);

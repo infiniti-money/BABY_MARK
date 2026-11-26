@@ -470,7 +470,7 @@ async function renderToday(id) {
     <section class="card employee-tools" tabindex="-1"><div class="card-head"><h2>Tiện ích của tôi</h2></div><div class="card-body employee-tool-grid"><button class="btn secondary" data-view="extra">${icon('calendar')} Ngoài lịch / thay ca</button><button type="button" class="btn secondary" data-action="my-decisions">${icon('check')} Kết quả duyệt của tôi</button><button class="btn secondary" data-view="requests">${icon('file')} Xin nghỉ / điều chỉnh</button><button class="btn secondary" data-view="handover">${icon('file')} Đọc lời nhắn ca trước / bàn giao ca</button><button class="btn secondary" data-view="messages">${icon('people')} Tin nhắn nội bộ</button><button class="btn secondary" data-view="push">${icon('shield')} Thiết lập quyền thiết bị</button></div></section>
     <section class="card employee-guidance"><details class="employee-policy"><summary>${icon('pin')} Để chấm công chính xác</summary><p>Cho phép camera và vị trí chính xác. GPS cần sai số tối đa 50 m. Thời gian công lấy từ máy chủ; ngoài vùng được ghi cờ để quản lý xem xét.</p></details><div data-handover-preview class="employee-handover-preview"></div></section>
   </div>`;
-  if(captureRows.length===1)$('#capture-assignment').value=captureRows[0].id;
+  if(captureRows.length===1){const select=$('#capture-assignment');for(const option of select.options)option.defaultSelected=option.value===captureRows[0].id;select.value=captureRows[0].id;}
   const branch=$('[data-dashboard-branch]');
   if(branch&&dayRows.length&&dayRows.every(a=>a.branch_id===dayRows[0].branch_id)&&dayRows[0].branch_name)branch.textContent=dayRows[0].branch_name;
   void loadDashboardNotices(id);
