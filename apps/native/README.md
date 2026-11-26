@@ -1,0 +1,18 @@
+# BABY MARK Android + iOS — native shell candidate
+Active Cloudflare v1.2.4 backend (same origin, roles, sessions, Timemark, reports). Separate from legacy apps/mobile Expo/Supabase; no API changes, no credentials or database in app. App shell version 1.2.4 / build 12401. Native WebView approach, not a fully native rewrite or offline app. Production web updates are immediately visible; shell releases version independently.
+## Android
+Android 8+ (API 26), compile/target 36, JDK 17, Gradle 8.13, AGP 8.13.2. Use Android SDK platform 36 and build tools 36.0.0.
+```sh
+bash apps/native/prepare-assets.sh android
+gradle -p apps/native/android --no-daemon lintDebug assembleDebug
+```
+APK: apps/native/android/app/build/outputs/apk/debug/app-debug.apk. CI debug key is temporary; reinstall may be necessary when signature changes, losing local session storage. Test only; do not distribute debug as production. Release APK/AAB requires owner-generated persistent keystore in secure local storage, configure Android Studio Generate Signed Bundle/APK, choose release and retain key offline. Existing legacy app with same package may require uninstall if signed with another key. Do not upload keys to GitHub or chat.
+## iOS
+iOS 15+, Xcode on Mac. Run bash apps/native/prepare-assets.sh ios, open apps/native/ios/BABYMARK.xcodeproj, select owner Apple signing team, configure registered device and profile. Product > Archive > Distribute App > registered devices (Ad Hoc or Development) for an installable IPA, or TestFlight/App Store as appropriate. Bundle identifier com.infinitimoney.babymark; confirm ownership/availability. Signed distribution needs suitable Apple credentials/profile; no signing certificate provided and no automatic purchase. CI compiles unsigned device .app ZIP; it is NOT an installable IPA, simulator build, or store release. No signing bypass. Verify icon alpha/store requirements and Apple review eligibility before store submission; web wrapper can face minimum-functionality review.
+## Build workflow
+Native Mobile GitHub Actions builds Android debug APK and unsigned iOS device app independently. PR/push paths and manual dispatch; artifacts expire after seven days. No production release publishing; no deployment, remote migration, or production credentials.
+## Permissions and limitations
+- Trusted HTTPS origin only, no JavaScript native bridge, no HTTP, no TLS exceptions. Android mediacapture grants video only to trusted origin after runtime permission; precise foreground location only; iOS camera prompts via WKUIDelegate, WebKit system location prompts. No microphone/background tracking. Same-origin web session storage, no new native token storage.
+- Check camera front/back, permission denial, precise/reduced location, capture confirmation/recovery, session revocation and logout on real devices. WebView feature support and location behavior vary; server checks unchanged, not device attestation.
+- Native APNs/FCM push, file export/share (CSV/Excel), offline use, deep links, native screen-lock and store distribution remain unimplemented or unverified. Web Push must not be assumed available in embedded WebViews. Use existing browser/PWA for these functions until native acceptance. External maps may be blocked if WebView does not mark new-window action user initiated. Do not weaken navigation restrictions to fix this.
+- App opening live HTTPS uses normal backend; CI compiles only and does not log in. Never use actual employee credentials in automated tests. Release APK/IPA needs physical acceptance and owner signing.

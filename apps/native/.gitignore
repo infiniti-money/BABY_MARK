@@ -1,0 +1,12 @@
+.gradle/
+**/build/
+**/local.properties
+**/xcuserdata/
+**/*.xcuserstate
+**/*.jks
+**/*.keystore
+**/*.p12
+**/*.mobileprovision
+**/*.ipa
+**/AppIcon.appiconset/AppIcon.png
+**/drawable-nodpi/babymark.png
