@@ -1,6 +1,6 @@
 import {assignmentScope,dateRange,identifier,validDay,invalid,ApiError} from './access.mjs';
 
-export async function readAssignments(db,actor,url,{paginate=false}={}){
+export async function readAssignments(db,actor,url,{paginate=false,summaryOnly=false}={}){
  const {from,to}=dateRange(url),scope=assignmentScope(actor),conditions=[scope.sql,'a.work_date>=?','a.work_date<=?'],values=[...scope.values,from,to];
  for(const [parameter,column] of [['branch_id','a.branch_id'],['user_id','a.user_id']]){
   const value=url.searchParams.get(parameter);
@@ -24,10 +24,20 @@ export async function readAssignments(db,actor,url,{paginate=false}={}){
  // Page assignment keys first: costly attendance/request/review joins see at most size+1 rows.
  const pageWhere=cursor?' AND (a.work_date,a.starts_at,p.employee_code,a.id)>(?,?,?,?)':'';
  const prefix=paginate?`WITH selected AS (SELECT a.id FROM assignments a JOIN profiles p ON p.id=a.user_id WHERE ${conditions.join(' AND ')}${pageWhere} ORDER BY ${order} LIMIT ?) `:'';
- const sql=prefix+`SELECT a.*,${reviews?'u.id AS unit_review_id,u.evidence AS unit_review_evidence,u.units AS unit_review_units,':''}${extra?'x.kind AS extra_kind,x.state AS extra_state,x.replaced_name,x.reason AS extra_reason,':''}p.employee_code,p.full_name,p.department,b.name AS branch_name,b.code AS branch_code,b.address_text,b.latitude,b.longitude,b.allowed_radius,s.name AS shift_name,
+ // The compact projection retains every field used by workUnitEvidence,
+ // summarizeAssignment and groupBranchReports, including raw evidence IDs.
+ // Keep the same joins, filters, precedence, ordering and 5000-row limit.
+ const compact=summaryOnly&&!paginate;
+ const projection=compact?`a.id,a.user_id,a.branch_id,a.shift_id,a.work_date,a.starts_at,a.ends_at,a.grace_minutes,
+ ${reviews?'u.id AS unit_review_id,u.evidence AS unit_review_evidence,u.units AS unit_review_units,':''}
+ ${extra?'x.state AS extra_state,':''}b.name AS branch_name,b.code AS branch_code,
+ i.id AS in_id,i.server_timestamp AS in_at,i.status AS in_status,
+ o.id AS out_id,o.server_timestamp AS out_at,o.status AS out_status,
+ r.id AS request_id,r.kind AS request_kind,r.state AS request_state,r.proposed_in,r.proposed_out`:`a.*,${reviews?'u.id AS unit_review_id,u.evidence AS unit_review_evidence,u.units AS unit_review_units,':''}${extra?'x.kind AS extra_kind,x.state AS extra_state,x.replaced_name,x.reason AS extra_reason,':''}p.employee_code,p.full_name,p.department,b.name AS branch_name,b.code AS branch_code,b.address_text,b.latitude,b.longitude,b.allowed_radius,s.name AS shift_name,
  i.id AS in_id,i.server_timestamp AS in_at,i.status AS in_status,i.late_minutes AS in_late,i.distance_m AS in_distance_m,i.accuracy_m AS in_accuracy_m,i.photo_source AS in_photo_source,
  o.id AS out_id,o.server_timestamp AS out_at,o.status AS out_status,o.early_minutes AS out_early,o.distance_m AS out_distance_m,o.accuracy_m AS out_accuracy_m,o.photo_source AS out_photo_source,
- r.id AS request_id,r.kind AS request_kind,r.state AS request_state,r.proposed_in,r.proposed_out,r.decided_by,r.decided_at
+ r.id AS request_id,r.kind AS request_kind,r.state AS request_state,r.proposed_in,r.proposed_out,r.decided_by,r.decided_at`;
+ const sql=prefix+`SELECT ${projection}
  FROM ${paginate?'selected JOIN assignments a ON a.id=selected.id':'assignments a'} JOIN profiles p ON p.id=a.user_id JOIN branches b ON b.id=a.branch_id JOIN shifts s ON s.id=a.shift_id
 ${extra?' LEFT JOIN extra_attendance x ON x.assignment_id=a.id':''}
  ${reviews?'LEFT JOIN work_unit_reviews u ON u.id=(SELECT max(w.id) FROM work_unit_reviews w WHERE w.assignment_id=a.id)':''}

@@ -37,8 +37,17 @@ const headerRules=new Map();let currentRule=null;
 try{const content=await readFile(resolve(root,'public/_headers'),'utf8');for(const line of content.split(/\r?\n/)){
  if(line.trim().startsWith('#')||!line.trim())continue;
  if(!/^\s/.test(line)){currentRule=line.trim();headerRules.set(currentRule,{});continue;}
+ const detach=line.match(/^\s+!\s+(.+)$/);if(detach&&currentRule){headerRules.get(currentRule)[detach[1].trim()]=null;continue;}
  const m=line.match(/^\s+([^:]+):\s*(.*)$/);if(m&&currentRule)headerRules.get(currentRule)[m[1].trim()]=m[2];
 }}catch{}
+// Match the repository's simple exact and single-wildcard paths in rule order.
+function staticHeaders(pathname){
+ const headers={};for(const [pattern,values] of headerRules){
+  const star=pattern.indexOf('*'),match=star<0?pathname===pattern:pathname.startsWith(pattern.slice(0,star))&&pathname.endsWith(pattern.slice(star+1));
+  if(!match)continue;for(const [key,value] of Object.entries(values)){if(value===null)delete headers[key];else headers[key]=value;}
+ }
+ return headers;
+}
 const server=createServer(async(req,res)=>{
  try{
   if(req.url==='/__test__/ready'){res.writeHead(200,{'Content-Type':'application/json'});res.end('{"local":true,"ephemeral":true}');return;}
@@ -50,7 +59,7 @@ const server=createServer(async(req,res)=>{
   const pathname=decodeURIComponent(new URL(req.url,'http://localhost').pathname);
   const file=resolve(assetRoot,'.'+(pathname==='/'?'/index.html':pathname));
   if(!file.startsWith(assetRoot+sep)||!await stat(file).then(s=>s.isFile()).catch(()=>false)){res.writeHead(404);res.end('Not found');return;}
-  res.writeHead(200,{'Content-Type':mime[extname(file)]||'application/octet-stream',...(headerRules.get('/*')||{}),...(headerRules.get(pathname)||{})});res.end(await readFile(file));
+  res.writeHead(200,{'Content-Type':mime[extname(file)]||'application/octet-stream',...staticHeaders(pathname)});res.end(await readFile(file));
  }catch(e){console.error('Local acceptance request failed:',e.message);res.writeHead(500);res.end('Local test server error');}
 });
 server.listen(port,'127.0.0.1',()=>console.log(`Ephemeral Cloudflare acceptance environment: http://127.0.0.1:${port}`));

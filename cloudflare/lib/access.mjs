@@ -1,4 +1,4 @@
-import {sessionUser,reply} from './auth.mjs';
+import {sessionUser,reply,digest} from './auth.mjs';
 import {HttpError} from './http.mjs';
 
 export class ApiError extends Error {
@@ -19,6 +19,13 @@ export async function actorFor(request,env,{admin=false}={}){
  if(!actor)throw new ApiError(401,'Chưa đăng nhập');
  if(admin&&actor.role!=='admin')throw new ApiError(403,'Chỉ quản trị viên được thay đổi cấu hình');
  return actor;
+}
+// SQL-bound revalidation of the same session and role observed at request entry.
+export async function writeSession(request,actor){
+ const token=request.headers.get('authorization')?.match(/^Bearer ([0-9a-f]{64})$/)?.[1];
+ if(!token)throw new ApiError(401,'Chưa đăng nhập');
+ const hash=await digest('babymark-session-v1:'+token);
+ return {sql:"EXISTS(SELECT 1 FROM sessions ss JOIN profiles p ON p.id=ss.user_id AND p.active=1 JOIN credentials c ON c.user_id=p.id AND c.version=ss.credential_version WHERE ss.token_hash=? AND ss.expires_at>? AND p.id=? AND p.role=?)",args:()=>[hash,Date.now(),actor.id,actor.role]};
 }
 export function assignmentScope(actor,alias='a'){
  if(actor.role==='admin')return {sql:'1=1',values:[]};

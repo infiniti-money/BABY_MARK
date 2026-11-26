@@ -187,3 +187,24 @@
 @media screen and (forced-colors:active){
  :is(button,a,input,select,textarea,summary,[tabindex]):focus-visible{outline-color:Highlight}
 }
+
+/* P2: keyboard focus and optional higher contrast, without changing the default brand. */
+@media screen{
+ #main:focus,.page-head h1:focus{outline:none}
+ #main:focus-visible,.page-head h1:focus-visible{outline:3px solid #5935a5;outline-offset:3px}
+ .page-head h1,.card-head h2,.modal-head h2,.navigation-link span,.admin-nav button span{overflow-wrap:anywhere;min-width:0}
+ .admin-nav [role=tab]:focus-visible{outline-offset:-3px}
+ #admin-work:focus-visible{outline:3px solid #5935a5;outline-offset:3px}
+ .modal-body :is(input,select,textarea,button){scroll-margin-block:12px}
+ .skip-link{max-width:calc(100% - 20px);border-radius:10px;color:#61243e;font-weight:700}
+}
+@media screen and (prefers-contrast:more){
+ :root{--bm-muted:#3d3543;--muted:#3d3543;--bm-frost-panel:#fff;--bm-frost-control:#fff;--bm-frost-modal:#fff;--bm-frost-edge:#66596d}
+ :is(.card,.stat,.btn.secondary,.btn.quiet,.navigation-link,dialog#modal,dialog#navigation-menu){border-color:#66596d}
+ :is(.hint,.muted,.table-wrap td small){color:#3d3543}
+ dialog#modal,dialog#navigation-menu{background:#fff;-webkit-backdrop-filter:none;backdrop-filter:none}
+ .shell:not([data-role=admin]) .sidebar .nav :is(.dashboard-dock-button,.mobile-more){color:#39283c}
+}
+@media screen and (forced-colors:active){
+ #main:focus-visible,.page-head h1:focus-visible,#admin-work:focus-visible{outline-color:Highlight}
+}

@@ -1,4 +1,4 @@
-import {actorFor,apiFailure,ApiError,identifier,textField,dateRange} from '../../cloudflare/lib/access.mjs';
+import {actorFor,apiFailure,ApiError,identifier,textField,dateRange,writeSession} from '../../cloudflare/lib/access.mjs';
 import {reply} from '../../cloudflare/lib/auth.mjs';
 import {jsonLimited} from '../../cloudflare/lib/http.mjs';
 const exists=db=>db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='shift_handover'").first();
@@ -28,10 +28,11 @@ export async function onRequestPost({request,env}){
   const id=identifier(b.assignment_id),message=textField(b.message,1000),now=Date.now();
   // Only the actual worker can leave a note, after a verified OUT, within 24h.
   const old=await db.prepare('SELECT h.message FROM shift_handover h JOIN assignments a ON a.id=h.assignment_id WHERE h.assignment_id=? AND a.user_id=?').bind(id,actor.id).first();
-  if(old){if(old.message===message)return reply({ok:true,idempotent:true});throw new ApiError(409,'Ca đã có lời nhắn; không ghi đè nội dung bàn giao.');}
+  if(old){await actorFor(request,env);if(old.message===message)return reply({ok:true,idempotent:true});throw new ApiError(409,'Ca đã có lời nhắn; không ghi đè nội dung bàn giao.');}
+  const session=await writeSession(request,actor);
   const row=await db.prepare(`INSERT INTO shift_handover(assignment_id,message,created_at)
    SELECT a.id,?,? FROM assignments a JOIN attendances t ON t.assignment_id=a.id AND t.user_id=a.user_id AND t.type='OUT'
-   WHERE a.id=? AND a.user_id=? AND t.server_timestamp BETWEEN ? AND ? ON CONFLICT(assignment_id) DO NOTHING RETURNING assignment_id`).bind(message,now,id,actor.id,now-86400000,now).first();
+   WHERE a.id=? AND a.user_id=? AND t.server_timestamp BETWEEN ? AND ? AND ${session.sql} ON CONFLICT(assignment_id) DO NOTHING RETURNING assignment_id`).bind(message,now,id,actor.id,now-86400000,now,...session.args()).first();
   if(!row)throw new ApiError(409,'Chỉ để lại lời nhắn cho ca của bạn đã tan trong 24 giờ qua.');
   return reply({ok:true},201);
  }catch(e){return apiFailure(e)}

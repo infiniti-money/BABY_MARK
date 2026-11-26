@@ -1,0 +1,56 @@
+name: BABY MARK release preflight
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Exact stable package version, without v prefix'
+        required: true
+        type: string
+      commit:
+        description: 'Full SHA of the reviewed main commit'
+        required: true
+        type: string
+permissions:
+  contents: read
+  checks: read
+concurrency:
+  group: babymark-release-preflight
+  cancel-in-progress: false
+jobs:
+  preflight:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      EXPECTED_VERSION: ${{ inputs.version }}
+      EXPECTED_SHA: ${{ inputs.commit }}
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - name: Require reviewed main SHA
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ "$EXPECTED_SHA" =~ ^[a-f0-9]{40}$ ]]
+          [[ "$EXPECTED_VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]
+          test "$EXPECTED_SHA" = "$GITHUB_SHA"
+          test "$(gh api "repos/$GITHUB_REPOSITORY/branches/main" --jq .commit.sha)" = "$EXPECTED_SHA"
+      - uses: actions/checkout@v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v7.1.0
+        with:
+          node-version-file: '.node-version'
+      - name: Validate release version and notes
+        shell: bash
+        run: |
+          set -euo pipefail
+          node scripts/check-release-metadata.mjs "$EXPECTED_VERSION"
+          test -s "docs/releases/v$EXPECTED_VERSION.md"
+      - name: Verify exact-commit CI and Pages
+        shell: bash
+        run: |
+          set -euo pipefail
+          gh api --paginate --slurp "repos/$GITHUB_REPOSITORY/commits/$EXPECTED_SHA/check-runs?per_page=100&filter=latest" > "$RUNNER_TEMP/babymark-checks.json"
+          node scripts/check-release-gate.mjs "$RUNNER_TEMP/babymark-checks.json" "$EXPECTED_SHA"
+          test "$(gh api "repos/$GITHUB_REPOSITORY/branches/main" --jq .commit.sha)" = "$EXPECTED_SHA"
+          echo "Preflight passed for v$EXPECTED_VERSION at $EXPECTED_SHA. No tag, release or deployment created." >> "$GITHUB_STEP_SUMMARY"
