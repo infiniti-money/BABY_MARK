@@ -26,3 +26,8 @@
 /brand/*
   ! Cache-Control
   Cache-Control: public, no-cache
+
+# Only content-hashed build output. HTML, service worker and APIs stay uncached.
+/assets/immutable/*
+  ! Cache-Control
+  Cache-Control: public, max-age=31536000, immutable

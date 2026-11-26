@@ -24,14 +24,16 @@ try{
  let statement;
  const recorder={prepare(sql){if(sql.includes('SELECT a.*'))statement=sql;return db.prepare(sql);}};
  const plan=()=>sqlite.prepare('EXPLAIN QUERY PLAN '+statement).all('2026-10-01','2026-10-30').map(x=>x.detail);
- const time=async(paginate=false)=>{
-  const samples=[];for(let i=0;i<7;i++){const start=performance.now();await readAssignments(recorder,actor,url,{paginate});samples.push(performance.now()-start);}
+ const time=async(paginate=false,summaryOnly=false)=>{
+  const samples=[];for(let i=0;i<7;i++){const start=performance.now();await readAssignments(recorder,actor,url,{paginate,summaryOnly});samples.push(performance.now()-start);}
   samples.sort((a,b)=>a-b);return Number(samples[3].toFixed(2));
  };
  sqlite.exec('DROP INDEX request_report_choice;DROP INDEX assignment_report_date;');
  const beforeMs=await time(),beforePlan=plan();
  sqlite.exec(await readFile(new URL('../cloudflare/d1/0022_report_indexes.sql',import.meta.url),'utf8'));
- const afterMs=await time(),afterPlan=plan();
+ const afterMs=await time(),afterPlan=plan(),compactMs=await time(false,true);
+ const fullRows=(await readAssignments(db,actor,url)).assignments,compactRows=(await readAssignments(db,actor,url,{summaryOnly:true})).assignments;
+ const d1ResultBytes={full:Buffer.byteLength(JSON.stringify(fullRows)),compact:Buffer.byteLength(JSON.stringify(compactRows))};
  url.searchParams.set('page_size','30');const pageMs=await time(true);
  const response=async(params)=>{
   const u=new URL(url);u.search='?'+new URLSearchParams({from:'2026-10-01',to:'2026-10-30',...params});
@@ -49,5 +51,5 @@ try{
   };
   await visit('app.mjs');return {bytes:[...files.values()].reduce((a,b)=>a+b,0),files:[...files.keys()]};
  };
- console.log(JSON.stringify({environment:{node:process.version,sqlite:sqlite.prepare('SELECT sqlite_version() v').get().v,scope:'synthetic in-memory; not D1 production or physical devices'},fixture:{assignments:1200,rejectedRequests:24000},median_ms_7_runs:{full_without_optional_indexes:beforeMs,full_with_optional_indexes:afterMs,page_30_with_indexes:pageMs},response_bytes:bytes,query_plans:{before:beforePlan,after:afterPlan},startup_static_modules:{base:await staticGraph('origin/fix/pages-routing-performance'),current:await staticGraph()}},null,2));
+ console.log(JSON.stringify({environment:{node:process.version,sqlite:sqlite.prepare('SELECT sqlite_version() v').get().v,scope:'synthetic in-memory; not D1 production or physical devices'},fixture:{assignments:1200,rejectedRequests:24000},median_ms_7_runs:{full_without_optional_indexes:beforeMs,full_with_optional_indexes:afterMs,compact_with_optional_indexes:compactMs,page_30_with_indexes:pageMs},response_bytes:bytes,query_plans:{before:beforePlan,after:afterPlan},startup_static_modules:{...(process.env.PERF_BASE_REF?{base:await staticGraph(process.env.PERF_BASE_REF)}:{}),current:await staticGraph()},d1_result_bytes:d1ResultBytes},null,2));
 }finally{db.close();}

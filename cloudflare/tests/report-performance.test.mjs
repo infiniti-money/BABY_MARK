@@ -4,6 +4,7 @@ import {readFile} from 'node:fs/promises';
 import {appFixture} from './helpers/app.mjs';
 import {shiftInterval} from '../lib/access.mjs';
 import * as reports from '../../functions/api/reports.js';
+import {readAssignments,summarizeAssignment,workUnitEvidence} from '../lib/reports.mjs';
 
 async function fixture(){
  const f=await appFixture();
@@ -62,4 +63,40 @@ test('report request precedence and indexed plans hold with and without optional
   const datePlan=f.db.sqlite.prepare('EXPLAIN QUERY PLAN SELECT id FROM assignments WHERE work_date>=? AND work_date<=? ORDER BY work_date,starts_at,id LIMIT 31').all(range.from,range.to).map(r=>r.detail).join('\n');
   assert.match(datePlan,/SEARCH assignments USING (?:COVERING )?INDEX assignment_report_date/);assert.doesNotMatch(datePlan,/TEMP B-TREE/);
  }finally{f.close();}
+});
+
+test('compact summary preserves reviewed full-day evidence, corrections, leave and extras; excludes private detail columns',async()=>{
+ const f=await fixture();try{
+  const db=f.db,staff=f.ids.staff,admin=f.ids.admin,now=Date.now();
+  const change=db.sqlite.prepare("UPDATE assignments SET shift_id='BM-ALLDAY' WHERE id=?");
+  db.sqlite.prepare("INSERT INTO shifts(id,name,start_time,end_time,grace_period) VALUES('BM-ALLDAY','Ca cả ngày','07:00','21:30',5)").run();
+  change.run('page-staff-1');
+  async function attendance(id,kind,offset,status='ON_TIME'){
+   const a=await db.prepare('SELECT * FROM assignments WHERE id=?').bind(id).first(),key=crypto.randomUUID();
+   await db.prepare("INSERT INTO attendances(id,assignment_id,user_id,type,server_timestamp,gps_lat,gps_lng,accuracy_m,distance_m,photo_path,status) VALUES(?,?,?,?,?,20,106,5,0,?,?)").bind(key,id,a.user_id,kind,a.starts_at+offset,'timemark/'+key+'.jpg',status).run();
+  }
+  await attendance('page-staff-1','IN',0);await attendance('page-staff-1','OUT',300000);
+  const url=new URL('https://test.invalid/?'+new URLSearchParams(range)),actor={id:admin,role:'admin'};
+  const first=(await readAssignments(db,actor,url)).assignments.find(x=>x.id==='page-staff-1');
+  assert.equal(summarizeAssignment(first,now).work_unit_review,true);
+  await db.prepare("INSERT INTO work_unit_reviews(assignment_id,evidence,units,reason,reviewed_by,reviewed_at) VALUES(?,?,0.5,'Đã đối soát',?,?)").bind(first.id,workUnitEvidence(first),admin,now).run();
+  const a=await db.prepare('SELECT * FROM assignments WHERE id=?').bind('page-staff-2').first();
+  await db.prepare("INSERT INTO workforce_requests(id,assignment_id,user_id,kind,reason,proposed_in,proposed_out,state,created_at,decided_by,decided_at) VALUES('correct',?,?,'CORRECTION','Đã đối soát',?,?,'APPROVED',?,?,?)").bind(a.id,staff,a.starts_at,a.ends_at+3600000,now-1,admin,now).run();
+  await db.prepare("INSERT INTO workforce_requests(id,assignment_id,user_id,kind,reason,state,created_at,decided_by,decided_at) VALUES('leave','page-staff-3',?,'LEAVE','Đã duyệt phép','APPROVED',?,?,?)").bind(staff,now-1,admin,now).run();
+  await attendance('page-staff-4','IN',0,'OUTSIDE');await attendance('page-staff-4','OUT',3600000);
+  await db.prepare("INSERT INTO extra_attendance(assignment_id,kind,reason,created_at) VALUES('page-staff-5','EXTRA','Chờ duyệt ca',?)").bind(now).run();
+  const full=(await readAssignments(db,actor,url)).assignments,compact=(await readAssignments(db,actor,url,{summaryOnly:true})).assignments;
+  assert.deepEqual(compact.map(x=>x.id),full.map(x=>x.id));
+  assert.deepEqual(compact.map(x=>summarizeAssignment(x,now)),full.map(x=>summarizeAssignment(x,now)));
+  assert.equal(summarizeAssignment(compact.find(x=>x.id===first.id),now).work_units,0.5);
+  for(const row of compact)for(const key of ['full_name','department','address_text','latitude','longitude','in_accuracy_m','out_distance_m','extra_reason','replaced_name','decided_by'])assert.equal(Object.hasOwn(row,key),false,key);
+  const fullBytes=Buffer.byteLength(JSON.stringify(full)),compactBytes=Buffer.byteLength(JSON.stringify(compact));
+  console.log('P3 compact D1 result JSON bytes: '+compactBytes+' / '+fullBytes);
+  assert.ok(compactBytes<fullBytes*0.8);
+  for(const who of ['admin','manager','staff'])for(const filters of [{},{branch_id:'BM-001'},{user_id:staff}]){
+   const all=await (await get(f,who,filters)).json(),summary=await (await get(f,who,{...filters,view:'summary'})).json();
+   assert.deepEqual(summary.summary,all.summary);assert.deepEqual(summary.branches,all.branches);assert.equal(summary.rows,undefined);
+  }
+  assert.equal((await get(f,'staff',{view:'summary',format:'csv'})).headers.get('Content-Type'),'text/csv; charset=utf-8');
+ }finally{f.close()}
 });
