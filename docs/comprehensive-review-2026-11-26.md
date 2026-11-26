@@ -26,3 +26,9 @@ Evidence: code and tests on pinned baseline, GitHub Actions checks. Production h
 - Add visible keyboard focus styles (including forced colors), baseline JS/CSS byte budgets and development dependency audit (report-only pending advisory review). Cancel superseded PR Verify runs, not main runs.
 - Fix old CI expectations for migration 0023 and versioned diagnostic heading. Preview build failure reason not available; verify new build before merging.
 - These are partial P1–P4 safeguards, not complete leave-policy/shift-swap implementation, device acceptance, D1 optimization or dependency upgrades. No automatic changes to company payroll/leave policies, live schema or data.
+
+## Preview build compatibility follow-up
+- PR head 22e6682 passed 162 backend, 47 browser and 30 mobile tests, including Wrangler 4.168.0 compilation and dependency audits, but Pages reported build failure without detailed logs available through GitHub.
+- Pin Node 22.23.5 (the verified CI runtime) in .node-version and use it in GitHub Actions. Pages supports this file; confirm dashboard Preview/Production NODE_VERSION overrides do not conflict. See https://developers.cloudflare.com/pages/configuration/build-image/.
+- Avoid JSON import attributes in the Pages Functions graph by using a plain version module. Release preparation must update cloudflare/lib/app-version.mjs with package.json and package-lock.json. A regression test verifies all four values and the diagnostic endpoint.
+- These are compatibility mitigations, not a verified root cause. If the new deployment fails, obtain the first error and runtime/build command from the exact Cloudflare Preview log; do not change production bindings, secrets or migrations to guess at the issue.

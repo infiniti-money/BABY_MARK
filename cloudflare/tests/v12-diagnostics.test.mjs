@@ -44,3 +44,13 @@ test('0022 indexes are optional, 0023 integrity triggers are required and diagno
   assert.equal(h.schema_target,'0023');assert.equal(h.schema_ready,false);
  }finally{f.close()}
 });
+
+// Release metadata must be updated atomically with the package and lockfile.
+test('diagnostics version matches package and lockfile without JSON import attributes',async()=>{
+ const {readFile}=await import('node:fs/promises');
+ const {appVersion}=await import('../lib/app-version.mjs');
+ const pkg=JSON.parse(await readFile(new URL('../../package.json',import.meta.url),'utf8'));
+ const lock=JSON.parse(await readFile(new URL('../../package-lock.json',import.meta.url),'utf8'));
+ assert.equal(appVersion,pkg.version);assert.equal(appVersion,lock.version);assert.equal(appVersion,lock.packages[''].version);
+ const f=await appFixture();try{const response=await f.call(diagnostic,'admin',{method:'GET'});assert.equal(response.status,200);assert.equal((await response.json()).version,appVersion);}finally{f.close()}
+});

@@ -1,4 +1,4 @@
-import pkg from '../../../package.json' with {type:'json'};
+import {appVersion} from '../../../cloudflare/lib/app-version.mjs';
 import {actorFor,apiFailure} from '../../../cloudflare/lib/access.mjs';
 import {reply} from '../../../cloudflare/lib/auth.mjs';
 import {schemaReadiness} from '../../../cloudflare/lib/schema-readiness.mjs';
@@ -53,6 +53,6 @@ export async function onRequestGet({request,env}){
    return {queue_ready:queueReady,queue,queue_count_cap:101,oldest_pending_deadline:oldest?.expires_at??null,schema_ready:s.available,enabled:s.enabled,vapid_ready:v.ready,cron_secret_ready:cron,recent_receipts:recent.length,failed,uncertain,receipt_sample_limit:100,last_receipt_at:receipts[0]?.claimed_at??null};
   });
   const retention=await check('RETENTION_UNAVAILABLE',async()=>{const p=await policy(env);return {attendance_enabled:p.attendance_retention,photo_eviction_enabled:p.photo_eviction}});
-  return reply({version:pkg.version,generated_at:now,diagnostic_ms:Math.round(performance.now()-started),probes,schema,kv_read_ready:kv===true,recovery,roster,push,retention,issues,backup:{status:'manual_verification_required',restore_mode:'isolated_environment_only',offline_tool:'npm run backup:local',kv_included:false}});
+  return reply({version:appVersion,generated_at:now,diagnostic_ms:Math.round(performance.now()-started),probes,schema,kv_read_ready:kv===true,recovery,roster,push,retention,issues,backup:{status:'manual_verification_required',restore_mode:'isolated_environment_only',offline_tool:'npm run backup:local',kv_included:false}});
  }catch(e){return apiFailure(e)}
 }
