@@ -1,0 +1,22 @@
+name: BABY MARK public production probe
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: babymark-public-production-probe
+  cancel-in-progress: false
+jobs:
+  probe:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v7.1.0
+        with:
+          node-version-file: '.node-version'
+      - name: Anonymous bounded public GETs only
+        run: node scripts/production-probe.mjs
