@@ -1,5 +1,5 @@
 import {reply,bodyJSON,digest} from '../../cloudflare/lib/auth.mjs';
-import {actorFor,ApiError,apiFailure,assignmentScope,dateRange,identifier,textField,invalid,managementAudit,validDay,dayVN} from '../../cloudflare/lib/access.mjs';
+import {actorFor,ApiError,apiFailure,assignmentScope,dateRange,identifier,textField,invalid,writeSession,validDay,dayVN} from '../../cloudflare/lib/access.mjs';
 
 export async function onRequestGet({request,env}){
  try{
@@ -43,9 +43,14 @@ export async function onRequestPost({request,env}){
    if(!validDay(from)||!validDay(to)||from<dayVN(now)||to<from||Date.parse(to)-Date.parse(from)>30*86400000||reason.length<5)invalid('Chọn từ hôm nay, tối đa 31 ngày và lý do tối thiểu 5 ký tự');
    const rows=(await db.prepare("SELECT a.id,a.work_date FROM assignments a WHERE a.user_id=? AND a.work_date BETWEEN ? AND ? AND a.starts_at>? AND NOT EXISTS(SELECT 1 FROM attendances t WHERE t.assignment_id=a.id) AND NOT EXISTS(SELECT 1 FROM workforce_requests w WHERE w.assignment_id=a.id AND w.state IN ('PENDING','APPROVED')) ORDER BY a.work_date,a.starts_at LIMIT 63").bind(actor.id,from,to,now).all()).results;
    if(!rows.length||rows.length>62)invalid('Không có ca tương lai đủ điều kiện hoặc quá nhiều ca');
-   const payload=rows.map(a=>({id:crypto.randomUUID(),assignment_id:a.id}));
-   const result=await db.batch([db.prepare("INSERT INTO workforce_requests(id,assignment_id,user_id,kind,reason,state,created_at) SELECT json_extract(j.value,'$.id'),a.id,?,'LEAVE',?,'PENDING',? FROM json_each(?) j JOIN assignments a ON a.id=json_extract(j.value,'$.assignment_id') WHERE a.user_id=? AND a.starts_at>? AND NOT EXISTS(SELECT 1 FROM attendances t WHERE t.assignment_id=a.id) AND NOT EXISTS(SELECT 1 FROM workforce_requests w WHERE w.assignment_id=a.id AND w.state IN ('PENDING','APPROVED')) RETURNING id").bind(actor.id,reason,now,JSON.stringify(payload),actor.id,now),managementAudit(db,actor,'workforce',actor.id,'LEAVE_RANGE',{from,to,requested:rows.length})]);
-   return reply({created:result[0].results.length},201);
+   const payload=rows.map(a=>({id:crypto.randomUUID(),assignment_id:a.id})),session=await writeSession(request,actor);
+   const result=await db.batch([
+    db.prepare("INSERT INTO workforce_requests(id,assignment_id,user_id,kind,reason,state,created_at) SELECT json_extract(j.value,'$.id'),a.id,?,'LEAVE',?,'PENDING',? FROM json_each(?) j JOIN assignments a ON a.id=json_extract(j.value,'$.assignment_id') WHERE a.user_id=? AND a.work_date BETWEEN ? AND ? AND a.starts_at>? AND NOT EXISTS(SELECT 1 FROM attendances t WHERE t.assignment_id=a.id) AND NOT EXISTS(SELECT 1 FROM workforce_requests w WHERE w.assignment_id=a.id AND w.state IN ('PENDING','APPROVED')) AND "+session.sql+" RETURNING id").bind(actor.id,reason,now,JSON.stringify(payload),actor.id,from,to,Date.now(),...session.args()),
+    db.prepare("INSERT INTO management_audit(id,actor_id,resource,resource_id,action,details_json,created_at) SELECT ?,?,'workforce',?,'LEAVE_RANGE',json_set(?,'$.created',changes()),? WHERE changes()>0").bind(crypto.randomUUID(),actor.id,actor.id,JSON.stringify({from,to,requested:rows.length}),Date.now())
+   ]);
+   const created=result[0].results?.length||0;
+   if(!created)throw new ApiError(409,'Phiên hoặc lịch ca đã thay đổi; tải lại trước khi gửi đơn');
+   return reply({created},201);
   }
   if(b.action!=null)invalid('Thao tác không hợp lệ');
   const assignment=identifier(b.assignment_id),kind=b.kind,reason=textField(b.reason,1000);
@@ -57,7 +62,13 @@ export async function onRequestPost({request,env}){
    entry=b.proposed_in;exit=b.proposed_out;
    if(!Number.isSafeInteger(entry)||!Number.isSafeInteger(exit)||entry<row.starts_at-2*3600000||exit>row.ends_at+6*3600000||exit<=entry||exit>now)invalid('Giờ điều chỉnh phải nằm trong khoảng ca cho phép và không ở tương lai');
   }else if(await db.prepare('SELECT id FROM attendances WHERE assignment_id=? LIMIT 1').bind(assignment).first())throw new ApiError(409,'Ca đã có chấm công, không thể xin nghỉ');
-  await db.batch([db.prepare("INSERT INTO workforce_requests(id,assignment_id,user_id,kind,reason,proposed_in,proposed_out,state,created_at) VALUES(?,?,?,?,?,?,?,'PENDING',?)").bind(id,assignment,actor.id,kind,reason,entry,exit,now),managementAudit(db,actor,'workforce',id,'SUBMIT',{assignment_id:assignment,kind,reason,proposed_in:entry,proposed_out:exit})]);
+  const session=await writeSession(request,actor);
+  const eligibility=kind==='LEAVE'?" AND NOT EXISTS(SELECT 1 FROM attendances t WHERE t.assignment_id=a.id)":" AND a.starts_at=? AND a.ends_at=?";
+  const result=await db.batch([
+   db.prepare("INSERT INTO workforce_requests(id,assignment_id,user_id,kind,reason,proposed_in,proposed_out,state,created_at) SELECT ?,a.id,a.user_id,?,?,?,?,'PENDING',? FROM assignments a WHERE a.id=? AND a.user_id=? AND "+session.sql+eligibility+" AND NOT EXISTS(SELECT 1 FROM workforce_requests w WHERE w.assignment_id=a.id AND w.state IN ('PENDING','APPROVED')) RETURNING id").bind(id,kind,reason,entry,exit,now,assignment,actor.id,...session.args(),...(kind==='CORRECTION'?[row.starts_at,row.ends_at]:[])),
+   db.prepare("INSERT INTO management_audit(id,actor_id,resource,resource_id,action,details_json,created_at) SELECT ?,?,'workforce',?,'SUBMIT',?,? WHERE changes()=1").bind(crypto.randomUUID(),actor.id,id,JSON.stringify({assignment_id:assignment,kind,reason,proposed_in:entry,proposed_out:exit}),Date.now())
+  ]);
+  if(result[0].results?.length!==1)throw new ApiError(409,'Phiên hoặc lịch ca đã thay đổi; tải lại trước khi gửi đơn');
   return reply({id,state:'PENDING'},201);
  }catch(error){return apiFailure(error)}
 }

@@ -1,4 +1,4 @@
-import {actorFor,apiFailure,ApiError,identifier,invalid,textField,dayVN,shiftInterval,assignmentScope,dateRange,managementAudit} from '../../cloudflare/lib/access.mjs';
+import {actorFor,apiFailure,ApiError,identifier,invalid,textField,dayVN,shiftInterval,assignmentScope,dateRange,writeSession} from '../../cloudflare/lib/access.mjs';
 import {reply,digest} from '../../cloudflare/lib/auth.mjs';
 import {jsonLimited} from '../../cloudflare/lib/http.mjs';
 async function available(db){return !!await db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='extra_attendance'").first();}
@@ -41,8 +41,13 @@ export async function onRequestPost({request,env}){
    const id=crypto.randomUUID();
    const rate=await db.prepare('SELECT COUNT(*) AS n FROM extra_attendance x JOIN assignments a ON a.id=x.assignment_id WHERE a.user_id=? AND x.created_at>?').bind(actor.id,now-86400000).first();
    if(rate.n>=6)throw new ApiError(429,'Đã tạo quá nhiều ca bổ sung trong 24 giờ');
-   await db.batch([db.prepare('INSERT INTO assignments(id,user_id,branch_id,shift_id,work_date,starts_at,ends_at,grace_minutes) VALUES(?,?,?,?,?,?,?,?)').bind(id,actor.id,branch,shiftId,date,interval.starts_at,interval.ends_at,shift.grace_period),
-    db.prepare('INSERT INTO extra_attendance(assignment_id,kind,replaced_name,reason,created_at) VALUES(?,?,?,?,?)').bind(id,kind,name,reason,now)]);
+   const session=await writeSession(request,actor),at=Date.now();
+   const branchGuard=actor.role==='manager'?' AND EXISTS(SELECT 1 FROM branch_managers bm WHERE bm.user_id=? AND bm.branch_id=b.id)':'';
+   const result=await db.batch([
+    db.prepare("INSERT INTO assignments(id,user_id,branch_id,shift_id,work_date,starts_at,ends_at,grace_minutes) SELECT ?,?,b.id,s.id,?,?,?,s.grace_period FROM branches b JOIN shifts s ON s.id=? WHERE b.id=? AND b.active=1 AND b.latitude IS NOT NULL AND b.longitude IS NOT NULL AND s.start_time=? AND s.end_time=? AND s.grace_period=? AND "+session.sql+branchGuard+" AND ? >= ?-14400000 AND ? < ? AND (SELECT COUNT(*) FROM extra_attendance x JOIN assignments a ON a.id=x.assignment_id WHERE a.user_id=? AND x.created_at>?)<6 RETURNING id").bind(id,actor.id,date,interval.starts_at,interval.ends_at,shiftId,branch,shift.start_time,shift.end_time,shift.grace_period,...session.args(),...(actor.role==='manager'?[actor.id]:[]),at,interval.starts_at,at,interval.ends_at,actor.id,at-86400000),
+    db.prepare("INSERT INTO extra_attendance(assignment_id,kind,replaced_name,reason,created_at) SELECT id,?,?,?,? FROM assignments WHERE id=? AND user_id=? RETURNING assignment_id").bind(kind,name,reason,now,id,actor.id)
+   ]);
+   if(result[0].results?.length!==1||result[1].results?.length!==1)throw new ApiError(409,'Phiên, quyền cửa hàng hoặc mẫu ca đã thay đổi; tải lại');
    return reply({assignment_id:id,state:'PENDING'},201);
   }
   if(b?.action==='decide'){
