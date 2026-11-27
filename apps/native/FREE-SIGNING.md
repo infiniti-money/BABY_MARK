@@ -7,7 +7,7 @@ keytool -genkeypair -v -keystore babymark-release.p12 -storetype PKCS12 -alias b
 Keytool hỏi mật khẩu và thông tin chứng chỉ; không đưa mật khẩu vào lệnh. Sao lưu khóa và mật khẩu riêng biệt, giữ bản sao mã hóa. Cùng applicationId và khóa ký cho các lần cập nhật; versionCode phải tăng. Debug APK đã ký bằng khóa khác có thể phải gỡ trước khi cài, sẽ mất dữ liệu/phiên lưu trên máy.
 Từ Git Bash (Windows) hoặc Bash trên macOS/Linux tại thư mục repo, sau khi cài SDK/JDK/Gradle:
 ```sh
-bash apps/native/sign-android.sh "/path/outside/repo/babymark-release.p12" babymark "/path/outside/repo/BABY-MARK-v1.2.4.apk"
+bash apps/native/sign-android.sh "/path/outside/repo/babymark-release.p12" babymark "/path/outside/repo/BABY-MARK-v1.2.5.apk"
 ```
 Lệnh build release không ký, căn chỉnh ZIP, ký với keystore qua prompt, xác minh chữ ký và chỉ tạo output mới. Không lưu password trong Gradle, env hay CI. Hoặc dùng Android Studio Generate Signed Bundle/APK. Không phát hành APK debug cho nhân viên. Kiểm thử trên thiết bị vật lý trước phân phối. Android developer verification/installation policies may apply depending on device/region; a self-signed APK is not a guarantee of unrestricted distribution.
 ## iOS: Personal Team
