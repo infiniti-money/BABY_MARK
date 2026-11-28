@@ -1,7 +1,12 @@
 // Require exact SHA and trusted check providers. No GitHub write access.
 import {readFile} from 'node:fs/promises';
 import {pathToFileURL} from 'node:url';
-export const requiredChecks=[['cloudflare','github-actions'],['Cloudflare Pages','cloudflare-workers-and-pages']];
+export const requiredChecks=[
+ ['cloudflare','github-actions'],
+ ['Cloudflare Pages','cloudflare-workers-and-pages'],
+ ['android','github-actions'],
+ ['ios','github-actions']
+];
 export function evaluateChecks(pages,sha){
  if(!/^[a-f0-9]{40}$/.test(sha))throw Error('Expected a full commit SHA');
  if(!Array.isArray(pages)||!pages.length||pages.some(p=>!Array.isArray(p.check_runs)))throw Error('Invalid check-run response');
